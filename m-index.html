@@ -3117,7 +3117,7 @@
         // 从支付服务器获取结算数据
         async function fetchSettlementData() {
             try {
-                const response = await fetch(`http://localhost:3002/api/settlement/store/${STORE_ID}`);
+                const response = await fetch(`http://localhost:3000/api/settlement/store/${STORE_ID}`);
                 const result = await response.json();
                 
                 if (result.success && result.data) {
@@ -3165,7 +3165,7 @@
             
             if (confirmed) {
                 try {
-                    const response = await fetch(`http://localhost:3002/api/settlement/store/${STORE_ID}/settle`, {
+                    const response = await fetch(`http://localhost:3000/api/settlement/store/${STORE_ID}/settle`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ settlementCycle: 7 })
@@ -3220,7 +3220,7 @@
             
             if (confirmed) {
                 try {
-                    const response = await fetch(`http://localhost:3002/api/settlement/store/${STORE_ID}/withdraw`, {
+                    const response = await fetch(`http://localhost:3000/api/settlement/store/${STORE_ID}/withdraw`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
@@ -6359,7 +6359,7 @@ ${(order.items || order.services || []).map((item, idx) => `${idx + 1}. ${item.n
             
             try {
                 // 1. 调用后端API创建真实订单 - 使用正确的端口3002
-                const apiResponse = await fetch('http://localhost:3002/api/cleaning/orders', {
+                const apiResponse = await fetch('http://localhost:3000/api/cleaning/orders', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -6493,7 +6493,7 @@ ${(order.items || order.services || []).map((item, idx) => `${idx + 1}. ${item.n
             let memberCardId = order.customerPhone || '';
             
             try {
-                const response = await fetch('http://localhost:3002/api/member-card/query', {
+                const response = await fetch('http://localhost:3000/api/member-card/query', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ phone: order.customerPhone })
@@ -7048,7 +7048,7 @@ ${(order.items || order.services || []).map((item, idx) => `${idx + 1}. ${item.n
                         const cardId = memberCardId || customerPhone;
                         
                         try {
-                            result = await fetch('http://localhost:3002/api/member-card/deduct', {
+                            result = await fetch('http://localhost:3000/api/member-card/deduct', {
                                 method: 'POST',
                                 headers: { 'Content-Type': 'application/json' },
                                 body: JSON.stringify({ 
