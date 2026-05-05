@@ -548,7 +548,7 @@
                                     ${order.store?.specialty ? `<div class="text-xs text-blue-500">${order.store.specialty}</div>` : ''}
                                     ${order.store?.address ? `<div class="text-xs text-gray-400">📍 ${order.store.address}</div>` : ''}
                                     ${order.store?.location?.coordinates ? `
-                                        <button onclick="showStoreMap('${order.storeId}', '${order.store?.name || order.storeName}', '${order.store?.address || order.storeAddress}', ${order.store.location.coordinates.split(' ')[0]}, ${order.store.location.coordinates.split(' ')[1]})" 
+                                        <button onclick="showStoreMap('${order.storeId}', '${order.store?.name || order.storeName}', '${order.store?.address || order.storeAddress}', ${Array.isArray(order.store.location.coordinates) ? order.store.location.coordinates[0] : order.store.location.coordinates.split(' ')[0]}, ${Array.isArray(order.store.location.coordinates) ? order.store.location.coordinates[1] : order.store.location.coordinates.split(' ')[1]})" 
                                                 class="mt-1 px-2 py-1 bg-blue-500 text-white text-xs rounded hover:bg-blue-600">
                                             🗺️ 查看地图
                                         </button>

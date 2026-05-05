@@ -172,9 +172,24 @@ const OrderSyncManager = {
             customerName: serverOrder.customerName || serverOrder.contact?.name || '客户',
             customerPhone: serverOrder.customerPhone || serverOrder.contact?.phone || '',
             items: serverOrder.items || [],
-            store: serverOrder.store || { name: '系统分配' },
+            store: serverOrder.store ? {
+                id: serverOrder.storeId,
+                name: serverOrder.store.name || serverOrder.storeName || '服务网点',
+                address: serverOrder.store.address || serverOrder.storeAddress || '',
+                phone: serverOrder.store.phone || '',
+                city: serverOrder.store.city || '',
+                district: serverOrder.store.district || '',
+                location: serverOrder.store.location || null,
+                specialty: serverOrder.store.specialty || ''
+            } : {
+                id: serverOrder.storeId,
+                name: serverOrder.storeName || '服务网点',
+                address: serverOrder.storeAddress || '',
+                location: null
+            },
             storeId: serverOrder.storeId,
-            storeName: serverOrder.store?.name || '系统分配',
+            storeName: serverOrder.store?.name || serverOrder.storeName || '',
+            storeAddress: serverOrder.store?.address || serverOrder.storeAddress || '',
             total: serverOrder.total || serverOrder.amount || 0,
             status: this.normalizeStatus(serverOrder.status),
             paymentStatus: serverOrder.paymentStatus || serverOrder.payStatus || 'pending',
