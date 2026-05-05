@@ -2765,6 +2765,15 @@
             // 加载用户订单
             loadStoreOrders();
             
+            // 启动数据同步管理器（M端使用store_orders）
+            OrderSyncManager.start();
+            
+            // 监听同步完成事件
+            window.addEventListener('ordersSynced', (e) => {
+                console.log('M端订单已同步，刷新列表...');
+                loadStoreOrders();
+            });
+            
             // 初始化客服中心
             initCustomerService();
             

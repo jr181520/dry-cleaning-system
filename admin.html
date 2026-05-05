@@ -3356,6 +3356,16 @@
             // 每10秒刷新终端数据
             setInterval(loadAllTerminals, 10000);
             
+            // 启动数据同步管理器（管理员端同步所有订单）
+            OrderSyncManager.start();
+            
+            // 监听同步完成事件
+            window.addEventListener('ordersSynced', (e) => {
+                console.log('管理员端订单已同步，刷新数据...');
+                renderPickupOrdersList();
+                loadFundManagementData();
+            });
+            
             console.log('所有初始化完成');
         });
         

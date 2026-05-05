@@ -134,8 +134,14 @@ const OrderSyncManager = {
         if (!serverOrders || !Array.isArray(serverOrders)) return;
         
         // 确定使用哪个本地存储键
-        const storageKey = window.location.pathname.includes('m-index') ? 
-            'store_orders' : 'orders';
+        let storageKey;
+        if (window.location.pathname.includes('m-index')) {
+            storageKey = 'store_orders';
+        } else if (window.location.pathname.includes('admin')) {
+            storageKey = 'all_orders';
+        } else {
+            storageKey = 'orders';
+        }
         
         const localOrders = JSON.parse(localStorage.getItem(storageKey) || '[]');
         const localOrderIds = new Set(localOrders.map(o => o.orderId || o._id));
@@ -143,7 +149,7 @@ const OrderSyncManager = {
         // 添加服务器订单中本地没有的
         let addedCount = 0;
         serverOrders.forEach(serverOrder => {
-            const orderId = serverOrder.orderId || serverOrder._id;
+            const orderId = serverOrder.orderNo || serverOrder._id;
             if (!localOrderIds.has(orderId)) {
                 // 转换为前端格式
                 const formattedOrder = this.formatOrderFromServer(serverOrder);
