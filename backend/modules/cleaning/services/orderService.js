@@ -9,6 +9,26 @@ const paymentService = require('../../common/services/paymentService');
 const notificationService = require('../../common/services/notificationService');
 const db = require('../../../config');
 
+// 导入门店 Schema 并获取 Store 模型
+const storeSchema = new mongoose.Schema({
+  storeNo: { type: String, unique: true, index: true },
+  name: { type: String, required: true },
+  address: { type: String, required: true },
+  city: String,
+  district: String,
+  location: {
+    type: { type: String, enum: ['Point'], default: 'Point' },
+    coordinates: { type: [Number], default: [0, 0] }
+  },
+  phone: { type: String, required: true },
+  businessHours: {
+    open: { type: String, default: '09:00' },
+    close: { type: String, default: '21:00' },
+    holidays: [String]
+  }
+});
+const Store = mongoose.models.Store || mongoose.model('Store', storeSchema);
+
 // 订单 Schema
 const orderSchema = new mongoose.Schema({
   orderNo: { type: String, unique: true, index: true },
