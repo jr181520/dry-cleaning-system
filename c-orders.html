@@ -8,6 +8,11 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Font Awesome -->
     <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+    <!-- Leaflet Maps -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <!-- 数据同步模块 -->
+    <script src="js/order-sync.js"></script>
     
     <script>
         tailwind.config = {
@@ -310,6 +315,15 @@
             
             loadOrders();
             
+            // 启动数据同步管理器
+            OrderSyncManager.start();
+            
+            // 监听同步完成事件
+            window.addEventListener('ordersSynced', (e) => {
+                console.log('订单已同步，刷新列表...');
+                loadOrders();
+            });
+            
             // 使用事件委托绑定取件按钮事件
             const ordersList = document.getElementById('orders-list');
             if (ordersList) {
@@ -364,7 +378,7 @@
                 
                 if (result.success && result.data) {
                     const serverOrders = result.data.list || [];
-                    return serverOrders.map(serverOrder => ({
+                    const mappedOrders = serverOrders.map(serverOrder => ({
                         orderId: serverOrder.orderNo,
                         id: serverOrder._id,
                         _id: serverOrder._id,
@@ -375,8 +389,24 @@
                             icon: '📦',
                             price: item.price
                         })) : [],
-                        store: { id: serverOrder.storeId, name: '服务网点' },
+                        store: serverOrder.store ? {
+                            id: serverOrder.storeId,
+                            name: serverOrder.store.name || serverOrder.storeName || '服务网点',
+                            address: serverOrder.store.address || serverOrder.storeAddress || '',
+                            phone: serverOrder.store.phone || '',
+                            city: serverOrder.store.city || '',
+                            district: serverOrder.store.district || '',
+                            location: serverOrder.store.location || null,
+                            specialty: serverOrder.store.specialty || ''
+                        } : {
+                            id: serverOrder.storeId,
+                            name: serverOrder.storeName || '服务网点',
+                            address: serverOrder.storeAddress || '',
+                            location: null
+                        },
                         storeId: serverOrder.storeId,
+                        storeName: serverOrder.storeName || serverOrder.store?.name || '',
+                        storeAddress: serverOrder.storeAddress || serverOrder.store?.address || '',
                         status: serverOrder.status,
                         deliveryStatus: serverOrder.status,
                         fees: {
@@ -393,6 +423,12 @@
                             address: serverOrder.delivery.address
                         } : {}
                     }));
+                    
+                    // 同步到localStorage备份（用于本地文件打开时使用）
+                    localStorage.setItem('orders_backup', JSON.stringify(mappedOrders));
+                    localStorage.setItem('orders_backup_time', new Date().toISOString());
+                    
+                    return mappedOrders;
                 }
                 return [];
             } catch (error) {
@@ -411,6 +447,22 @@
             
             // 尝试从API加载订单
             let apiOrders = await loadOrdersFromAPI();
+            
+            // 如果API失败，使用localStorage备份数据
+            if (!apiOrders || apiOrders.length === 0) {
+                const backupOrders = JSON.parse(localStorage.getItem('orders_backup') || '[]');
+                if (backupOrders.length > 0) {
+                    console.log('API获取失败，使用localStorage备份数据，共', backupOrders.length, '条订单');
+                    apiOrders = backupOrders;
+                    
+                    // 显示提示
+                    const backupTime = localStorage.getItem('orders_backup_time');
+                    if (backupTime) {
+                        const backupDate = new Date(backupTime).toLocaleString();
+                        console.log('数据备份时间:', backupDate);
+                    }
+                }
+            }
             
             // 合并订单：API订单 + 本地订单（去重，优先使用本地更新的订单）
             let orders = [];
@@ -495,6 +547,12 @@
                                     <div class="text-sm text-gray-800 font-medium">${order.store?.name || order.storeName || '系统分配'}</div>
                                     ${order.store?.specialty ? `<div class="text-xs text-blue-500">${order.store.specialty}</div>` : ''}
                                     ${order.store?.address ? `<div class="text-xs text-gray-400">📍 ${order.store.address}</div>` : ''}
+                                    ${order.store?.location?.coordinates ? `
+                                        <button onclick="showStoreMap('${order.storeId}', '${order.store?.name || order.storeName}', '${order.store?.address || order.storeAddress}', ${order.store.location.coordinates.split(' ')[0]}, ${order.store.location.coordinates.split(' ')[1]})" 
+                                                class="mt-1 px-2 py-1 bg-blue-500 text-white text-xs rounded hover:bg-blue-600">
+                                            🗺️ 查看地图
+                                        </button>
+                                    ` : ''}
                                 </div>
                             </div>
                             ${order.status === 'ready' ? `
@@ -1099,6 +1157,65 @@
                 toast.style.transform = 'translateX(-50%) translateY(-20px)';
                 setTimeout(() => toast.remove(), 300);
             }, 2500);
+        }
+
+        // 显示门店地图
+        let storeMap = null;
+        function showStoreMap(storeId, storeName, address, lng, lat) {
+            // 创建模态框
+            const modal = document.createElement('div');
+            modal.id = 'storeMapModal';
+            modal.className = 'fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4';
+            modal.onclick = function(e) {
+                if (e.target === modal) closeStoreMap();
+            };
+            
+            modal.innerHTML = `
+                <div class="bg-white rounded-lg shadow-2xl w-full max-w-2xl">
+                    <div class="p-4 border-b border-gray-200 flex items-center justify-between">
+                        <div>
+                            <h3 class="text-lg font-bold text-gray-800">🏪 ${storeName}</h3>
+                            <p class="text-sm text-gray-500 mt-1">📍 ${address}</p>
+                        </div>
+                        <button onclick="closeStoreMap()" class="text-gray-500 hover:text-gray-700 text-2xl">&times;</button>
+                    </div>
+                    <div id="storeMapContainer" class="w-full h-80 bg-gray-100"></div>
+                    <div class="p-4 bg-gray-50 rounded-b-lg">
+                        <p class="text-sm text-gray-600 text-center">
+                            📍 地址: ${address}<br>
+                            🗺️ 坐标: ${lng}, ${lat}
+                        </p>
+                    </div>
+                </div>
+            `;
+            
+            document.body.appendChild(modal);
+            
+            // 初始化地图
+            setTimeout(() => {
+                if (storeMap) {
+                    storeMap.remove();
+                }
+                storeMap = L.map('storeMapContainer').setView([lat, lng], 16);
+                
+                // 添加地图图层
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+                }).addTo(storeMap);
+                
+                // 添加标记
+                const marker = L.marker([lat, lng]).addTo(storeMap);
+                marker.bindPopup(`<b>${storeName}</b><br>${address}`).openPopup();
+            }, 100);
+        }
+        
+        function closeStoreMap() {
+            const modal = document.getElementById('storeMapModal');
+            if (modal) modal.remove();
+            if (storeMap) {
+                storeMap.remove();
+                storeMap = null;
+            }
         }
     </script>
 </body>
