@@ -251,14 +251,18 @@ class OrderService {
       const store = storeMap[order.storeId];
       return {
         ...order,
-        storeInfo: store ? {
+        store: store ? {
           id: store._id,
           name: store.name,
           address: store.address,
           phone: store.phone,
           city: store.city,
-          district: store.district
-        } : null
+          district: store.district,
+          location: store.location,
+          businessHours: store.businessHours
+        } : null,
+        storeName: store ? store.name : '系统分配',
+        storeAddress: store ? store.address : ''
       };
     });
 
@@ -292,6 +296,30 @@ class OrderService {
     if ((auth.roles?.includes('store_staff') || auth.roles?.includes('store_owner')) 
         && order.storeId !== auth.storeId) {
       throw new Error('无权查看此订单');
+    }
+    
+    // 填充门店信息
+    if (order.storeId) {
+      try {
+        const store = await Store.findById(order.storeId).lean();
+        if (store) {
+          order.store = {
+            id: store._id,
+            name: store.name,
+            address: store.address,
+            phone: store.phone,
+            city: store.city,
+            district: store.district,
+            location: store.location,
+            businessHours: store.businessHours
+          };
+          order.storeName = store.name;
+          order.storeAddress = store.address;
+        }
+      } catch (e) {
+        // 门店查询失败不影响订单返回
+        console.warn('获取门店信息失败:', e.message);
+      }
     }
     
     return order;
