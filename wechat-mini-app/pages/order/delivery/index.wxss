@@ -1,0 +1,547 @@
+/* pages/order/delivery/index.wxss */
+
+.container {
+  min-height: 100vh;
+  background: #f5f7fa;
+  padding-bottom: 200rpx;
+}
+
+/* 页面头部 */
+.page-header {
+  background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
+  padding: 32rpx;
+  padding-top: calc(env(safe-area-inset-top) + 20rpx);
+}
+
+.header-content {
+  display: flex;
+  flex-direction: column;
+  gap: 8rpx;
+}
+
+.page-title {
+  font-size: 40rpx;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.page-subtitle {
+  font-size: 26rpx;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+/* 订单摘要 */
+.order-summary {
+  margin: 24rpx;
+  background: #ffffff;
+  border-radius: 20rpx;
+  padding: 24rpx;
+  box-shadow: 0 4rpx 16rpx rgba(0, 0, 0, 0.06);
+}
+
+.summary-header {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+  margin-bottom: 20rpx;
+  padding-bottom: 16rpx;
+  border-bottom: 1rpx solid #f3f4f6;
+}
+
+.summary-icon {
+  font-size: 32rpx;
+}
+
+.summary-title {
+  font-size: 30rpx;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.summary-content {
+  display: flex;
+  flex-direction: column;
+  gap: 16rpx;
+}
+
+.summary-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.row-label {
+  font-size: 26rpx;
+  color: #6b7280;
+  flex-shrink: 0;
+}
+
+.row-value {
+  font-size: 26rpx;
+  color: #1f2937;
+  font-weight: 500;
+  text-align: right;
+  flex: 1;
+  margin-left: 16rpx;
+}
+
+.row-value.address {
+  font-size: 24rpx;
+  color: #6b7280;
+}
+
+.row-value.auto-assigned {
+  color: #1e40af;
+  font-style: italic;
+  font-size: 24rpx;
+}
+
+/* 通用Section */
+.section {
+  margin: 24rpx;
+  background: #ffffff;
+  border-radius: 20rpx;
+  padding: 24rpx;
+  box-shadow: 0 4rpx 16rpx rgba(0, 0, 0, 0.06);
+}
+
+.section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20rpx;
+}
+
+.section-title {
+  font-size: 32rpx;
+  font-weight: 700;
+  color: #1f2937;
+}
+
+.section-subtitle {
+  font-size: 24rpx;
+  color: #9ca3af;
+}
+
+/* 配送方式选择 */
+.delivery-methods {
+  display: flex;
+  flex-direction: column;
+  gap: 16rpx;
+}
+
+.method-card {
+  display: flex;
+  align-items: center;
+  gap: 20rpx;
+  padding: 24rpx;
+  background: #f9fafb;
+  border-radius: 16rpx;
+  border: 2rpx solid transparent;
+  transition: all 0.3s;
+}
+
+.method-card.selected {
+  background: #eff6ff;
+  border-color: #3b82f6;
+}
+
+.method-radio {
+  flex-shrink: 0;
+}
+
+.radio-outer {
+  width: 40rpx;
+  height: 40rpx;
+  border: 2rpx solid #d1d5db;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s;
+}
+
+.radio-outer.small {
+  width: 32rpx;
+  height: 32rpx;
+}
+
+.method-card.selected .radio-outer {
+  border-color: #3b82f6;
+}
+
+.radio-inner {
+  width: 24rpx;
+  height: 24rpx;
+  background: #3b82f6;
+  border-radius: 50%;
+}
+
+.radio-outer.small .radio-inner {
+  width: 18rpx;
+  height: 18rpx;
+}
+
+.method-icon {
+  font-size: 48rpx;
+  flex-shrink: 0;
+}
+
+.method-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6rpx;
+}
+
+.method-name {
+  font-size: 30rpx;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.method-desc {
+  font-size: 24rpx;
+  color: #6b7280;
+}
+
+.method-discount {
+  font-size: 22rpx;
+  color: #10b981;
+  font-weight: 600;
+  background: #dcfce7;
+  padding: 4rpx 12rpx;
+  border-radius: 8rpx;
+  width: fit-content;
+  margin-top: 4rpx;
+}
+
+/* 配送服务商 */
+.providers-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16rpx;
+}
+
+.provider-card {
+  padding: 24rpx;
+  background: #f9fafb;
+  border-radius: 16rpx;
+  border: 2rpx solid transparent;
+  transition: all 0.3s;
+}
+
+.provider-card.selected {
+  background: #eff6ff;
+  border-color: #3b82f6;
+}
+
+.provider-header {
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+  margin-bottom: 16rpx;
+}
+
+.provider-icon {
+  font-size: 48rpx;
+}
+
+.provider-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6rpx;
+}
+
+.provider-name {
+  font-size: 30rpx;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.provider-rating {
+  display: flex;
+  align-items: center;
+  gap: 6rpx;
+}
+
+.rating-star {
+  font-size: 22rpx;
+}
+
+.rating-value {
+  font-size: 24rpx;
+  font-weight: 600;
+  color: #f59e0b;
+}
+
+.rating-text {
+  font-size: 22rpx;
+  color: #6b7280;
+}
+
+.provider-select {
+  flex-shrink: 0;
+}
+
+.provider-details {
+  display: flex;
+  flex-direction: column;
+  gap: 12rpx;
+  margin-bottom: 16rpx;
+}
+
+.detail-row {
+  display: flex;
+  align-items: center;
+  gap: 8rpx;
+}
+
+.detail-icon {
+  font-size: 24rpx;
+}
+
+.detail-text {
+  font-size: 24rpx;
+  color: #6b7280;
+}
+
+.detail-actual {
+  font-size: 24rpx;
+  color: #ef4444;
+  font-weight: 600;
+  margin-left: 8rpx;
+}
+
+.provider-footer {
+  padding-top: 12rpx;
+  border-top: 1rpx solid #e5e7eb;
+}
+
+.discount-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8rpx;
+  background: #fef3c7;
+  padding: 8rpx 16rpx;
+  border-radius: 12rpx;
+}
+
+.badge-icon {
+  font-size: 22rpx;
+}
+
+.badge-text {
+  font-size: 22rpx;
+  color: #92400e;
+  font-weight: 600;
+}
+
+/* 取件信息表单 */
+.info-form {
+  display: flex;
+  flex-direction: column;
+  gap: 24rpx;
+}
+
+.form-item {
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+}
+
+.form-label {
+  font-size: 28rpx;
+  color: #6b7280;
+  width: 140rpx;
+  flex-shrink: 0;
+}
+
+.form-input {
+  flex: 1;
+  height: 80rpx;
+  padding: 0 24rpx;
+  background: #f9fafb;
+  border-radius: 12rpx;
+  font-size: 28rpx;
+  color: #1f2937;
+}
+
+.form-input:focus {
+  background: #eff6ff;
+  border: 2rpx solid #3b82f6;
+}
+
+/* 预约时间 */
+.time-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16rpx;
+}
+
+.time-item {
+  position: relative;
+  padding: 24rpx;
+  background: #f9fafb;
+  border-radius: 16rpx;
+  border: 2rpx solid transparent;
+  transition: all 0.3s;
+}
+
+.time-item.selected {
+  background: #eff6ff;
+  border-color: #3b82f6;
+}
+
+.time-text {
+  font-size: 26rpx;
+  color: #374151;
+  font-weight: 500;
+}
+
+.time-item.selected .time-text {
+  color: #1e40af;
+}
+
+.time-check {
+  position: absolute;
+  top: 12rpx;
+  right: 12rpx;
+  width: 32rpx;
+  height: 32rpx;
+  background: #3b82f6;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.check-icon {
+  font-size: 20rpx;
+  color: #ffffff;
+  font-weight: 700;
+}
+
+/* 费用明细 */
+.fee-section {
+  margin: 24rpx;
+}
+
+.fee-card {
+  background: #ffffff;
+  border-radius: 20rpx;
+  padding: 24rpx;
+  box-shadow: 0 4rpx 16rpx rgba(0, 0, 0, 0.06);
+}
+
+.fee-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16rpx 0;
+}
+
+.fee-label {
+  font-size: 28rpx;
+  color: #6b7280;
+}
+
+.fee-value {
+  font-size: 28rpx;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.fee-original {
+  font-size: 26rpx;
+  color: #9ca3af;
+  text-decoration: line-through;
+}
+
+.fee-discount {
+  font-size: 28rpx;
+  font-weight: 600;
+  color: #10b981;
+}
+
+.fee-divider {
+  height: 2rpx;
+  background: #e5e7eb;
+  margin: 12rpx 0;
+}
+
+.fee-row.total .fee-label {
+  font-size: 30rpx;
+  font-weight: 700;
+  color: #1f2937;
+}
+
+.fee-total {
+  font-size: 40rpx;
+  font-weight: 700;
+  color: #ef4444;
+}
+
+/* 确认按钮 */
+.confirm-section {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: #ffffff;
+  padding: 24rpx;
+  padding-bottom: calc(24rpx + env(safe-area-inset-bottom));
+  box-shadow: 0 -4rpx 20rpx rgba(0, 0, 0, 0.1);
+  z-index: 100;
+}
+
+.confirm-content {
+  display: flex;
+  align-items: center;
+  gap: 24rpx;
+}
+
+.total-display {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4rpx;
+}
+
+.total-label {
+  font-size: 24rpx;
+  color: #6b7280;
+}
+
+.total-amount {
+  font-size: 48rpx;
+  font-weight: 700;
+  color: #ef4444;
+}
+
+.confirm-btn {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+  background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
+  padding: 28rpx 48rpx;
+  border-radius: 28rpx;
+  box-shadow: 0 4rpx 16rpx rgba(30, 64, 175, 0.3);
+}
+
+.btn-text {
+  font-size: 32rpx;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.btn-arrow {
+  font-size: 28rpx;
+  color: #ffffff;
+}
+
+/* 底部安全区 */
+.safe-area-bottom {
+  height: env(safe-area-inset-bottom);
+}

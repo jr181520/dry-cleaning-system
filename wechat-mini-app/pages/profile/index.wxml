@@ -1,0 +1,147 @@
+<view class="container">
+  <!-- 用户信息头部 -->
+  <view class="profile-header">
+    <view class="user-info">
+      <image class="avatar" src="{{userInfo.avatar || '/assets/images/avatar-default.png'}}" mode="aspectFill"></image>
+      <view class="user-detail">
+        <text class="nickname">{{userInfo.nickname || '微信用户'}}</text>
+        <text class="member-level" wx:if="{{userInfo.memberLevel}}">{{userInfo.memberLevel}}</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 会员卡片 -->
+  <view class="member-card" wx:if="{{memberInfo}}">
+    <view class="member-header">
+      <view class="member-title">
+        <text class="iconfont icon-crown"></text>
+        <text>{{memberInfo.name}}</text>
+      </view>
+      <text class="member-expire">有效期至 {{memberInfo.expireDate}}</text>
+    </view>
+    <view class="member-stats">
+      <view class="stat-item">
+        <text class="stat-value">{{memberInfo.points}}</text>
+        <text class="stat-label">积分</text>
+      </view>
+      <view class="stat-item">
+        <text class="stat-value">¥{{memberInfo.balance}}</text>
+        <text class="stat-label">余额</text>
+      </view>
+      <view class="stat-item">
+        <text class="stat-value">{{memberInfo.discount}}</text>
+        <text class="stat-label">折扣</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 快捷功能 -->
+  <view class="quick-functions">
+    <view class="function-item" bindtap="onViewPoints">
+      <view class="function-icon bg-points">
+        <text class="iconfont icon-points"></text>
+      </view>
+      <text class="function-text">我的积分</text>
+    </view>
+    <view class="function-item" bindtap="onViewCoupons">
+      <view class="function-icon bg-coupons">
+        <text class="iconfont icon-coupon"></text>
+      </view>
+      <text class="function-text">优惠券</text>
+    </view>
+    <view class="function-item" bindtap="onViewAddresses">
+      <view class="function-icon bg-address">
+        <text class="iconfont icon-location"></text>
+      </view>
+      <text class="function-text">地址管理</text>
+    </view>
+    <view class="function-item" bindtap="onViewHistory">
+      <view class="function-icon bg-history">
+        <text class="iconfont icon-history"></text>
+      </view>
+      <text class="function-text">历史记录</text>
+    </view>
+  </view>
+
+  <!-- 菜单列表 -->
+  <view class="menu-list">
+    <view class="menu-item" bindtap="onPickupRecords">
+      <view class="menu-left">
+        <text class="iconfont icon-list menu-icon"></text>
+        <text class="menu-text">取件记录</text>
+      </view>
+      <view class="menu-right">
+        <text class="menu-arrow">></text>
+      </view>
+    </view>
+    <view class="menu-item" bindtap="onMyOrders">
+      <view class="menu-left">
+        <text class="iconfont icon-orders menu-icon"></text>
+        <text class="menu-text">我的订单</text>
+      </view>
+      <view class="menu-right">
+        <text class="menu-arrow">></text>
+      </view>
+    </view>
+    <view class="menu-item" bindtap="onFavorite">
+      <view class="menu-left">
+        <text class="iconfont icon-favorite menu-icon"></text>
+        <text class="menu-text">收藏夹</text>
+      </view>
+      <view class="menu-right">
+        <text class="menu-arrow">></text>
+      </view>
+    </view>
+    <view class="menu-item" bindtap="onFeedback">
+      <view class="menu-left">
+        <text class="iconfont icon-feedback menu-icon"></text>
+        <text class="menu-text">意见反馈</text>
+      </view>
+      <view class="menu-right">
+        <text class="menu-arrow">></text>
+      </view>
+    </view>
+  </view>
+
+  <view class="menu-list">
+    <view class="menu-item" bindtap="onAbout">
+      <view class="menu-left">
+        <text class="iconfont icon-info menu-icon"></text>
+        <text class="menu-text">关于我们</text>
+      </view>
+      <view class="menu-right">
+        <text class="menu-arrow">></text>
+      </view>
+    </view>
+    <view class="menu-item" bindtap="onHelp">
+      <view class="menu-left">
+        <text class="iconfont icon-help menu-icon"></text>
+        <text class="menu-text">帮助中心</text>
+      </view>
+      <view class="menu-right">
+        <text class="menu-arrow">></text>
+      </view>
+    </view>
+    <view class="menu-item" bindtap="onSettings">
+      <view class="menu-left">
+        <text class="iconfont icon-settings menu-icon"></text>
+        <text class="menu-text">设置</text>
+      </view>
+      <view class="menu-right">
+        <text class="menu-arrow">></text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 客服热线 -->
+  <view class="service-section">
+    <button class="service-btn" open-type="contact">
+      <text class="iconfont icon-service"></text>
+      <text>在线客服</text>
+    </button>
+    <button class="service-btn" bindtap="onCallService">
+      <text class="iconfont icon-phone"></text>
+      <text>客服热线</text>
+    </button>
+  </view>
+</view>

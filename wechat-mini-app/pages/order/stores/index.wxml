@@ -1,0 +1,175 @@
+<view class="container">
+  <!-- 页面头部 -->
+  <view class="page-header">
+    <view class="header-content">
+      <text class="page-title">选择门店</text>
+      <text class="page-subtitle">根据您的需求选择最合适的门店</text>
+    </view>
+  </view>
+
+  <!-- 已选服务摘要 -->
+  <view class="selected-services-summary" wx:if="{{serviceDetails.length > 0}}">
+    <view class="summary-header">
+      <text class="summary-icon">📋</text>
+      <text class="summary-title">已选服务</text>
+      <text class="summary-count">{{serviceDetails.length}}项</text>
+    </view>
+    <view class="summary-services">
+      <view class="service-tag" wx:for="{{serviceDetails}}" wx:key="id">
+        <text class="tag-icon">{{item.icon}}</text>
+        <text class="tag-name">{{item.name}}</text>
+        <text class="tag-price">¥{{item.price}}</text>
+      </view>
+    </view>
+    <view class="summary-footer">
+      <text class="total-label">服务费用合计</text>
+      <text class="total-price">¥{{serviceTotalPrice}}</text>
+    </view>
+  </view>
+
+  <!-- 排序和筛选 -->
+  <view class="filter-bar">
+    <view class="sort-options">
+      <view 
+        class="sort-item {{item.active ? 'active' : ''}}" 
+        wx:for="{{sortOptions}}" 
+        wx:key="id"
+        bindtap="onSortChange"
+        data-id="{{item.id}}"
+      >
+        <text class="sort-icon">{{item.icon}}</text>
+        <text class="sort-label">{{item.label}}</text>
+      </view>
+    </view>
+    
+    <view class="filter-actions">
+      <checkbox-group bindchange="onFilterChange" data-type="promotion">
+        <label class="filter-checkbox">
+          <checkbox value="promotion" color="#1e40af" checked="{{filterOptions.isPromotion}}" />
+          <text class="filter-text">促销</text>
+        </label>
+      </checkbox-group>
+      <checkbox-group bindchange="onFilterChange" data-type="online">
+        <label class="filter-checkbox">
+          <checkbox value="online" color="#10b981" checked="{{filterOptions.isOnline}}" />
+          <text class="filter-text">营业中</text>
+        </label>
+      </checkbox-group>
+    </view>
+  </view>
+
+  <!-- 门店列表 -->
+  <view class="store-list">
+    <view 
+      class="store-card" 
+      wx:for="{{stores}}" 
+      wx:key="id"
+      bindtap="onSelectStore"
+      data-id="{{item.id}}"
+    >
+      <!-- 门店信息 -->
+      <view class="store-main">
+        <view class="store-header">
+          <view class="store-title-row">
+            <text class="store-name">{{item.name}}</text>
+            <view class="store-status {{item.isOnline ? 'online' : 'offline'}}">
+              <view class="status-dot"></view>
+              <text class="status-text">{{item.isOnline ? '营业中' : '休息中'}}</text>
+            </view>
+          </view>
+          
+          <view class="store-rating-row">
+            <view class="rating-stars">
+              <text class="star">⭐</text>
+              <text class="rating-value">{{item.rating}}</text>
+            </view>
+            <view class="store-meta">
+              <text class="meta-item">{{item.serviceCount}}项服务</text>
+              <text class="meta-divider">|</text>
+              <text class="meta-item">最低¥{{item.minPrice}}</text>
+            </view>
+          </view>
+        </view>
+        
+        <view class="store-location">
+          <view class="location-row">
+            <text class="location-icon">📍</text>
+            <text class="location-text">{{item.address}}</text>
+          </view>
+          <view class="distance-row">
+            <text class="distance-icon">🚗</text>
+            <text class="distance-value">{{item.distance}}</text>
+          </view>
+        </view>
+        
+        <!-- 标签 -->
+        <view class="store-tags" wx:if="{{item.isPromotion || item.isRecommended}}">
+          <view class="tag promotion" wx:if="{{item.isPromotion}}">
+            <text class="tag-icon">🔥</text>
+            <text class="tag-text">{{item.promotionDesc || '促销中'}}</text>
+          </view>
+          <view class="tag recommended" wx:if="{{item.isRecommended}}">
+            <text class="tag-icon">⭐</text>
+            <text class="tag-text">推荐</text>
+          </view>
+        </view>
+        
+        <!-- 价格和配送信息 -->
+        <view class="store-pricing">
+          <view class="price-info">
+            <text class="price-label">基础配送费</text>
+            <text class="price-value">¥{{item.baseDeliveryFee}}</text>
+          </view>
+          <view class="service-info">
+            <text class="service-label">预计费用</text>
+            <text class="service-value">¥{{serviceTotalPrice + item.baseDeliveryFee}}</text>
+          </view>
+        </view>
+      </view>
+      
+      <!-- 门店操作 -->
+      <view class="store-actions">
+        <view class="action-buttons">
+          <view 
+            class="action-btn contact"
+            catchtap="onContactStore"
+            data-phone="{{item.phone}}"
+          >
+            <text class="action-icon">📞</text>
+            <text class="action-text">联系</text>
+          </view>
+          <view 
+            class="action-btn detail"
+            catchtap="onViewStoreDetail"
+            data-id="{{item.id}}"
+          >
+            <text class="action-icon">ℹ️</text>
+            <text class="action-text">详情</text>
+          </view>
+        </view>
+        
+        <view class="select-btn">
+          <text class="btn-text">选择</text>
+          <text class="btn-arrow">→</text>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 门店数量提示 -->
+  <view class="list-footer">
+    <text class="footer-text">共找到 {{stores.length}} 家门店</text>
+  </view>
+  
+  <!-- 暂不选择门店按钮 -->
+  <view class="skip-section">
+    <view class="skip-button" bindtap="onSkipStore">
+      <text class="skip-icon">⏭️</text>
+      <text class="skip-text">暂不选择门店</text>
+    </view>
+    <text class="skip-hint">系统将自动分配最近的门店为您服务</text>
+  </view>
+  
+  <!-- 底部安全区 -->
+  <view class="safe-area-bottom"></view>
+</view>

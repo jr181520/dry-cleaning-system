@@ -1,0 +1,29 @@
+<view class="container">
+  <view class="page-header">
+    <text class="page-title">服务项目</text>
+  </view>
+
+  <!-- 服务分类 -->
+  <view class="category-section">
+    <scroll-view scroll-x="true" class="category-scroll">
+      <view class="category-item" wx:for="{{categories}}" wx:key="id" bindtap="onSelectCategory" data-id="{{item.id}}">
+        <text class="category-text {{selectedCategory === item.id ? 'active' : ''}}">{{item.name}}</text>
+      </view>
+    </scroll-view>
+  </view>
+
+  <!-- 服务列表 -->
+  <view class="service-list">
+    <view class="service-item" wx:for="{{services}}" wx:key="id" bindtap="onServiceDetail" data-id="{{item.id}}">
+      <view class="service-icon">{{item.icon}}</view>
+      <view class="service-info">
+        <text class="service-name">{{item.name}}</text>
+        <text class="service-desc">{{item.desc}}</text>
+        <text class="service-price">¥{{item.price}}</text>
+      </view>
+      <view class="service-arrow">
+        <text class="iconfont icon-arrow-right"></text>
+      </view>
+    </view>
+  </view>
+</view>

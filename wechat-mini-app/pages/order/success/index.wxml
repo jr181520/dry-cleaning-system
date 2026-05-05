@@ -1,0 +1,149 @@
+<view class="container">
+  <!-- 成功图标 -->
+  <view class="success-header">
+    <view class="success-icon">
+      <text class="icon">✓</text>
+    </view>
+    <text class="success-title">支付成功</text>
+    <text class="success-subtitle">您的订单已提交成功</text>
+  </view>
+
+  <!-- 订单信息 -->
+  <view class="order-info" wx:if="{{orderData}}">
+    <view class="info-card">
+      <view class="info-row">
+        <text class="row-label">订单编号</text>
+        <text class="row-value">{{orderId}}</text>
+      </view>
+      <view class="info-row">
+        <text class="row-label">服务门店</text>
+        <text class="row-value">{{orderData.store.name}}</text>
+      </view>
+      <view class="info-row">
+        <text class="row-label">预约时间</text>
+        <text class="row-value">{{orderData.time.text}}</text>
+      </view>
+      <view class="info-row">
+        <text class="row-label">取件方式</text>
+        <text class="row-value">{{orderData.deliveryMethod === 'pickup' ? '自送到店' : '跑腿上门取件'}}</text>
+      </view>
+      <view class="info-row total">
+        <text class="row-label">支付金额</text>
+        <text class="row-value">¥{{orderData.fees.totalAmount}}</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 配送跟踪模块（仅跑腿订单显示） -->
+  <view class="delivery-tracker" wx:if="{{orderData && orderData.deliveryMethod === 'courier' && orderData.courier}}">
+    <view class="tracker-card">
+      <view class="tracker-header">
+        <text class="tracker-title">🏃 配送跟踪</text>
+        <view class="status-badge badge-{{courierInfo.status}}">
+          <text>{{courierInfo.statusText}}</text>
+        </view>
+      </view>
+      
+      <!-- 配送员信息 -->
+      <view class="courier-info">
+        <view class="courier-avatar">
+          <text class="avatar-icon">🧑‍✈️</text>
+        </view>
+        <view class="courier-details">
+          <view class="courier-name-row">
+            <text class="courier-name">{{courierInfo.name}}</text>
+            <text class="courier-status">正在取件</text>
+          </view>
+          <view class="courier-distance-row">
+            <text class="distance">{{courierInfo.distance}}</text>
+            <text class="separator">|</text>
+            <text class="eta">预计{{courierInfo.eta}}后到达</text>
+          </view>
+        </view>
+        <view class="courier-actions">
+          <view class="action-btn call" bindtap="onCallCourier">
+            <text class="action-icon">📞</text>
+          </view>
+          <view class="action-btn chat" bindtap="onChatCourier">
+            <text class="action-icon">💬</text>
+          </view>
+        </view>
+      </view>
+      
+      <!-- 配送进度 -->
+      <view class="delivery-progress">
+        <view class="progress-labels">
+          <text class="label-start">已取件</text>
+          <text class="label-end">送至门店</text>
+        </view>
+        <view class="progress-bar-container">
+          <view class="progress-bar">
+            <view class="progress-fill" style="width: {{courierInfo.progress}}%"></view>
+          </view>
+          <view class="progress-dots">
+            <view class="dot dot-1 {{courierInfo.progress >= 0 ? 'active' : ''}}"></view>
+            <view class="dot dot-2 {{courierInfo.progress >= 50 ? 'active' : ''}}"></view>
+            <view class="dot dot-3 {{courierInfo.progress >= 100 ? 'active' : ''}}"></view>
+          </view>
+        </view>
+        <view class="status-labels">
+          <text class="status-text status-1 {{courierInfo.progress >= 0 ? 'active' : ''}}">{{courierInfo.progress >= 0 ? '✓ ' : ''}}已取件</text>
+          <text class="status-text status-2 {{courierInfo.progress >= 50 ? 'active' : ''}}">{{courierInfo.progress >= 50 ? '✓ ' : ''}}配送中</text>
+          <text class="status-text status-3 {{courierInfo.progress >= 100 ? 'active' : ''}}">{{courierInfo.progress >= 100 ? '✓ ' : ''}}已送达</text>
+        </view>
+      </view>
+      
+      <!-- 配送信息 -->
+      <view class="delivery-info">
+        <view class="info-row">
+          <text class="info-icon">📍</text>
+          <view class="info-content">
+            <view class="info-item">
+              <text class="info-label">取件地址</text>
+              <text class="info-value">{{orderData.userAddress}}</text>
+            </view>
+            <view class="info-item">
+              <text class="info-label">送达地址</text>
+              <text class="info-value">{{orderData.store.address}}</text>
+            </view>
+          </view>
+        </view>
+        <view class="info-row">
+          <text class="info-icon">🛡️</text>
+          <text class="info-text">配送保障</text>
+          <text class="info-badge">全程监控 · 丢失赔付</text>
+        </view>
+      </view>
+      
+      <!-- 刷新按钮 -->
+      <view class="refresh-btn" bindtap="onRefreshDelivery">
+        <text class="refresh-icon">🔄</text>
+        <text class="refresh-text">刷新配送状态</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 提示信息 -->
+  <view class="tips-section">
+    <view class="tips-card">
+      <view class="tip-item">
+        <text class="tip-icon">💡</text>
+        <view class="tip-content">
+          <text class="tip-title">温馨提示</text>
+          <text class="tip-text" wx:if="{{orderData.deliveryMethod === 'pickup'}}">请在预约时间内将衣物送到门店</text>
+          <text class="tip-text" wx:else>请保持电话畅通，骑手将联系您取件</text>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 按钮区域 -->
+  <view class="button-section">
+    <view class="btn-primary" bindtap="onViewOrder">
+      <text class="btn-text">查看订单</text>
+    </view>
+    <view class="btn-secondary" bindtap="onBackHome">
+      <text class="btn-text">返回首页</text>
+    </view>
+  </view>
+</view>

@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>导航测试</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome -->
+    <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#1e40af',
+                        secondary: '#3b82f6',
+                        success: '#10b981',
+                        warning: '#f59e0b',
+                        danger: '#ef4444',
+                        info: '#3b82f6',
+                    },
+                    boxShadow: {
+                        'card': '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+                        'card-hover': '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
+                    },
+                    animation: {
+                        'fade-in': 'fadeIn 0.5s ease-in-out',
+                        'slide-in': 'slideIn 0.5s ease-in-out',
+                    },
+                    keyframes: {
+                        fadeIn: {
+                            '0%': { opacity: '0' },
+                            '100%': { opacity: '1' },
+                        },
+                        slideIn: {
+                            '0%': { transform: 'translateY(20px)', opacity: '0' },
+                            '100%': { transform: 'translateY(0)', opacity: '1' },
+                        },
+                    },
+                    transitionProperty: {
+                        'height': 'height',
+                        'spacing': 'margin, padding',
+                    },
+                },
+            },
+        };
+    </script>
+</head>
+<body class="bg-gray-50 font-sans">
+    <div class="flex h-screen overflow-hidden">
+        <!-- 侧边栏 -->
+        <aside class="w-64 bg-white shadow-sm fixed inset-y-0 left-0 z-20 md:translate-x-0 transform transition-transform duration-300 ease-in-out">
+            <nav class="flex-1 px-4 py-6">
+                <div class="flex items-center space-x-2 mb-8">
+                    <div class="w-10 h-10 rounded-lg bg-primary flex items-center justify-center">
+                        <i class="fa fa-cogs text-white"></i>
+                    </div>
+                    <h1 class="text-lg font-semibold text-gray-800">总后台管理</h1>
+                </div>
+                
+                <ul class="space-y-1">
+                    <!-- 总仪表盘 -->
+                    <li>
+                        <a href="#dashboard" class="nav-link flex items-center space-x-3 p-3 rounded-lg text-gray-700 hover:bg-blue-50 hover:text-primary transition-all duration-300 ease-in-out hover:translate-x-1">
+                            <i class="fa fa-tachometer w-5 text-center"></i>
+                            <span>总仪表盘</span>
+                        </a>
+                    </li>
+                    
+                    <!-- 业务管理 -->
+                    <li class="menu-item">
+                        <a href="#business" class="nav-link flex items-center space-x-3 p-3 rounded-lg text-gray-700 hover:bg-blue-50 hover:text-primary transition-all duration-300 ease-in-out hover:translate-x-1">
+                            <i class="fa fa-briefcase w-5 text-center"></i>
+                            <span>业务管理</span>
+                            <i class="fa fa-chevron-down ml-auto text-xs transition-transform duration-300"></i>
+                        </a>
+                        <ul class="submenu pl-6 mt-1 space-y-1 hidden">
+                            <li>
+                                <a href="#orders" class="nav-link flex items-center space-x-3 p-2 rounded-lg text-gray-600 hover:bg-blue-50 hover:text-primary transition-all duration-300 ease-in-out hover:translate-x-1">
+                                    <i class="fa fa-shopping-cart w-5 text-center"></i>
+                                    <span>订单管理</span>
+                                </a>
+                            </li>
+                            <li>
+                                <a href="#customers" class="nav-link flex items-center space-x-3 p-2 rounded-lg text-gray-600 hover:bg-blue-50 hover:text-primary transition-all duration-300 ease-in-out hover:translate-x-1">
+                                    <i class="fa fa-users w-5 text-center"></i>
+                                    <span>客户管理</span>
+                                </a>
+                            </li>
+                            <li>
+                                <a href="#items" class="nav-link flex items-center space-x-3 p-2 rounded-lg text-gray-600 hover:bg-blue-50 hover:text-primary transition-all duration-300 ease-in-out hover:translate-x-1">
+                                    <i class="fa fa-list w-5 text-center"></i>
+                                    <span>物品管理</span>
+                                </a>
+                            </li>
+                            <li>
+                                <a href="#members" class="nav-link flex items-center space-x-3 p-2 rounded-lg text-gray-600 hover:bg-blue-50 hover:text-primary transition-all duration-300 ease-in-out hover:translate-x-1">
+                                    <i class="fa fa-user-circle w-5 text-center"></i>
+                                    <span>会员管理</span>
+                                </a>
+                            </li>
+                        </ul>
+                    </li>
+                    
+                    <!-- 门店管理 -->
+                    <li class="menu-item">
+                        <a href="#store-management" class="nav-link flex items-center space-x-3 p-3 rounded-lg text-gray-700 hover:bg-blue-50 hover:text-primary transition-all duration-300 ease-in-out hover:translate-x-1">
+                            <i class="fa fa-shopping-bag w-5 text-center"></i>
+                            <span>门店管理</span>
+                            <i class="fa fa-chevron-down ml-auto text-xs transition-transform duration-300"></i>
+                        </a>
+                        <ul class="submenu pl-6 mt-1 space-y-1 hidden">
+                            <li>
+                                <a href="#stores" class="nav-link flex items-center space-x-3 p-2 rounded-lg text-gray-600 hover:bg-blue-50 hover:text-primary transition-all duration-300 ease-in-out hover:translate-x-1">
+                                    <i class="fa fa-building w-5 text-center"></i>
+                                    <span>门店列表</span>
+                                </a>
+                            </li>
+                            <li>
+                                <a href="#provincial-summary" class="nav-link flex items-center space-x-3 p-2 rounded-lg text-gray-600 hover:bg-blue-50 hover:text-primary transition-all duration-300 ease-in-out hover:translate-x-1">
+                                    <i class="fa fa-map w-5 text-center"></i>
+                                    <span>区域汇总</span>
+                                </a>
+                            </li>
+                            <li>
+                                <a href="#light-system" class="nav-link flex items-center space-x-3 p-2 rounded-lg text-gray-600 hover:bg-blue-50 hover:text-primary transition-all duration-300 ease-in-out hover:translate-x-1">
+                                    <i class="fa fa-lightbulb-o w-5 text-center"></i>
+                                    <span>智能灯条系统</span>
+                                </a>
+                            </li>
+                        </ul>
+                    </li>
+                    
+                    <!-- 系统管理 -->
+                    <li class="menu-item">
+                        <a href="#system" class="nav-link flex items-center space-x-3 p-3 rounded-lg text-gray-700 hover:bg-blue-50 hover:text-primary transition-all duration-300 ease-in-out hover:translate-x-1">
+                            <i class="fa fa-cog w-5 text-center"></i>
+                            <span>系统管理</span>
+                            <i class="fa fa-chevron-down ml-auto text-xs transition-transform duration-300"></i>
+                        </a>
+                        <ul class="submenu pl-6 mt-1 space-y-1 hidden">
+                            <li>
+                                <a href="#users" class="nav-link flex items-center space-x-3 p-2 rounded-lg text-gray-600 hover:bg-blue-50 hover:text-primary transition-all duration-300 ease-in-out hover:translate-x-1">
+                                    <i class="fa fa-users w-5 text-center"></i>
+                                    <span>用户管理</span>
+                                </a>
+                            </li>
+                            <li>
+                                <a href="#messages" class="nav-link flex items-center space-x-3 p-2 rounded-lg text-gray-600 hover:bg-blue-50 hover:text-primary transition-all duration-300 ease-in-out hover:translate-x-1">
+                                    <i class="fa fa-envelope w-5 text-center"></i>
+                                    <span>消息中心</span>
+                                </a>
+                            </li>
+                            <li>
+                                <a href="#statistics" class="nav-link flex items-center space-x-3 p-2 rounded-lg text-gray-600 hover:bg-blue-50 hover:text-primary transition-all duration-300 ease-in-out hover:translate-x-1">
+                                    <i class="fa fa-bar-chart w-5 text-center"></i>
+                                    <span>统计分析</span>
+                                </a>
+                            </li>
+                            <li>
+                                <a href="#settings" class="nav-link flex items-center space-x-3 p-2 rounded-lg text-gray-600 hover:bg-blue-50 hover:text-primary transition-all duration-300 ease-in-out hover:translate-x-1">
+                                    <i class="fa fa-sliders w-5 text-center"></i>
+                                    <span>系统设置</span>
+                                </a>
+                            </li>
+                            <li>
+                                <a href="#backup" class="nav-link flex items-center space-x-3 p-2 rounded-lg text-gray-600 hover:bg-blue-50 hover:text-primary transition-all duration-300 ease-in-out hover:translate-x-1">
+                                    <i class="fa fa-database w-5 text-center"></i>
+                                    <span>数据备份</span>
+                                </a>
+                            </li>
+                            <li>
+                                <a href="#miniprogram" class="nav-link flex items-center space-x-3 p-2 rounded-lg text-gray-600 hover:bg-blue-50 hover:text-primary transition-all duration-300 ease-in-out hover:translate-x-1">
+                                    <i class="fa fa-weixin w-5 text-center"></i>
+                                    <span>C端小程序</span>
+                                </a>
+                            </li>
+                        </ul>
+                    </li>
+                </ul>
+            </nav>
+        </aside>
+        
+        <!-- 主内容区 -->
+        <div class="flex-1 flex flex-col overflow-hidden md:ml-64">
+            <!-- 顶部导航栏 -->
+            <header class="bg-white shadow-sm z-10">
+                <div class="flex items-center justify-between px-4 py-3">
+                    <div class="flex items-center">
+                        <h1 class="text-xl font-semibold text-gray-800">导航测试页面</h1>
+                    </div>
+                </div>
+            </header>
+            
+            <!-- 内容区域 -->
+            <main class="flex-1 overflow-y-auto p-6">
+                <!-- 总仪表盘 -->
+                <div id="dashboard-content" class="content-section">
+                    <h2 class="text-2xl font-bold text-gray-800 mb-6">总仪表盘</h2>
+                    <p>总仪表盘内容</p>
+                </div>
+                
+                <!-- 订单管理 -->
+                <div id="orders-content" class="content-section hidden">
+                    <h2 class="text-2xl font-bold text-gray-800 mb-6">订单管理</h2>
+                    <p>订单管理内容</p>
+                </div>
+                
+                <!-- 客户管理 -->
+                <div id="customers-content" class="content-section hidden">
+                    <h2 class="text-2xl font-bold text-gray-800 mb-6">客户管理</h2>
+                    <p>客户管理内容</p>
+                </div>
+                
+                <!-- 物品管理 -->
+                <div id="items-content" class="content-section hidden">
+                    <h2 class="text-2xl font-bold text-gray-800 mb-6">物品管理</h2>
+                    <p>物品管理内容</p>
+                </div>
+                
+                <!-- 会员管理 -->
+                <div id="members-content" class="content-section hidden">
+                    <h2 class="text-2xl font-bold text-gray-800 mb-6">会员管理</h2>
+                    <p>会员管理内容</p>
+                </div>
+                
+                <!-- 门店列表 -->
+                <div id="stores-content" class="content-section hidden">
+                    <h2 class="text-2xl font-bold text-gray-800 mb-6">门店列表</h2>
+                    <p>门店列表内容</p>
+                </div>
+                
+                <!-- 区域汇总 -->
+                <div id="provincial-summary-content" class="content-section hidden">
+                    <h2 class="text-2xl font-bold text-gray-800 mb-6">区域汇总</h2>
+                    <p>区域汇总内容</p>
+                </div>
+                
+                <!-- 智能灯条系统 -->
+                <div id="light-system-content" class="content-section hidden">
+                    <h2 class="text-2xl font-bold text-gray-800 mb-6">智能灯条系统</h2>
+                    <p>智能灯条系统内容</p>
+                </div>
+                
+                <!-- 用户管理 -->
+                <div id="users-content" class="content-section hidden">
+                    <h2 class="text-2xl font-bold text-gray-800 mb-6">用户管理</h2>
+                    <p>用户管理内容</p>
+                </div>
+                
+                <!-- 消息中心 -->
+                <div id="messages-content" class="content-section hidden">
+                    <h2 class="text-2xl font-bold text-gray-800 mb-6">消息中心</h2>
+                    <p>消息中心内容</p>
+                </div>
+                
+                <!-- 统计分析 -->
+                <div id="statistics-content" class="content-section hidden">
+                    <h2 class="text-2xl font-bold text-gray-800 mb-6">统计分析</h2>
+                    <p>统计分析内容</p>
+                </div>
+                
+                <!-- 系统设置 -->
+                <div id="settings-content" class="content-section hidden">
+                    <h2 class="text-2xl font-bold text-gray-800 mb-6">系统设置</h2>
+                    <p>系统设置内容</p>
+                </div>
+                
+                <!-- 数据备份 -->
+                <div id="backup-content" class="content-section hidden">
+                    <h2 class="text-2xl font-bold text-gray-800 mb-6">数据备份</h2>
+                    <p>数据备份内容</p>
+                </div>
+                
+                <!-- C端小程序 -->
+                <div id="miniprogram-content" class="content-section hidden">
+                    <h2 class="text-2xl font-bold text-gray-800 mb-6">C端小程序</h2>
+                    <p>C端小程序内容</p>
+                </div>
+            </main>
+        </div>
+    </div>
+    
+    <script>
+        // 初始化导航功能
+        function initNavigation() {
+            console.log('初始化导航功能');
+            
+            // 获取所有导航链接
+            const navLinks = document.querySelectorAll('.nav-link');
+            // 获取所有内容区域
+            const contentSections = document.querySelectorAll('.content-section');
+            
+            console.log('导航链接数量:', navLinks.length);
+            console.log('内容区域数量:', contentSections.length);
+            
+            // 为每个导航链接添加点击事件监听器
+            navLinks.forEach(link => {
+                link.addEventListener('click', function(e) {
+                    const href = link.getAttribute('href');
+                    if (href && href.startsWith('#')) {
+                        const target = href.substring(1);
+                        const isParentMenu = (target === 'business' || target === 'store-management' || target === 'system');
+                        
+                        e.preventDefault(); // 阻止默认的锚点行为
+                        
+                        if (isParentMenu) {
+                            // 处理父菜单项点击，展开/折叠子菜单
+                            console.log('点击父菜单项，切换子菜单显示状态:', target);
+                            const menuItem = link.closest('.menu-item');
+                            if (menuItem) {
+                                const submenu = menuItem.querySelector('.submenu');
+                                if (submenu) {
+                                    submenu.classList.toggle('hidden');
+                                    const icon = link.querySelector('.fa-chevron-down');
+                                    if (icon) {
+                                        icon.classList.toggle('rotate-180');
+                                    }
+                                }
+                            }
+                        } else {
+                            // 处理子菜单项点击，导航到对应内容区域
+                            console.log('点击子菜单项，导航到:', target);
+                            
+                            // 更新导航菜单的活跃状态
+                            navLinks.forEach(navLink => {
+                                navLink.classList.remove('text-primary', 'bg-blue-50', 'font-medium', 'border-l-4', 'border-primary');
+                                navLink.classList.add('text-gray-700', 'hover:bg-blue-50', 'hover:text-primary');
+                            });
+                            link.classList.remove('text-gray-700', 'hover:bg-blue-50', 'hover:text-primary');
+                            link.classList.add('text-primary', 'bg-blue-50', 'font-medium', 'border-l-4', 'border-primary');
+                            
+                            // 显示对应的内容区域，隐藏其他内容区域
+                            contentSections.forEach(section => {
+                                section.classList.add('hidden');
+                            });
+                            const targetSection = document.getElementById(`${target}-content`);
+                            if (targetSection) {
+                                console.log('显示内容区域:', `${target}-content`);
+                                targetSection.classList.remove('hidden');
+                            } else {
+                                console.warn('内容区域未找到:', `${target}-content`);
+                            }
+                        }
+                    }
+                });
+            });
+        }
+        
+        // 页面加载完成后初始化
+        window.addEventListener('load', function() {
+            console.log('页面加载完成，初始化导航功能');
+            initNavigation();
+        });
+    </script>
+</body>
+</html>

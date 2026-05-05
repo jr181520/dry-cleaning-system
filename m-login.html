@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>干洗店管理系统 - 终端登录</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome -->
+    <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#1e40af',
+                        secondary: '#3b82f6',
+                        success: '#10b981',
+                        warning: '#f59e0b',
+                        danger: '#ef4444',
+                    }
+                }
+            }
+        }
+    </script>
+    
+    <style>
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        
+        .login-card {
+            animation: slideUp 0.5s ease-out forwards;
+        }
+        
+        @keyframes slideUp {
+            from {
+                transform: translateY(20px);
+                opacity: 0;
+            }
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+        
+        .toggle-checkbox:checked {
+            right: 0;
+            border-color: #1e40af;
+        }
+        .toggle-checkbox:checked + .toggle-label {
+            background-color: #1e40af;
+        }
+    </style>
+</head>
+<body class="flex items-center justify-center p-4">
+    
+    <div class="login-card w-full max-w-md">
+        <!-- Logo和标题 -->
+        <div class="text-center mb-8">
+            <div class="w-20 h-20 bg-white rounded-2xl shadow-xl mx-auto mb-4 flex items-center justify-center">
+                <i class="fa fa-truck text-4xl text-primary"></i>
+            </div>
+            <h1 class="text-3xl font-bold text-white mb-2">干洗店管理系统</h1>
+            <p class="text-white/80">终端门店管理系统</p>
+        </div>
+        
+        <!-- 已登录账号显示 -->
+        <div id="current-account" class="bg-white/20 backdrop-blur-sm rounded-xl p-4 mb-6 hidden">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center space-x-3">
+                    <div class="w-10 h-10 bg-white rounded-full flex items-center justify-center">
+                        <i class="fa fa-user text-primary"></i>
+                    </div>
+                    <div>
+                        <p class="text-white font-medium" id="current-account-name">已登录账号</p>
+                        <p class="text-white/70 text-sm" id="current-account-info">138****8888</p>
+                    </div>
+                </div>
+                <div class="relative inline-block w-10 mr-2 align-middle select-none transition duration-200 ease-in">
+                    <input type="checkbox" name="toggle" id="toggle" class="toggle-checkbox absolute block w-6 h-6 rounded-full bg-white border-4 appearance-none cursor-pointer transition-all duration-300 ease-in-out left-0 top-0"/>
+                    <label for="toggle" class="toggle-label block overflow-hidden h-6 rounded-full bg-white/50 cursor-pointer transition-all duration-300"></label>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 登录表单 -->
+        <div class="bg-white rounded-2xl shadow-2xl p-8">
+            <h2 class="text-2xl font-bold text-gray-800 mb-6 text-center">
+                <i class="fa fa-sign-in mr-2 text-primary"></i>
+                账号登录
+            </h2>
+            
+            <form id="login-form" class="space-y-5">
+                <!-- 登录方式选择 -->
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">登录方式</label>
+                    <div class="flex space-x-6">
+                        <label class="flex items-center cursor-pointer">
+                            <input type="radio" name="loginType" value="phone" checked 
+                                   class="w-4 h-4 text-primary focus:ring-primary border-gray-300"
+                                   onchange="toggleLoginType()">
+                            <span class="ml-2 text-sm text-gray-700">手机号登录</span>
+                        </label>
+                        <label class="flex items-center cursor-pointer">
+                            <input type="radio" name="loginType" value="storeId" 
+                                   class="w-4 h-4 text-primary focus:ring-primary border-gray-300"
+                                   onchange="toggleLoginType()">
+                            <span class="ml-2 text-sm text-gray-700">门店ID登录</span>
+                        </label>
+                    </div>
+                </div>
+                
+                <!-- 手机号登录 -->
+                <div id="phone-login" class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">
+                            手机号码 <span class="text-red-500">*</span>
+                        </label>
+                        <div class="relative">
+                            <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+                                <i class="fa fa-mobile text-xl"></i>
+                            </span>
+                            <input type="tel" name="phone" id="phone" required
+                                   class="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
+                                   placeholder="请输入手机号码">
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">
+                            登录密码 <span class="text-red-500">*</span>
+                        </label>
+                        <div class="relative">
+                            <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+                                <i class="fa fa-lock"></i>
+                            </span>
+                            <input type="password" name="password" id="password" required
+                                   class="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
+                                   placeholder="请输入登录密码">
+                            <button type="button" onclick="togglePassword()" 
+                                    class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                                <i class="fa fa-eye" id="toggle-password-icon"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 门店ID登录 -->
+                <div id="storeId-login" class="space-y-4 hidden">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">
+                            门店ID <span class="text-red-500">*</span>
+                        </label>
+                        <div class="relative">
+                            <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+                                <i class="fa fa-building"></i>
+                            </span>
+                            <input type="text" name="storeId" id="storeId"
+                                   class="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
+                                   placeholder="请输入门店ID（如：ST001）">
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">
+                            门店密码 <span class="text-red-500">*</span>
+                        </label>
+                        <div class="relative">
+                            <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+                                <i class="fa fa-key"></i>
+                            </span>
+                            <input type="password" name="storePassword" id="storePassword"
+                                   class="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
+                                   placeholder="请输入门店密码">
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 记住登录 -->
+                <div class="flex items-center justify-between">
+                    <label class="flex items-center cursor-pointer">
+                        <input type="checkbox" name="remember" 
+                               class="w-4 h-4 text-primary focus:ring-primary border-gray-300 rounded">
+                        <span class="ml-2 text-sm text-gray-600">记住登录状态</span>
+                    </label>
+                    <a href="#" class="text-sm text-primary hover:underline">忘记密码？</a>
+                </div>
+                
+                <!-- 登录按钮 -->
+                <button type="submit" id="login-btn"
+                        class="w-full bg-primary text-white py-3 rounded-lg font-medium hover:bg-primary/90 transition-all shadow-lg hover:shadow-xl flex items-center justify-center space-x-2">
+                    <i class="fa fa-sign-in"></i>
+                    <span>登录</span>
+                </button>
+                
+                <!-- 注册账号 -->
+                <div class="text-center pt-4 border-t border-gray-200">
+                    <p class="text-gray-600 text-sm">
+                        还没有账号？
+                        <a href="admin.html#store-apply" class="text-primary font-medium hover:underline">
+                            <i class="fa fa-user-plus mr-1"></i>
+                            注册门店账号
+                        </a>
+                    </p>
+                    <p class="text-gray-500 text-xs mt-2">
+                        <i class="fa fa-info-circle mr-1"></i>
+                        注册后将进入门店入驻申请流程
+                    </p>
+                </div>
+                
+                <!-- 测试账号快捷登录 -->
+                <div class="mt-6 p-4 bg-green-50 rounded-lg border border-green-100">
+                    <div class="text-sm text-green-800 mb-3">
+                        <i class="fa fa-flask mr-1"></i> 测试模式 - 快捷登录
+                    </div>
+                    <div class="grid grid-cols-2 gap-2">
+                        <button onclick="quickLogin('13900001001')" class="px-3 py-2 bg-white border border-green-200 rounded-lg text-sm text-green-700 hover:bg-green-50 transition-colors">
+                            <div class="font-medium">店员测试</div>
+                            <div class="text-xs text-gray-500">13900001001</div>
+                        </button>
+                        <button onclick="quickLogin('13900001002')" class="px-3 py-2 bg-white border border-purple-200 rounded-lg text-sm text-purple-700 hover:bg-purple-50 transition-colors">
+                            <div class="font-medium">店长测试</div>
+                            <div class="text-xs text-gray-500">13900001002</div>
+                        </button>
+                    </div>
+                </div>
+            </form>
+            
+            <!-- 其他登录方式 -->
+            <div class="mt-6 pt-6 border-t border-gray-200">
+                <p class="text-center text-sm text-gray-500 mb-4">其他登录方式</p>
+                <div class="flex justify-center space-x-6">
+                    <button class="w-12 h-12 bg-green-500 rounded-full flex items-center justify-center hover:bg-green-600 transition-all shadow">
+                        <i class="fa fa-wechat text-white text-xl"></i>
+                    </button>
+                    <button class="w-12 h-12 bg-blue-500 rounded-full flex items-center justify-center hover:bg-blue-600 transition-all shadow">
+                        <i class="fa fa-qq text-white text-xl"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 切换账号提示 -->
+        <div id="switch-account-tip" class="mt-4 bg-white/20 backdrop-blur-sm rounded-xl p-4 text-center hidden">
+            <p class="text-white text-sm">
+                <i class="fa fa-info-circle mr-1"></i>
+                如需切换账号，请先
+                <button onclick="logout()" class="underline font-medium hover:text-white/80">
+                    退出当前账号
+                </button>
+            </p>
+        </div>
+        
+        <!-- 底部版权 -->
+        <div class="mt-6 text-center">
+            <p class="text-white/60 text-sm">
+                © 2024 干洗店管理系统 - 终端版 v1.0
+            </p>
+        </div>
+    </div>
+    
+    <!-- 账号切换确认弹窗 -->
+    <div id="switch-account-modal" class="fixed inset-0 bg-black/50 hidden z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-xl shadow-2xl max-w-sm w-full p-6">
+            <h3 class="text-lg font-bold text-gray-800 mb-4">
+                <i class="fa fa-exchange mr-2 text-primary"></i>
+                切换账号
+            </h3>
+            <p class="text-gray-600 mb-6">
+                确定要退出当前账号并切换到其他账号吗？
+            </p>
+            <div class="flex space-x-3">
+                <button onclick="closeSwitchModal()" 
+                        class="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-all">
+                    取消
+                </button>
+                <button onclick="confirmSwitch()" 
+                        class="flex-1 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-all">
+                    确定切换
+                </button>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // 切换登录方式
+        function toggleLoginType() {
+            const loginType = document.querySelector('input[name="loginType"]:checked').value;
+            const phoneLogin = document.getElementById('phone-login');
+            const storeIdLogin = document.getElementById('storeId-login');
+            
+            if (loginType === 'phone') {
+                phoneLogin.classList.remove('hidden');
+                storeIdLogin.classList.add('hidden');
+            } else {
+                phoneLogin.classList.add('hidden');
+                storeIdLogin.classList.remove('hidden');
+            }
+        }
+        
+        // 切换密码显示
+        function togglePassword() {
+            const passwordInput = document.getElementById('password');
+            const storePasswordInput = document.getElementById('storePassword');
+            const icon = document.getElementById('toggle-password-icon');
+            
+            if (passwordInput) {
+                if (passwordInput.type === 'password') {
+                    passwordInput.type = 'text';
+                    icon.classList.remove('fa-eye');
+                    icon.classList.add('fa-eye-slash');
+                } else {
+                    passwordInput.type = 'password';
+                    icon.classList.remove('fa-eye-slash');
+                    icon.classList.add('fa-eye');
+                }
+            }
+            
+            if (storePasswordInput) {
+                if (storePasswordInput.type === 'password') {
+                    storePasswordInput.type = 'text';
+                } else {
+                    storePasswordInput.type = 'password';
+                }
+            }
+        }
+        
+        // 检查已登录账号
+        function checkLoggedInAccount() {
+            const account = localStorage.getItem('storeAccount');
+            const token = localStorage.getItem('storeToken');
+            
+            if (account && token) {
+                const accountData = JSON.parse(account);
+                document.getElementById('current-account').classList.remove('hidden');
+                document.getElementById('current-account-name').textContent = accountData.name || '门店账号';
+                document.getElementById('current-account-info').textContent = accountData.type === 'phone' 
+                    ? maskPhone(accountData.value) 
+                    : accountData.value;
+                document.getElementById('switch-account-tip').classList.remove('hidden');
+            }
+        }
+        
+        // 手机号脱敏
+        function maskPhone(phone) {
+            return phone.substring(0, 3) + '****' + phone.substring(7);
+        }
+        
+        // 登录表单提交
+        document.getElementById('login-form').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const loginType = document.querySelector('input[name="loginType"]:checked').value;
+            const loginBtn = document.getElementById('login-btn');
+            
+            // 添加loading状态
+            const originalText = loginBtn.innerHTML;
+            loginBtn.disabled = true;
+            loginBtn.innerHTML = '<i class="fa fa-spinner fa-spin mr-2"></i>登录中...';
+            
+            try {
+                let loginData = {};
+                
+                if (loginType === 'phone') {
+                    loginData = {
+                        phone: document.getElementById('phone').value,
+                        password: document.getElementById('password').value
+                    };
+                } else {
+                    loginData = {
+                        storeId: document.getElementById('storeId').value,
+                        storePassword: document.getElementById('storePassword').value
+                    };
+                }
+                
+                console.log('开始登录，类型:', loginType, '数据:', loginData);
+                
+                // TODO: 调用实际的登录API
+                // 模拟登录成功
+                setTimeout(() => {
+                    const accountData = {
+                        type: loginType,
+                        value: loginType === 'phone' ? loginData.phone : loginData.storeId,
+                        name: '门店用户',
+                        loginTime: new Date().toISOString()
+                    };
+                    
+                    localStorage.setItem('storeAccount', JSON.stringify(accountData));
+                    localStorage.setItem('storeToken', 'mock-token-' + Date.now());
+                    
+                    alert('登录成功！即将跳转到管理系统...');
+                    window.location.href = 'm-index.html';
+                }, 1000);
+                
+            } catch (error) {
+                console.error('登录失败:', error);
+                alert('登录失败: ' + error.message);
+            } finally {
+                loginBtn.disabled = false;
+                loginBtn.innerHTML = originalText;
+            }
+        });
+        
+        // 切换账号
+        document.getElementById('toggle').addEventListener('change', function() {
+            if (this.checked) {
+                document.getElementById('switch-account-modal').classList.remove('hidden');
+            }
+        });
+        
+        function closeSwitchModal() {
+            document.getElementById('switch-account-modal').classList.add('hidden');
+            document.getElementById('toggle').checked = false;
+        }
+        
+        function confirmSwitch() {
+            closeSwitchModal();
+            logout();
+        }
+        
+        // 退出登录
+        function logout() {
+            localStorage.removeItem('storeAccount');
+            localStorage.removeItem('storeToken');
+            
+            document.getElementById('current-account').classList.add('hidden');
+            document.getElementById('switch-account-tip').classList.add('hidden');
+            
+            alert('已退出登录');
+            
+            // 刷新页面
+            location.reload();
+        }
+        
+        // 页面加载时检查
+        window.addEventListener('DOMContentLoaded', function() {
+            checkLoggedInAccount();
+        });
+        
+        // 模拟测试账号登录
+        function quickLogin(phone) {
+            const mockStaff = {
+                '13900001001': { id: 'mock-staff-001', userNo: 'S001', phone: '13900001001', name: '店员小王', roles: ['store_staff'], storeId: 'ST002', storeName: '测试门店ST002' },
+                '13900001002': { id: 'mock-owner-001', userNo: 'S002', phone: '13900001002', name: '店长李明', roles: ['store_owner'], storeId: 'ST002', storeName: '测试门店ST002' }
+            };
+            
+            const staff = mockStaff[phone];
+            if (staff) {
+                localStorage.setItem('storeToken', 'mock-store-token-' + phone);
+                localStorage.setItem('storeUser', JSON.stringify(staff));
+                localStorage.setItem('storeAccount', JSON.stringify({ type: 'phone', value: phone, name: staff.name }));
+                localStorage.setItem('isMockStoreUser', 'true');
+                alert('模拟登录成功: ' + staff.name + '\n门店: ' + staff.storeName);
+                window.location.href = 'm-index.html';
+            } else {
+                alert('测试账号不存在');
+            }
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,738 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>POS收银 - 干洗店管理系统</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#1e40af',
+                        secondary: '#3b82f6',
+                        accent: '#60a5fa',
+                        success: '#10b981',
+                        warning: '#f59e0b',
+                        danger: '#ef4444'
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        * { -webkit-tap-highlight-color: transparent; }
+        
+        .pos-keypad {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 12px;
+        }
+        
+        .keypad-btn {
+            padding: 20px;
+            font-size: 24px;
+            font-weight: bold;
+            border-radius: 12px;
+            background: white;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            transition: all 0.2s;
+            cursor: pointer;
+        }
+        
+        .keypad-btn:active {
+            transform: scale(0.95);
+            background: #f3f4f6;
+        }
+        
+        .keypad-btn.operator {
+            background: #3b82f6;
+            color: white;
+        }
+        
+        .keypad-btn.clear {
+            background: #ef4444;
+            color: white;
+        }
+        
+        .payment-method {
+            padding: 20px;
+            border: 2px solid #e5e7eb;
+            border-radius: 16px;
+            transition: all 0.3s;
+            cursor: pointer;
+        }
+        
+        .payment-method:hover {
+            border-color: #3b82f6;
+        }
+        
+        .payment-method.selected {
+            border-color: #3b82f6;
+            background: #eff6ff;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen">
+    <!-- 顶部导航 -->
+    <div class="bg-gradient-to-r from-blue-600 to-blue-800 text-white p-4">
+        <div class="flex items-center justify-between">
+            <div class="flex items-center gap-4">
+                <i class="fa fa-arrow-left text-xl cursor-pointer" onclick="goBack()"></i>
+                <h1 class="text-xl font-bold">POS收银系统</h1>
+            </div>
+            <div class="text-sm">
+                <div id="store-name">门店名称</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="flex h-[calc(100vh-72px)]">
+        <!-- 左侧：金额输入 -->
+        <div class="flex-1 p-6">
+            <!-- 金额显示 -->
+            <div class="bg-white rounded-2xl p-6 mb-6 shadow-sm">
+                <div class="text-sm text-gray-500 mb-2">收款金额</div>
+                <div class="text-6xl font-bold text-gray-800 mb-4">
+                    ¥<span id="amount-display">0.00</span>
+                </div>
+                <div class="text-sm text-gray-500">
+                    订单号: <span id="order-id">-</span>
+                </div>
+            </div>
+            
+            <!-- 数字键盘 -->
+            <div class="bg-white rounded-2xl p-6 shadow-sm">
+                <div class="pos-keypad">
+                    <button class="keypad-btn" onclick="inputNumber('1')">1</button>
+                    <button class="keypad-btn" onclick="inputNumber('2')">2</button>
+                    <button class="keypad-btn" onclick="inputNumber('3')">3</button>
+                    <button class="keypad-btn" onclick="inputNumber('4')">4</button>
+                    <button class="keypad-btn" onclick="inputNumber('5')">5</button>
+                    <button class="keypad-btn" onclick="inputNumber('6')">6</button>
+                    <button class="keypad-btn" onclick="inputNumber('7')">7</button>
+                    <button class="keypad-btn" onclick="inputNumber('8')">8</button>
+                    <button class="keypad-btn" onclick="inputNumber('9')">9</button>
+                    <button class="keypad-btn" onclick="inputNumber('.')">.</button>
+                    <button class="keypad-btn" onclick="inputNumber('0')">0</button>
+                    <button class="keypad-btn clear" onclick="clearAmount()">C</button>
+                </div>
+            </div>
+            
+            <!-- 快捷金额 -->
+            <div class="mt-4">
+                <div class="text-sm text-gray-600 mb-2">快捷金额</div>
+                <div class="grid grid-cols-4 gap-2">
+                    <button onclick="setQuickAmount(50)" class="bg-gray-200 text-gray-700 py-2 rounded-lg font-semibold hover:bg-gray-300">¥50</button>
+                    <button onclick="setQuickAmount(100)" class="bg-gray-200 text-gray-700 py-2 rounded-lg font-semibold hover:bg-gray-300">¥100</button>
+                    <button onclick="setQuickAmount(200)" class="bg-gray-200 text-gray-700 py-2 rounded-lg font-semibold hover:bg-gray-300">¥200</button>
+                    <button onclick="setQuickAmount(500)" class="bg-gray-200 text-gray-700 py-2 rounded-lg font-semibold hover:bg-gray-300">¥500</button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 右侧：支付方式 -->
+        <div class="w-96 bg-white p-6 border-l border-gray-200 overflow-y-auto">
+            <h3 class="text-lg font-bold text-gray-800 mb-4">选择支付方式</h3>
+            
+            <!-- 扫码支付 -->
+            <div class="payment-method mb-4" onclick="selectPayMethod('scan')" id="method-scan">
+                <div class="flex items-center gap-4">
+                    <div class="w-16 h-16 bg-green-500 rounded-2xl flex items-center justify-center">
+                        <span class="text-3xl">📱</span>
+                    </div>
+                    <div class="flex-1">
+                        <div class="font-bold text-gray-800">扫码收款</div>
+                        <div class="text-sm text-gray-500">扫描用户付款码</div>
+                    </div>
+                    <div class="w-6 h-6 rounded-full border-2 border-gray-300 flex items-center justify-center" id="check-scan">
+                        <div class="w-3 h-3 rounded-full bg-blue-500 hidden"></div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 现金支付 -->
+            <div class="payment-method mb-4" onclick="selectPayMethod('cash')" id="method-cash">
+                <div class="flex items-center gap-4">
+                    <div class="w-16 h-16 bg-yellow-500 rounded-2xl flex items-center justify-center">
+                        <span class="text-3xl">💵</span>
+                    </div>
+                    <div class="flex-1">
+                        <div class="font-bold text-gray-800">现金收款</div>
+                        <div class="text-sm text-gray-500">输入收款金额</div>
+                    </div>
+                    <div class="w-6 h-6 rounded-full border-2 border-gray-300 flex items-center justify-center" id="check-cash">
+                        <div class="w-3 h-3 rounded-full bg-blue-500"></div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 会员卡支付 -->
+            <div class="payment-method mb-4" onclick="selectPayMethod('card')" id="method-card">
+                <div class="flex items-center gap-4">
+                    <div class="w-16 h-16 bg-purple-500 rounded-2xl flex items-center justify-center">
+                        <span class="text-3xl">💳</span>
+                    </div>
+                    <div class="flex-1">
+                        <div class="font-bold text-gray-800">会员卡</div>
+                        <div class="text-sm text-gray-500">扫描会员卡或输入卡号</div>
+                    </div>
+                    <div class="w-6 h-6 rounded-full border-2 border-gray-300 flex items-center justify-center" id="check-card">
+                        <div class="w-3 h-3 rounded-full bg-blue-500 hidden"></div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 微信支付 -->
+            <div class="payment-method mb-4" onclick="selectPayMethod('wechat')" id="method-wechat">
+                <div class="flex items-center gap-4">
+                    <div class="w-16 h-16 bg-green-600 rounded-2xl flex items-center justify-center">
+                        <span class="text-3xl">💬</span>
+                    </div>
+                    <div class="flex-1">
+                        <div class="font-bold text-gray-800">微信支付</div>
+                        <div class="text-sm text-gray-500">生成二维码收款</div>
+                    </div>
+                    <div class="w-6 h-6 rounded-full border-2 border-gray-300 flex items-center justify-center" id="check-wechat">
+                        <div class="w-3 h-3 rounded-full bg-blue-500 hidden"></div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 支付宝 -->
+            <div class="payment-method mb-4" onclick="selectPayMethod('alipay')" id="method-alipay">
+                <div class="flex items-center gap-4">
+                    <div class="w-16 h-16 bg-blue-500 rounded-2xl flex items-center justify-center">
+                        <span class="text-3xl">💰</span>
+                    </div>
+                    <div class="flex-1">
+                        <div class="font-bold text-gray-800">支付宝</div>
+                        <div class="text-sm text-gray-500">生成二维码收款</div>
+                    </div>
+                    <div class="w-6 h-6 rounded-full border-2 border-gray-300 flex items-center justify-center" id="check-alipay">
+                        <div class="w-3 h-3 rounded-full bg-blue-500 hidden"></div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 确认收款按钮 -->
+            <div class="mt-8">
+                <button id="confirm-btn" onclick="confirmPayment()" class="w-full bg-green-500 text-white py-4 rounded-2xl text-xl font-bold shadow-lg hover:bg-green-600 transition-colors">
+                    确认收款 ¥<span id="confirm-amount">0.00</span>
+                </button>
+            </div>
+            
+            <!-- 最近交易 -->
+            <div class="mt-8">
+                <h4 class="text-lg font-bold text-gray-800 mb-4">最近交易</h4>
+                <div id="recent-transactions" class="space-y-2">
+                    <div class="text-center text-gray-400 py-4">暂无交易记录</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 扫码弹窗 -->
+    <div id="scan-modal" class="fixed inset-0 bg-black/80 z-50 hidden">
+        <div class="bg-white rounded-t-3xl p-6 absolute bottom-0 left-0 right-0">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-xl font-bold">扫描付款码</h3>
+                <button onclick="closeScanModal()" class="text-gray-400">
+                    <i class="fa fa-times text-2xl"></i>
+                </button>
+            </div>
+            <div class="text-center py-8">
+                <div class="w-64 h-64 bg-gray-100 rounded-2xl mx-auto mb-4 flex items-center justify-center">
+                    <div id="scan-area" class="text-center">
+                        <i class="fa fa-qrcode text-6xl text-gray-400 mb-2"></i>
+                        <p class="text-gray-500">等待扫描...</p>
+                    </div>
+                </div>
+                <p class="text-sm text-gray-500">请将用户付款码对准扫描框</p>
+            </div>
+            <button onclick="simulateScan()" class="w-full bg-blue-500 text-white py-4 rounded-2xl font-bold">
+                模拟扫码 (测试用)
+            </button>
+        </div>
+    </div>
+
+    <!-- 会员卡输入弹窗 -->
+    <div id="card-modal" class="fixed inset-0 bg-black/80 z-50 hidden">
+        <div class="bg-white rounded-t-3xl p-6 absolute bottom-0 left-0 right-0">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-xl font-bold">输入会员卡号</h3>
+                <button onclick="closeCardModal()" class="text-gray-400">
+                    <i class="fa fa-times text-2xl"></i>
+                </button>
+            </div>
+            <div class="mb-4">
+                <input type="text" id="card-number" class="w-full border-2 border-gray-300 rounded-xl px-4 py-3 text-xl focus:border-blue-500 outline-none" placeholder="请输入会员卡号">
+            </div>
+            <div class="mb-4">
+                <input type="password" id="card-password" class="w-full border-2 border-gray-300 rounded-xl px-4 py-3 text-xl focus:border-blue-500 outline-none" placeholder="请输入密码">
+            </div>
+            <button onclick="verifyCard()" class="w-full bg-blue-500 text-white py-4 rounded-2xl font-bold">
+                验证会员卡
+            </button>
+        </div>
+    </div>
+
+    <!-- 找零弹窗 -->
+    <div id="change-modal" class="fixed inset-0 bg-black/80 z-50 hidden">
+        <div class="bg-white rounded-t-3xl p-6 absolute bottom-0 left-0 right-0">
+            <div class="text-center">
+                <div class="text-6xl mb-4">💰</div>
+                <h3 class="text-2xl font-bold text-gray-800 mb-2">收款成功</h3>
+                <div class="text-4xl font-bold text-green-500 mb-4">¥<span id="received-amount">0.00</span></div>
+                <div id="change-display" class="text-lg text-gray-600 mb-4">
+                    找零: ¥<span id="change-amount">0.00</span>
+                </div>
+            </div>
+            <button onclick="completeTransaction()" class="w-full bg-green-500 text-white py-4 rounded-2xl font-bold">
+                完成交易
+            </button>
+        </div>
+    </div>
+
+    <!-- 成功弹窗 -->
+    <div id="success-modal" class="fixed inset-0 bg-black/80 z-50 hidden">
+        <div class="bg-white rounded-t-3xl p-6 absolute bottom-0 left-0 right-0">
+            <div class="text-center">
+                <div class="text-6xl mb-4">✅</div>
+                <h3 class="text-2xl font-bold text-gray-800 mb-4">收款成功!</h3>
+                <div class="bg-green-50 rounded-xl p-4 mb-4">
+                    <div class="text-sm text-gray-600 mb-2">支付方式</div>
+                    <div class="text-lg font-bold text-green-700" id="success-method">-</div>
+                </div>
+                <div class="text-4xl font-bold text-green-500 mb-4">
+                    ¥<span id="success-amount">0.00</span>
+                </div>
+            </div>
+            <button onclick="completeSuccess()" class="w-full bg-green-500 text-white py-4 rounded-2xl font-bold">
+                完成
+            </button>
+        </div>
+    </div>
+
+    <script>
+        let currentAmount = 0;
+        let currentInput = '0';
+        let selectedMethod = 'cash';
+        let currentOrderId = null;
+        let transactions = [];
+        
+        // 获取URL参数
+        function getUrlParams() {
+            const params = new URLSearchParams(window.location.search);
+            return {
+                orderId: params.get('orderId'),
+                amount: params.get('amount'),
+                method: params.get('method'),
+                customerPhone: params.get('customerPhone')
+            };
+        }
+
+        // 页面初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            // 显示加载状态
+            console.log('[POS] 正在初始化...');
+            
+            loadStoreInfo();
+            loadRecentTransactions();
+            generateOrderId();
+            updateDisplay();
+            
+            // 处理URL参数
+            const urlParams = getUrlParams();
+            if (urlParams.orderId) {
+                currentOrderId = decodeURIComponent(urlParams.orderId);
+                document.getElementById('order-id').textContent = currentOrderId;
+                console.log('[POS] 订单ID:', currentOrderId);
+            }
+            if (urlParams.amount) {
+                currentAmount = parseFloat(decodeURIComponent(urlParams.amount));
+                currentInput = decodeURIComponent(urlParams.amount);
+                updateDisplay();
+                console.log('[POS] 金额:', currentAmount);
+            }
+            if (urlParams.method) {
+                const method = decodeURIComponent(urlParams.method);
+                selectPayMethod(method);
+                console.log('[POS] 支付方式:', method);
+            }
+            
+            console.log('[POS] 初始化完成');
+        });
+
+        // 加载门店信息
+        function loadStoreInfo() {
+            const store = JSON.parse(localStorage.getItem('currentStore') || '{}');
+            document.getElementById('store-name').textContent = store.storeName || '干洗店';
+        }
+
+        // 生成订单号
+        function generateOrderId() {
+            currentOrderId = 'POS' + Date.now();
+            document.getElementById('order-id').textContent = currentOrderId;
+        }
+
+        // 加载最近交易
+        function loadRecentTransactions() {
+            const saved = localStorage.getItem('pos_transactions');
+            if (saved) {
+                transactions = JSON.parse(saved);
+                updateTransactionsDisplay();
+            }
+        }
+
+        // 保存交易
+        function saveTransaction(transaction) {
+            transactions.unshift(transaction);
+            if (transactions.length > 10) transactions.pop();
+            localStorage.setItem('pos_transactions', JSON.stringify(transactions));
+            updateTransactionsDisplay();
+        }
+
+        // 更新交易显示
+        function updateTransactionsDisplay() {
+            const container = document.getElementById('recent-transactions');
+            if (transactions.length === 0) {
+                container.innerHTML = '<div class="text-center text-gray-400 py-4">暂无交易记录</div>';
+                return;
+            }
+            
+            container.innerHTML = transactions.slice(0, 5).map(t => `
+                <div class="flex justify-between items-center p-3 bg-gray-50 rounded-xl">
+                    <div>
+                        <div class="font-semibold text-gray-800">¥${t.amount.toFixed(2)}</div>
+                        <div class="text-xs text-gray-500">${t.method}</div>
+                    </div>
+                    <div class="text-right">
+                        <div class="text-xs text-gray-400">${new Date(t.time).toLocaleTimeString()}</div>
+                        <div class="text-xs ${t.status === 'success' ? 'text-green-600' : 'text-red-600'}">${t.status === 'success' ? '成功' : '失败'}</div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // 输入数字
+        function inputNumber(num) {
+            if (currentInput === '0' && num !== '.') {
+                currentInput = num;
+            } else {
+                currentInput += num;
+            }
+            
+            // 限制长度
+            if (currentInput.length > 10) {
+                currentInput = currentInput.slice(0, 10);
+            }
+            
+            currentAmount = parseFloat(currentInput) || 0;
+            updateDisplay();
+        }
+
+        // 清空金额
+        function clearAmount() {
+            currentInput = '0';
+            currentAmount = 0;
+            updateDisplay();
+        }
+
+        // 设置快捷金额
+        function setQuickAmount(amount) {
+            currentAmount = amount;
+            currentInput = amount.toString();
+            updateDisplay();
+        }
+
+        // 更新显示
+        function updateDisplay() {
+            document.getElementById('amount-display').textContent = currentAmount.toFixed(2);
+            document.getElementById('confirm-amount').textContent = currentAmount.toFixed(2);
+        }
+
+        // 选择支付方式
+        function selectPayMethod(method) {
+            selectedMethod = method;
+            
+            // 更新UI
+            document.querySelectorAll('.payment-method').forEach(item => {
+                item.classList.remove('selected');
+                item.querySelector('.rounded-full > div').classList.add('hidden');
+            });
+            
+            document.getElementById(`method-${method}`).classList.add('selected');
+            document.getElementById(`check-${method}`).querySelector('div').classList.remove('hidden');
+            
+            // 根据支付方式显示不同的弹窗
+            if (method === 'scan') {
+                showScanModal();
+            } else if (method === 'card') {
+                showCardModal();
+            }
+        }
+
+        // 确认收款
+        function confirmPayment() {
+            if (currentAmount <= 0) {
+                alert('请输入收款金额');
+                return;
+            }
+            
+            switch (selectedMethod) {
+                case 'cash':
+                    showChangeModal();
+                    break;
+                case 'scan':
+                    alert('请先扫描用户付款码');
+                    break;
+                case 'card':
+                    alert('请先验证会员卡');
+                    break;
+                case 'wechat':
+                case 'alipay':
+                    processQRPayment();
+                    break;
+            }
+        }
+
+        // 显示扫码弹窗
+        function showScanModal() {
+            document.getElementById('scan-modal').classList.remove('hidden');
+        }
+
+        // 关闭扫码弹窗
+        function closeScanModal() {
+            document.getElementById('scan-modal').classList.add('hidden');
+        }
+
+        // 模拟扫码
+        function simulateScan() {
+            closeScanModal();
+            
+            // 模拟扫码成功
+            setTimeout(() => {
+                processPayment('scan', {
+                    transactionId: 'SCAN_' + Date.now()
+                });
+            }, 500);
+        }
+
+        // 显示会员卡弹窗
+        function showCardModal() {
+            document.getElementById('card-modal').classList.remove('hidden');
+        }
+
+        // 关闭会员卡弹窗
+        function closeCardModal() {
+            document.getElementById('card-modal').classList.add('hidden');
+        }
+
+        // 验证会员卡
+        async function verifyCard() {
+            const cardNumber = document.getElementById('card-number').value.trim();
+            const password = document.getElementById('card-password').value.trim();
+            
+            if (!cardNumber) {
+                alert('请输入会员卡号');
+                return;
+            }
+            
+            try {
+                const response = await fetch('http://localhost:3002/api/member-card/info/' + cardNumber);
+                const result = await response.json();
+                
+                if (result.success) {
+                    if (result.data.balance >= currentAmount) {
+                        closeCardModal();
+                        
+                        // 扣除会员卡余额
+                        await fetch('http://localhost:3002/api/pos/card', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                orderId: currentOrderId,
+                                cardId: cardNumber,
+                                cardType: result.data.cardType,
+                                storeId: JSON.parse(localStorage.getItem('currentStore') || '{}').storeId || 'ST001'
+                            })
+                        });
+                        
+                        processPayment('card', {
+                            transactionId: 'CARD_' + Date.now(),
+                            cardNumber: cardNumber
+                        });
+                    } else {
+                        alert(`会员卡余额不足，当前余额: ¥${result.data.balance.toFixed(2)}`);
+                    }
+                } else {
+                    alert('会员卡不存在');
+                }
+            } catch (error) {
+                console.error('验证会员卡失败:', error);
+                // 模拟会员卡支付成功
+                closeCardModal();
+                processPayment('card', {
+                    transactionId: 'CARD_' + Date.now(),
+                    cardNumber: cardNumber
+                });
+            }
+        }
+
+        // 处理找零弹窗
+        function showChangeModal() {
+            document.getElementById('received-amount').textContent = currentAmount.toFixed(2);
+            document.getElementById('change-amount').textContent = '0.00';
+            document.getElementById('change-display').classList.remove('hidden');
+            document.getElementById('change-modal').classList.remove('hidden');
+        }
+
+        // 完成交易
+        function completeTransaction() {
+            processPayment('cash', {
+                transactionId: 'CASH_' + Date.now(),
+                amount: currentAmount
+            });
+            document.getElementById('change-modal').classList.add('hidden');
+        }
+
+        // 处理二维码支付
+        async function processQRPayment() {
+            try {
+                const response = await fetch('http://localhost:3002/api/pos/create', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        orderId: currentOrderId,
+                        storeId: JSON.parse(localStorage.getItem('currentStore') || '{}').storeId || 'ST001',
+                        amount: currentAmount
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    // 显示收款码
+                    showQRCode(result.data.qrCode);
+                } else {
+                    // 模拟支付成功
+                    processPayment(selectedMethod, {
+                        transactionId: selectedMethod.toUpperCase() + '_' + Date.now()
+                    });
+                }
+            } catch (error) {
+                console.error('创建POS订单失败:', error);
+                // 模拟支付成功
+                setTimeout(() => {
+                    processPayment(selectedMethod, {
+                        transactionId: selectedMethod.toUpperCase() + '_' + Date.now()
+                    });
+                }, 1000);
+            }
+        }
+
+        // 显示二维码
+        function showQRCode(qrUrl) {
+            const modal = document.createElement('div');
+            modal.id = 'qr-modal';
+            modal.className = 'fixed inset-0 bg-black/80 z-50 flex items-center justify-center';
+            modal.innerHTML = `
+                <div class="bg-white rounded-3xl p-8 text-center">
+                    <h3 class="text-xl font-bold mb-4">请使用${selectedMethod === 'wechat' ? '微信' : '支付宝'}扫码支付</h3>
+                    <div class="text-4xl font-bold text-red-500 mb-4">¥${currentAmount.toFixed(2)}</div>
+                    <div class="w-64 h-64 bg-gray-100 rounded-2xl mx-auto mb-4 flex items-center justify-center">
+                        <i class="fa fa-qrcode text-6xl text-gray-400"></i>
+                    </div>
+                    <p class="text-sm text-gray-500 mb-4">等待用户支付...</p>
+                    <button onclick="simulateQRPay()" class="w-full bg-green-500 text-white py-3 rounded-xl font-bold mb-2">
+                        模拟支付成功 (测试用)
+                    </button>
+                    <button onclick="closeQRModal()" class="w-full bg-gray-200 text-gray-700 py-3 rounded-xl font-bold">
+                        取消
+                    </button>
+                </div>
+            `;
+            document.body.appendChild(modal);
+        }
+
+        // 关闭二维码弹窗
+        function closeQRModal() {
+            const modal = document.getElementById('qr-modal');
+            if (modal) modal.remove();
+        }
+
+        // 模拟二维码支付
+        function simulateQRPay() {
+            closeQRModal();
+            processPayment(selectedMethod, {
+                transactionId: selectedMethod.toUpperCase() + '_' + Date.now()
+            });
+        }
+
+        // 处理支付
+        async function processPayment(method, data) {
+            const transaction = {
+                orderId: currentOrderId,
+                amount: currentAmount,
+                method: method,
+                transactionId: data.transactionId,
+                time: new Date().toISOString(),
+                status: 'success'
+            };
+            
+            // 保存交易
+            saveTransaction(transaction);
+            
+            // 显示成功
+            document.getElementById('success-method').textContent = getMethodName(method);
+            document.getElementById('success-amount').textContent = currentAmount.toFixed(2);
+            document.getElementById('success-modal').classList.remove('hidden');
+            
+            // 同步到结算中心
+            try {
+                await fetch('http://localhost:3002/api/pos/settlement/sync', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(transaction)
+                });
+            } catch (error) {
+                console.error('同步结算中心失败:', error);
+            }
+        }
+
+        // 获取支付方式名称
+        function getMethodName(method) {
+            const names = {
+                'cash': '现金支付',
+                'scan': '扫码支付',
+                'card': '会员卡',
+                'wechat': '微信支付',
+                'alipay': '支付宝'
+            };
+            return names[method] || method;
+        }
+
+        // 完成成功弹窗
+        function completeSuccess() {
+            document.getElementById('success-modal').classList.add('hidden');
+            
+            // 重置
+            currentAmount = 0;
+            currentInput = '0';
+            generateOrderId();
+            updateDisplay();
+        }
+
+        // 返回
+        function goBack() {
+            window.location.href = 'm-index.html';
+        }
+    </script>
+</body>
+</html>

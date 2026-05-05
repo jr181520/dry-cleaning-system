@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>门店列表 - 干洗服务</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome -->
+    <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#1e40af',
+                        secondary: '#3b82f6',
+                        accent: '#60a5fa',
+                        success: '#10b981',
+                        warning: '#f59e0b',
+                        danger: '#ef4444',
+                        dark: '#1e293b',
+                        light: '#f8fafc',
+                        info: '#3b82f6',
+                        purple: '#8b5cf6',
+                        pink: '#ec4899',
+                        teal: '#14b8a6',
+                        orange: '#f97316'
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        * {
+            -webkit-tap-highlight-color: transparent;
+        }
+        
+        /* 门店卡片 */
+        .store-card {
+            background: #ffffff;
+            border-radius: 24rpx;
+            padding: 28rpx;
+            box-shadow: 0 4rpx 20rpx rgba(0, 0, 0, 0.06);
+            transition: transform 0.3s, box-shadow 0.3s;
+            cursor: pointer;
+        }
+        
+        .store-card:active {
+            transform: scale(0.99);
+        }
+        
+        /* 状态标签 */
+        .store-status {
+            display: inline-flex;
+            align-items: center;
+            gap: 6rpx;
+            padding: 6rpx 12rpx;
+            border-radius: 12rpx;
+            font-size: 20rpx;
+            font-weight: 600;
+        }
+        
+        .store-status.online {
+            background: #dcfce7;
+            color: #10b981;
+        }
+        
+        .store-status.offline {
+            background: #f3f4f6;
+            color: #9ca3af;
+        }
+        
+        /* 标签 */
+        .tag {
+            display: inline-flex;
+            align-items: center;
+            gap: 6rpx;
+            padding: 8rpx 16rpx;
+            border-radius: 14rpx;
+            font-size: 22rpx;
+            font-weight: 600;
+        }
+        
+        .tag.promotion {
+            background: #fee2e2;
+            color: #ef4444;
+        }
+        
+        .tag.recommended {
+            background: #dbeafe;
+            color: #1e40af;
+        }
+        
+        /* 排序选项 */
+        .sort-item {
+            display: flex;
+            align-items: center;
+            gap: 8rpx;
+            padding: 12rpx 20rpx;
+            background: #f9fafb;
+            border-radius: 16rpx;
+            transition: all 0.3s;
+            cursor: pointer;
+        }
+        
+        .sort-item.active {
+            background: #1e40af;
+        }
+        
+        .sort-item.active .sort-label {
+            color: #ffffff;
+        }
+        
+        /* 底部导航 */
+        .bottom-tab-bar {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: #ffffff;
+            box-shadow: 0 -4rpx 20rpx rgba(0, 0, 0, 0.08);
+            z-index: 100;
+            padding-bottom: env(safe-area-inset-bottom);
+        }
+        
+        .tab-icon {
+            width: 48rpx;
+            height: 48rpx;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 4rpx;
+        }
+        
+        .tab-icon.active {
+            background: #eff6ff;
+            color: #1e40af;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen pb-24">
+    <!-- 顶部导航 -->
+    <header class="bg-white sticky top-0 z-50">
+        <div class="flex items-center justify-between px-4 py-4 border-b border-gray-100">
+            <a href="c-index.html" class="text-gray-700">
+                <i class="fa fa-arrow-left text-lg"></i>
+            </a>
+            <span class="text-lg font-semibold text-gray-800">附近门店</span>
+            <span class="w-8"></span>
+        </div>
+        
+        <!-- 排序和筛选 -->
+        <div class="px-4 py-3 bg-gray-50">
+            <div class="flex justify-between items-center">
+                <div class="flex gap-2">
+                    <div class="sort-item active" onclick="sortStores('recommended', event)">
+                        <span class="text-lg">⭐</span>
+                        <span class="sort-label text-sm font-medium text-gray-700">推荐</span>
+                    </div>
+                    <div class="sort-item" onclick="sortStores('price', event)">
+                        <span class="text-lg">💰</span>
+                        <span class="sort-label text-sm font-medium text-gray-700">价格最优</span>
+                    </div>
+                    <div class="sort-item" onclick="sortStores('distance', event)">
+                        <span class="text-lg">📍</span>
+                        <span class="sort-label text-sm font-medium text-gray-700">距离最近</span>
+                    </div>
+                </div>
+                <label class="flex items-center gap-2">
+                    <input type="checkbox" id="filter-online" class="w-4 h-4 rounded" onchange="filterStores()">
+                    <span class="text-sm text-gray-600">营业中</span>
+                </label>
+            </div>
+        </div>
+    </header>
+
+    <!-- 门店列表 -->
+    <main class="px-4 py-4">
+        <div class="flex flex-col gap-4" id="stores-list">
+            <!-- 门店将通过JavaScript加载 -->
+        </div>
+        
+        <!-- 门店数量 -->
+        <div class="text-center py-8 text-sm text-gray-400">
+            共找到 <span id="store-count">0</span> 家门店
+        </div>
+    </main>
+
+    <!-- 底部TabBar -->
+    <div class="bottom-tab-bar">
+        <div class="flex justify-around items-center py-3">
+            <div class="flex flex-col items-center gap-1 text-gray-500" onclick="goToPage('c-index.html')">
+                <div class="tab-icon">
+                    <i class="fa fa-home text-lg"></i>
+                </div>
+                <span class="text-xs">首页</span>
+            </div>
+            <div class="flex flex-col items-center gap-1 text-gray-500" onclick="goToPage('c-order.html')">
+                <div class="tab-icon">
+                    <i class="fa fa-plus-circle text-lg"></i>
+                </div>
+                <span class="text-xs">下单</span>
+            </div>
+            <div class="flex flex-col items-center gap-1 text-gray-500" onclick="goToPage('c-orders.html')">
+                <div class="tab-icon">
+                    <i class="fa fa-shopping-bag text-lg"></i>
+                </div>
+                <span class="text-xs">订单</span>
+            </div>
+            <div class="flex flex-col items-center gap-1 text-gray-500" onclick="goToPage('c-profile.html')">
+                <div class="tab-icon">
+                    <i class="fa fa-user text-lg"></i>
+                </div>
+                <span class="text-xs">我的</span>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 门店数据
+        let stores = [
+            { id: 1, name: '干洗店旗舰店', address: '朝阳区建国路88号', phone: '010-12345678', distance: '1.2km', isOnline: true, isPromotion: true, isRecommended: true, serviceCount: 12, minPrice: 30, rating: 4.8, hours: '09:00-21:00' },
+            { id: 2, name: '干洗店中心店', address: '海淀区中关村大街1号', phone: '010-23456789', distance: '2.5km', isOnline: true, isPromotion: false, isRecommended: true, serviceCount: 10, minPrice: 35, rating: 4.6, hours: '09:00-20:00' },
+            { id: 3, name: '干洗店东门店', address: '东城区王府井大街5号', phone: '010-34567890', distance: '3.8km', isOnline: false, isPromotion: false, isRecommended: false, serviceCount: 8, minPrice: 40, rating: 4.5, hours: '09:00-19:00' },
+            { id: 4, name: '干洗店西城店', address: '西城区金融街18号', phone: '010-45678901', distance: '4.5km', isOnline: true, isPromotion: true, isRecommended: false, serviceCount: 9, minPrice: 32, rating: 4.7, hours: '09:00-21:00' }
+        ];
+
+        // 页面初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            // 检查登录状态
+            if (!localStorage.getItem('userToken')) {
+                window.location.href = 'c-login.html';
+                return;
+            }
+            
+            loadStores();
+        });
+
+        // 加载门店列表
+        function loadStores() {
+            const container = document.getElementById('stores-list');
+            const countEl = document.getElementById('store-count');
+            
+            countEl.textContent = stores.length;
+            
+            container.innerHTML = stores.map(store => `
+                <div class="store-card" onclick="selectStore(${store.id})">
+                    <div class="flex justify-between items-start mb-3">
+                        <div>
+                            <div class="flex items-center gap-2 mb-1">
+                                <span class="font-bold text-gray-800 text-lg">${store.name}</span>
+                                <span class="store-status ${store.isOnline ? 'online' : 'offline'}">
+                                    <span class="w-2 h-2 rounded-full ${store.isOnline ? 'bg-green-500' : 'bg-gray-400'}"></span>
+                                    ${store.isOnline ? '营业中' : '休息中'}
+                                </span>
+                            </div>
+                            <div class="flex items-center gap-1 text-sm text-gray-500 mb-1">
+                                <span>📍</span>
+                                <span>${store.distance}</span>
+                            </div>
+                            <div class="text-sm text-gray-500 mb-1">${store.address}</div>
+                            <div class="flex items-center gap-1 text-sm text-gray-500">
+                                <span>⏰</span>
+                                <span>${store.hours}</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="flex flex-wrap gap-2 mb-3">
+                        ${store.isPromotion ? '<span class="tag promotion"><span>🔥</span><span>促销中</span></span>' : ''}
+                        ${store.isRecommended ? '<span class="tag recommended"><span>⭐</span><span>推荐</span></span>' : ''}
+                    </div>
+                    
+                    <div class="flex justify-between items-center pt-3 border-t border-gray-100">
+                        <div class="flex items-center gap-4">
+                            <div class="flex items-center gap-1 text-sm text-amber-500">
+                                <span>⭐</span>
+                                <span class="font-semibold">${store.rating}</span>
+                            </div>
+                            <div class="text-sm text-gray-500">
+                                ${store.serviceCount}项服务
+                            </div>
+                        </div>
+                        <div class="text-lg font-bold text-red-500">
+                            ¥${store.minPrice}起
+                        </div>
+                    </div>
+                    
+                    <div class="flex gap-2 mt-4 pt-3 border-t border-gray-100">
+                        <button class="flex-1 py-2 border border-blue-500 text-blue-500 rounded-xl text-sm font-medium" onclick="event.stopPropagation(); callStore('${store.phone}')">
+                            <i class="fa fa-phone mr-1"></i> 联系门店
+                        </button>
+                        <button class="flex-1 py-2 bg-blue-500 text-white rounded-xl text-sm font-medium" onclick="event.stopPropagation(); goToOrder(${store.id})">
+                            选择此门店
+                        </button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // 排序门店
+        function sortStores(type, event) {
+            document.querySelectorAll('.sort-item').forEach(item => item.classList.remove('active'));
+            event.currentTarget.classList.add('active');
+            
+            switch(type) {
+                case 'recommended':
+                    stores.sort((a, b) => (b.isRecommended ? 1 : 0) - (a.isRecommended ? 1 : 0));
+                    break;
+                case 'price':
+                    stores.sort((a, b) => a.minPrice - b.minPrice);
+                    break;
+                case 'distance':
+                    stores.sort((a, b) => parseFloat(a.distance) - parseFloat(b.distance));
+                    break;
+            }
+            loadStores();
+        }
+
+        // 筛选门店
+        function filterStores() {
+            const showOnlineOnly = document.getElementById('filter-online').checked;
+            if (showOnlineOnly) {
+                stores = [
+                    { id: 1, name: '干洗店旗舰店', address: '朝阳区建国路88号', phone: '010-12345678', distance: '1.2km', isOnline: true, isPromotion: true, isRecommended: true, serviceCount: 12, minPrice: 30, rating: 4.8, hours: '09:00-21:00' },
+                    { id: 2, name: '干洗店中心店', address: '海淀区中关村大街1号', phone: '010-23456789', distance: '2.5km', isOnline: true, isPromotion: false, isRecommended: true, serviceCount: 10, minPrice: 35, rating: 4.6, hours: '09:00-20:00' },
+                    { id: 4, name: '干洗店西城店', address: '西城区金融街18号', phone: '010-45678901', distance: '4.5km', isOnline: true, isPromotion: true, isRecommended: false, serviceCount: 9, minPrice: 32, rating: 4.7, hours: '09:00-21:00' }
+                ];
+            } else {
+                stores = [
+                    { id: 1, name: '干洗店旗舰店', address: '朝阳区建国路88号', phone: '010-12345678', distance: '1.2km', isOnline: true, isPromotion: true, isRecommended: true, serviceCount: 12, minPrice: 30, rating: 4.8, hours: '09:00-21:00' },
+                    { id: 2, name: '干洗店中心店', address: '海淀区中关村大街1号', phone: '010-23456789', distance: '2.5km', isOnline: true, isPromotion: false, isRecommended: true, serviceCount: 10, minPrice: 35, rating: 4.6, hours: '09:00-20:00' },
+                    { id: 3, name: '干洗店东门店', address: '东城区王府井大街5号', phone: '010-34567890', distance: '3.8km', isOnline: false, isPromotion: false, isRecommended: false, serviceCount: 8, minPrice: 40, rating: 4.5, hours: '09:00-19:00' },
+                    { id: 4, name: '干洗店西城店', address: '西城区金融街18号', phone: '010-45678901', distance: '4.5km', isOnline: true, isPromotion: true, isRecommended: false, serviceCount: 9, minPrice: 32, rating: 4.7, hours: '09:00-21:00' }
+                ];
+            }
+            loadStores();
+        }
+
+        // 选择门店
+        function selectStore(storeId) {
+            const store = stores.find(s => s.id === storeId);
+            if (store) {
+                localStorage.setItem('selectedStore', JSON.stringify(store));
+                window.location.href = 'c-order.html';
+            }
+        }
+
+        // 跳转下单
+        function goToOrder(storeId) {
+            const store = stores.find(s => s.id === storeId);
+            if (store) {
+                localStorage.setItem('selectedStore', JSON.stringify(store));
+                window.location.href = 'c-order.html';
+            }
+        }
+
+        // 拨打电话
+        function callStore(phone) {
+            window.location.href = `tel:${phone}`;
+        }
+
+        // 页面跳转
+        function goToPage(url) {
+            window.location.href = url;
+        }
+    </script>
+</body>
+</html>

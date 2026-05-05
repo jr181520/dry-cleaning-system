@@ -1,0 +1,2117 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>订单详情 - 干洗服务</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/css/bootstrap.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    * { box-sizing: border-box; }
+    body { background-color: #f5f5f5; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+    
+    .order-detail-page { max-width: 750px; margin: 0 auto; padding: 0 0 80px 0; }
+    
+    /* 顶部状态卡片 */
+    .status-card {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 30px 20px;
+      border-radius: 0 0 24px 24px;
+    }
+    .status-icon-large {
+      width: 60px;
+      height: 60px;
+      background: rgba(255,255,255,0.2);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 28px;
+      margin-bottom: 12px;
+    }
+    .status-text {
+      font-size: 24px;
+      font-weight: 600;
+      margin-bottom: 6px;
+    }
+    .status-desc {
+      font-size: 14px;
+      opacity: 0.9;
+    }
+    
+    /* 配送员信息 */
+    .driver-card {
+      background: white;
+      border-radius: 12px;
+      padding: 16px;
+      margin: -20px 16px 16px;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.1);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .driver-avatar {
+      width: 48px;
+      height: 48px;
+      background: #2196f3;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-size: 20px;
+    }
+    .driver-info { flex: 1; }
+    .driver-name { font-weight: 600; font-size: 16px; }
+    .driver-status { font-size: 13px; color: #666; }
+    .driver-actions { display: flex; gap: 10px; }
+    .driver-btn {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      border: none;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+    }
+    .driver-btn.call { background: #4caf50; color: white; }
+    .driver-btn.message { background: #2196f3; color: white; }
+    
+    /* 进度条 */
+    .progress-section {
+      background: white;
+      border-radius: 12px;
+      padding: 20px 16px;
+      margin: 16px;
+    }
+    .progress-steps {
+      display: flex;
+      justify-content: space-between;
+      position: relative;
+    }
+    .progress-line {
+      position: absolute;
+      top: 16px;
+      left: 20px;
+      right: 20px;
+      height: 3px;
+      background: #e0e0e0;
+    }
+    .progress-line-fill {
+      position: absolute;
+      top: 16px;
+      left: 20px;
+      height: 3px;
+      background: linear-gradient(90deg, #667eea, #764ba2);
+      transition: width 0.5s ease;
+    }
+    .progress-step {
+      position: relative;
+      z-index: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      width: 60px;
+    }
+    .step-icon {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: #e0e0e0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-size: 14px;
+      margin-bottom: 8px;
+      transition: all 0.3s;
+    }
+    .progress-step.active .step-icon {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    }
+    .progress-step.current .step-icon {
+      width: 36px;
+      height: 36px;
+      font-size: 16px;
+      box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.2);
+    }
+    .step-label {
+      font-size: 11px;
+      color: #999;
+      text-align: center;
+    }
+    .progress-step.active .step-label {
+      color: #333;
+      font-weight: 500;
+    }
+    
+    /* 订单信息卡片 */
+    .info-section {
+      background: white;
+      border-radius: 12px;
+      margin: 0 16px 16px;
+      padding: 16px;
+    }
+    .info-title {
+      font-weight: 600;
+      font-size: 16px;
+      margin-bottom: 12px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid #f0f0f0;
+    }
+    .info-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 8px 0;
+      font-size: 14px;
+    }
+    .info-label { color: #666; }
+    .info-value { color: #333; font-weight: 500; }
+    
+    /* 物品列表 */
+    .item-list { margin-top: 12px; }
+    .item-card {
+      display: flex;
+      align-items: center;
+      padding: 12px;
+      background: #f8f9fa;
+      border-radius: 8px;
+      margin-bottom: 8px;
+    }
+    .item-icon {
+      width: 44px;
+      height: 44px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      margin-right: 12px;
+    }
+    .item-info { flex: 1; }
+    .item-name { font-weight: 600; margin-bottom: 4px; }
+    .item-desc { font-size: 12px; color: #666; }
+    .item-price { font-weight: 600; color: #ff5722; }
+    
+    /* 取件码 */
+    .pickup-code-section {
+      background: linear-gradient(135deg, #ff9800 0%, #ff5722 100%);
+      color: white;
+      border-radius: 12px;
+      padding: 16px;
+      margin: 16px;
+      text-align: center;
+    }
+    .pickup-code-label { font-size: 14px; margin-bottom: 8px; }
+    .pickup-code-value {
+      font-size: 36px;
+      font-weight: 700;
+      letter-spacing: 8px;
+      font-family: monospace;
+    }
+    
+    /* 底部操作栏 */
+    .bottom-bar {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      max-width: 750px;
+      margin: 0 auto;
+      background: white;
+      padding: 12px 16px;
+      box-shadow: 0 -2px 12px rgba(0,0,0,0.1);
+      display: flex;
+      justify-content: flex-end;
+      gap: 12px;
+    }
+    .btn-action {
+      padding: 10px 24px;
+      border-radius: 22px;
+      border: none;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s;
+    }
+    .btn-primary {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+    }
+    .btn-outline {
+      background: white;
+      border: 2px solid #667eea;
+      color: #667eea;
+    }
+    .btn-success {
+      background: linear-gradient(135deg, #4caf50 0%, #2e7d32 100%);
+      color: white;
+    }
+    
+    /* 订单操作栏 */
+    .order-actions-bar {
+      position: fixed;
+      bottom: 70px;
+      left: 0;
+      right: 0;
+      max-width: 750px;
+      margin: 0 auto;
+      background: white;
+      padding: 10px 16px;
+      box-shadow: 0 -2px 12px rgba(0,0,0,0.08);
+      display: flex;
+      justify-content: center;
+      gap: 12px;
+      z-index: 99;
+    }
+    .btn-cancel {
+      border-color: #ef4444 !important;
+      color: #ef4444 !important;
+    }
+    .btn-cancel:hover {
+      background: #fef2f2 !important;
+    }
+    .btn-modify {
+      border-color: #3b82f6 !important;
+      color: #3b82f6 !important;
+    }
+    .btn-modify:hover {
+      background: #eff6ff !important;
+    }
+    
+    /* 动态时间线 */
+    .timeline { margin-top: 12px; }
+    .timeline-item {
+      display: flex;
+      gap: 12px;
+      padding-bottom: 16px;
+      position: relative;
+    }
+    .timeline-item:not(:last-child)::before {
+      content: '';
+      position: absolute;
+      left: 11px;
+      top: 24px;
+      bottom: 0;
+      width: 2px;
+      background: #e0e0e0;
+    }
+    .timeline-dot {
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      background: #e0e0e0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-size: 12px;
+      flex-shrink: 0;
+    }
+    .timeline-item.active .timeline-dot {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    }
+    .timeline-content { flex: 1; }
+    .timeline-title { font-weight: 600; margin-bottom: 4px; }
+    .timeline-time { font-size: 12px; color: #999; }
+    
+    /* 实时更新指示器 */
+    .live-indicator {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      color: #4caf50;
+      margin-left: 12px;
+    }
+    .live-dot {
+      width: 8px;
+      height: 8px;
+      background: #4caf50;
+      border-radius: 50%;
+      animation: pulse 1.5s infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.5; transform: scale(1.2); }
+    }
+    
+    /* 响应式 */
+    @media (max-width: 480px) {
+      .progress-steps { overflow-x: auto; padding-bottom: 8px; }
+      .progress-step { min-width: 70px; }
+    }
+    
+    /* 返回订单列表按钮 */
+    .back-btn {
+      position: absolute;
+      top: 16px;
+      left: 16px;
+      width: 40px;
+      height: 40px;
+      background: rgba(255,255,255,0.9);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #1a1a1a;
+      text-decoration: none;
+      transition: all 0.3s;
+      font-size: 18px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+    }
+    .back-btn:hover {
+      background: white;
+      transform: translateX(-2px);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+    }
+    
+    /* 取件方式选择 */
+    .pickup-method-section {
+      background: white;
+      border-radius: 12px;
+      margin: 0 16px 16px;
+      padding: 16px;
+    }
+    .pickup-method-title {
+      font-weight: 600;
+      font-size: 16px;
+      margin-bottom: 16px;
+      color: #333;
+    }
+    .pickup-method-option {
+      display: flex;
+      align-items: center;
+      padding: 16px;
+      border: 2px solid #e0e0e0;
+      border-radius: 12px;
+      margin-bottom: 12px;
+      cursor: pointer;
+      transition: all 0.3s;
+    }
+    .pickup-method-option:hover {
+      border-color: #667eea;
+    }
+    .pickup-method-option.selected {
+      border-color: #667eea;
+      background: #f5f7ff;
+    }
+    .pickup-method-icon {
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 24px;
+      margin-right: 12px;
+    }
+    .pickup-method-option:nth-child(1) .pickup-method-icon {
+      background: #e8f5e9;
+      color: #4caf50;
+    }
+    .pickup-method-option:nth-child(2) .pickup-method-icon {
+      background: #e3f2fd;
+      color: #2196f3;
+    }
+    .pickup-method-info { flex: 1; }
+    .pickup-method-name { font-weight: 600; margin-bottom: 4px; }
+    .pickup-method-desc { font-size: 12px; color: #666; }
+    .pickup-method-check {
+      width: 24px;
+      height: 24px;
+      border: 2px solid #e0e0e0;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .pickup-method-option.selected .pickup-method-check {
+      background: #667eea;
+      border-color: #667eea;
+      color: white;
+    }
+    
+    /* 配送地址表单 */
+    .delivery-form {
+      display: none;
+      margin-top: 16px;
+      padding-top: 16px;
+      border-top: 1px solid #eee;
+    }
+    .delivery-form.show { display: block; }
+    .form-group {
+      margin-bottom: 12px;
+    }
+    .form-label {
+      display: block;
+      font-size: 13px;
+      color: #666;
+      margin-bottom: 6px;
+    }
+    .form-input {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid #e0e0e0;
+      border-radius: 8px;
+      font-size: 14px;
+    }
+    .form-input:focus {
+      outline: none;
+      border-color: #667eea;
+    }
+    
+    /* 一键取货按钮 */
+    .batch-pickup-btn {
+      background: linear-gradient(135deg, #ff9800, #ff5722);
+      color: white;
+      border: none;
+      padding: 14px 24px;
+      border-radius: 24px;
+      font-weight: 600;
+      font-size: 16px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin: 16px auto;
+      transition: all 0.3s;
+    }
+    .batch-pickup-btn:hover {
+      transform: scale(1.02);
+      box-shadow: 0 4px 16px rgba(255, 152, 0, 0.4);
+    }
+    .batch-pickup-btn:active {
+      transform: scale(0.98);
+    }
+  </style>
+</head>
+<body>
+  <div class="order-detail-page">
+    <!-- 顶部状态 -->
+    <div class="status-card" id="statusCard">
+      <!-- 返回订单列表按钮 -->
+      <a href="c-orders.html" class="back-btn">
+        <i class="fas fa-arrow-left"></i>
+      </a>
+      <div class="status-icon-large" id="statusIcon">
+        <i class="fas fa-spinner fa-spin"></i>
+      </div>
+      <div class="status-text" id="statusText">加载中...</div>
+      <div class="status-desc" id="statusDesc">正在获取订单信息</div>
+      <div class="live-indicator" id="liveIndicator" style="display:none;">
+        <span class="live-dot"></span>
+        <span>实时更新中</span>
+      </div>
+    </div>
+    
+    <!-- 配送员信息 -->
+    <div class="driver-card" id="driverCard" style="display:none;">
+      <div class="driver-avatar">
+        <i class="fas fa-motorcycle"></i>
+      </div>
+      <div class="driver-info">
+        <div class="driver-name" id="driverName">配送员</div>
+        <div class="driver-status" id="driverStatus">正在配送中</div>
+      </div>
+      <div class="driver-actions">
+        <button class="driver-btn call" onclick="callDriver()">
+          <i class="fas fa-phone"></i>
+        </button>
+        <button class="driver-btn message" onclick="messageDriver()">
+          <i class="fas fa-comment"></i>
+        </button>
+      </div>
+    </div>
+    
+    <!-- 订单进度 -->
+    <div class="progress-section">
+      <div class="info-title">订单进度</div>
+      <div class="progress-steps">
+        <div class="progress-line"></div>
+        <div class="progress-line-fill" id="progressFill"></div>
+        
+        <div class="progress-step" data-step="paid">
+          <div class="step-icon"><i class="fas fa-check"></i></div>
+          <span class="step-label">已支付</span>
+        </div>
+        <div class="progress-step" data-step="delivering">
+          <div class="step-icon"><i class="fas fa-truck"></i></div>
+          <span class="step-label">取件中</span>
+        </div>
+        <div class="progress-step" data-step="received">
+          <div class="step-icon"><i class="fas fa-warehouse"></i></div>
+          <span class="step-label">已入库</span>
+        </div>
+        <div class="progress-step" data-step="processing">
+          <div class="step-icon"><i class="fas fa-cog"></i></div>
+          <span class="step-label">处理中</span>
+        </div>
+        <div class="progress-step" data-step="ready">
+          <div class="step-icon"><i class="fas fa-box"></i></div>
+          <span class="step-label">待取件</span>
+        </div>
+        <div class="progress-step" data-step="completed">
+          <div class="step-icon"><i class="fas fa-flag-checkered"></i></div>
+          <span class="step-label">完成</span>
+        </div>
+      </div>
+    </div>
+    
+    <!-- 取件码 -->
+    <div class="pickup-code-section" id="pickupCodeSection" style="display:none;">
+      <div class="pickup-code-label">取件码</div>
+      <div class="pickup-code-value" id="pickupCode">P000000</div>
+    </div>
+    
+    <!-- 取件方式选择（待取件状态显示） -->
+    <div class="pickup-method-section" id="pickupMethodSection" style="display:none;">
+      <div class="pickup-method-title">请选择取件方式</div>
+      
+      <!-- 到店自提 -->
+      <div class="pickup-method-option selected" data-method="store_pickup" onclick="selectPickupMethod('store_pickup')">
+        <div class="pickup-method-icon">🏪</div>
+        <div class="pickup-method-info">
+          <div class="pickup-method-name">到店自提</div>
+          <div class="pickup-method-desc">凭取件码到店取件，无需等待</div>
+        </div>
+        <div class="pickup-method-check"><i class="fas fa-check"></i></div>
+      </div>
+      
+      <!-- 配送到家 -->
+      <div class="pickup-method-option" data-method="home_delivery" onclick="selectPickupMethod('home_delivery')">
+        <div class="pickup-method-icon">🚚</div>
+        <div class="pickup-method-info">
+          <div class="pickup-method-name">配送到家</div>
+          <div class="pickup-method-desc">骑手送件上门，方便快捷</div>
+        </div>
+        <div class="pickup-method-check"><i class="fas fa-check"></i></div>
+      </div>
+      
+      <!-- 配送地址表单 -->
+      <div class="delivery-form" id="deliveryForm">
+        <div class="form-group">
+          <label class="form-label">配送地址</label>
+          <input type="text" class="form-input" id="deliveryAddress" placeholder="请输入详细配送地址">
+        </div>
+        <div class="form-group">
+          <label class="form-label">联系人</label>
+          <input type="text" class="form-input" id="deliveryContact" placeholder="请输入联系人姓名">
+        </div>
+        <div class="form-group">
+          <label class="form-label">联系电话</label>
+          <input type="tel" class="form-input" id="deliveryPhone" placeholder="请输入联系电话">
+        </div>
+      </div>
+    </div>
+    
+    <!-- 物品清单 -->
+    <div class="info-section">
+      <div class="info-title">物品清单</div>
+      <div class="item-list" id="itemList">
+        <!-- 动态填充 -->
+      </div>
+      <div class="info-row mt-3">
+        <span class="info-label">合计</span>
+        <span class="info-value" style="color:#ff5722;font-size:18px;" id="totalAmount">¥0</span>
+      </div>
+    </div>
+    
+    <!-- 订单信息 -->
+    <div class="info-section">
+      <div class="info-title">订单信息</div>
+      <div class="info-row">
+        <span class="info-label">订单编号</span>
+        <span class="info-value" id="orderNo">-</span>
+      </div>
+      <div class="info-row">
+        <span class="info-label">门店</span>
+        <span class="info-value" id="storeName">-</span>
+      </div>
+      <div class="info-row">
+        <span class="info-label">下单时间</span>
+        <span class="info-value" id="createTime">-</span>
+      </div>
+      <!-- 配送信息（跑腿配送时显示） -->
+      <div class="info-row" id="deliveryInfoRow" style="display:none;">
+        <span class="info-label">配送方式</span>
+        <span class="info-value" id="deliveryMethodText">-</span>
+      </div>
+      <div class="info-row" id="courierProviderRow" style="display:none;">
+        <span class="info-label">服务商</span>
+        <span class="info-value" id="courierProviderText">-</span>
+      </div>
+    </div>
+    
+    <!-- 配送费支付入口（跑腿配送且未支付时显示） -->
+    <div class="info-section" id="deliveryFeeSection" style="display:none;">
+      <div class="info-title">配送费支付</div>
+      
+      <!-- 服务商选择（如果还未选择） -->
+      <div id="courierProviderSelection" style="display:none;">
+        <div style="font-size: 14px; color: #666; margin-bottom: 12px;">请选择跑腿服务商</div>
+        <div style="display: grid; gap: 10px;">
+          <!-- 美团跑腿 -->
+          <div class="provider-card" onclick="selectCourierProvider('meituan')" id="provider-meituan" style="
+            display: flex;
+            align-items: center;
+            padding: 12px;
+            background: white;
+            border: 2px solid #e5e7eb;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.2s;
+          " onmouseover="this.style.borderColor='#ff6633'" onmouseout="this.style.borderColor='#e5e7eb'">
+            <div style="font-size: 32px; margin-right: 12px;">🛵</div>
+            <div style="flex: 1;">
+              <div style="font-weight: 600; color: #333; margin-bottom: 4px;">美团跑腿</div>
+              <div style="font-size: 12px; color: #666;">预计30-45分钟 | ¥15</div>
+            </div>
+            <div style="text-align: right;">
+              <div style="font-size: 12px; color: #ff6633; margin-bottom: 4px;">新用户首单立减3元</div>
+              <div style="font-size: 18px; font-weight: bold; color: #ff6633;">¥12</div>
+            </div>
+          </div>
+          
+          <!-- 顺丰跑腿 -->
+          <div class="provider-card" onclick="selectCourierProvider('sf')" id="provider-sf" style="
+            display: flex;
+            align-items: center;
+            padding: 12px;
+            background: white;
+            border: 2px solid #e5e7eb;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.2s;
+          " onmouseover="this.style.borderColor='#e62029'" onmouseout="this.style.borderColor='#e5e7eb'">
+            <div style="font-size: 32px; margin-right: 12px;">✈️</div>
+            <div style="flex: 1;">
+              <div style="font-weight: 600; color: #333; margin-bottom: 4px;">顺丰跑腿</div>
+              <div style="font-size: 12px; color: #666;">预计40-60分钟 | ¥20</div>
+            </div>
+            <div style="text-align: right;">
+              <div style="font-size: 12px; color: #e62029; margin-bottom: 4px;">满50元减5元</div>
+              <div style="font-size: 18px; font-weight: bold; color: #e62029;">¥15</div>
+            </div>
+          </div>
+          
+          <!-- 京东秒送 -->
+          <div class="provider-card" onclick="selectCourierProvider('jd')" id="provider-jd" style="
+            display: flex;
+            align-items: center;
+            padding: 12px;
+            background: white;
+            border: 2px solid #e5e7eb;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.2s;
+          " onmouseover="this.style.borderColor='#c4161c'" onmouseout="this.style.borderColor='#e5e7eb'">
+            <div style="font-size: 32px; margin-right: 12px;">🚚</div>
+            <div style="flex: 1;">
+              <div style="font-weight: 600; color: #333; margin-bottom: 4px;">京东秒送</div>
+              <div style="font-size: 12px; color: #666;">预计35-50分钟 | ¥18</div>
+            </div>
+            <div style="text-align: right;">
+              <div style="font-size: 12px; color: #c4161c; margin-bottom: 4px;">准时必达</div>
+              <div style="font-size: 18px; font-weight: bold; color: #c4161c;">¥18</div>
+            </div>
+          </div>
+          
+          <!-- 淘宝闪购 -->
+          <div class="provider-card" onclick="selectCourierProvider('taobao')" id="provider-taobao" style="
+            display: flex;
+            align-items: center;
+            padding: 12px;
+            background: white;
+            border: 2px solid #e5e7eb;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.2s;
+          " onmouseover="this.style.borderColor='#ff5000'" onmouseout="this.style.borderColor='#e5e7eb'">
+            <div style="font-size: 32px; margin-right: 12px;">📦</div>
+            <div style="flex: 1;">
+              <div style="font-weight: 600; color: #333; margin-bottom: 4px;">淘宝闪购</div>
+              <div style="font-size: 12px; color: #666;">预计40-55分钟 | ¥16</div>
+            </div>
+            <div style="text-align: right;">
+              <div style="font-size: 12px; color: #ff5000; margin-bottom: 4px;">急速送达</div>
+              <div style="font-size: 18px; font-weight: bold; color: #ff5000;">¥16</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- 已选择服务商，显示支付按钮 -->
+      <div id="courierProviderSelected" style="display:none;">
+        <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 12px; padding: 16px; color: white; text-align: center;">
+          <div style="font-size: 14px; margin-bottom: 8px;">待支付配送费</div>
+          <div style="font-size: 28px; font-weight: bold; margin-bottom: 12px;">¥<span id="deliveryFeeAmount">0</span></div>
+          <div style="font-size: 12px; opacity: 0.9; margin-bottom: 12px;" id="courierProviderInfo"></div>
+          <button onclick="payDeliveryFee()" style="width: 100%; padding: 12px; background: white; color: #667eea; border: none; border-radius: 8px; font-weight: 600; cursor: pointer;">
+            立即支付配送费
+          </button>
+        </div>
+      </div>
+    </div>
+    
+    <!-- 动态时间线 -->
+    <div class="info-section">
+      <div class="info-title">订单动态</div>
+      <div class="timeline" id="timeline">
+        <!-- 动态填充 -->
+      </div>
+    </div>
+    
+    <!-- 底部操作栏 -->
+    <div class="bottom-bar" id="bottomBar">
+      <button class="btn-action btn-outline" id="secondaryAction" onclick="viewStore()">联系门店</button>
+      <button class="btn-action btn-primary" id="mainAction" onclick="handleMainAction()">确认取件</button>
+    </div>
+    
+    <!-- 订单操作栏（取消/修改） -->
+    <div class="order-actions-bar" id="orderActionsBar" style="display:none;">
+      <button class="btn-action btn-outline btn-cancel" onclick="cancelOrder()">
+        <i class="fas fa-times"></i> 取消订单
+      </button>
+      <button class="btn-action btn-outline btn-modify" onclick="modifyOrder()">
+        <i class="fas fa-edit"></i> 修改订单
+      </button>
+    </div>
+  </div>
+  
+  <script src="frontend/order-tracker.js"></script>
+  <script>
+    // 订单状态配置（兼容后端状态值）
+    const STATUS_CONFIG = {
+      pending: { text: '待支付', icon: 'fa-clock', color: '#ff9800', gradient: 'linear-gradient(135deg, #ff9800, #ff5722)' },
+      paid: { text: '已支付', icon: 'fa-check-circle', color: '#4caf50', gradient: 'linear-gradient(135deg, #4caf50, #2e7d32)' },
+      awaiting_store_confirm: { text: '待门店确认', icon: 'fa-store', color: '#ff9800', gradient: 'linear-gradient(135deg, #ff9800, #ff5722)' },
+      store_confirmed: { text: '门店已确认', icon: 'fa-check-circle', color: '#4caf50', gradient: 'linear-gradient(135deg, #4caf50, #2e7d32)' },
+      delivering: { text: '配送中', icon: 'fa-truck', color: '#2196f3', gradient: 'linear-gradient(135deg, #2196f3, #1976d2)' },
+      received: { text: '已入库', icon: 'fa-warehouse', color: '#9c27b0', gradient: 'linear-gradient(135deg, #9c27b0, #7b1fa2)' },
+      processing: { text: '处理中', icon: 'fa-cog fa-spin', color: '#ff5722', gradient: 'linear-gradient(135deg, #ff5722, #e64a19)' },
+      in_progress: { text: '清洗中', icon: 'fa-cog fa-spin', color: '#ff5722', gradient: 'linear-gradient(135deg, #ff5722, #e64a19)' },
+      cleaning: { text: '清洗中', icon: 'fa-cog fa-spin', color: '#ff5722', gradient: 'linear-gradient(135deg, #ff5722, #e64a19)' },
+      cleaned: { text: '清洗完成', icon: 'fa-check-circle', color: '#9c27b0', gradient: 'linear-gradient(135deg, #9c27b0, #7b1fa2)' },
+      ready: { text: '待取件', icon: 'fa-box', color: '#00bcd4', gradient: 'linear-gradient(135deg, #00bcd4, #0097a7)' },
+      delivering_back: { text: '配送中', icon: 'fa-truck', color: '#2196f3', gradient: 'linear-gradient(135deg, #2196f3, #1976d2)' },
+      completed: { text: '已完成', icon: 'fa-flag-checkered', color: '#4caf50', gradient: 'linear-gradient(135deg, #4caf50, #388e3c)' },
+      cancelled: { text: '已取消', icon: 'fa-times-circle', color: '#9e9e9e', gradient: 'linear-gradient(135deg, #9e9e9e, #757575)' }
+    };
+    
+    const STEPS_ORDER = ['awaiting_store_confirm', 'store_confirmed', 'delivering', 'received', 'processing', 'in_progress', 'cleaning', 'cleaned', 'ready', 'completed'];
+    
+    // 获取状态文字
+    function getStatusText(status) {
+      return STATUS_CONFIG[status]?.text || status || '未知状态';
+    }
+    
+    let currentOrder = null;
+    let tracker = null;
+    let orderId = null;
+    let selectedPickupMethod = 'store_pickup'; // 默认到店自提
+    
+    // 初始化
+    function init() {
+      // 从URL获取订单ID
+      const urlParams = new URLSearchParams(window.location.search);
+      orderId = urlParams.get('id');
+      
+      // 加载记忆的用户信息
+      loadUserInfo();
+      
+      if (!orderId) {
+        // 尝试从currentOrder获取订单ID
+        const currentOrderStr = localStorage.getItem('currentOrder');
+        if (currentOrderStr) {
+          const order = JSON.parse(currentOrderStr);
+          orderId = order.orderId || order.id;
+        }
+      }
+      
+      if (!orderId) {
+        // 使用演示数据
+        isPageLoading = false;
+        showDemoOrder();
+      } else {
+        loadOrderDetail().then(() => {
+          // 加载完成后标记并开始轮询
+          isPageLoading = false;
+          if (currentOrder) {
+            lastKnownOrderStatus = currentOrder.status;
+            lastKnownUpdatedAt = currentOrder.updatedAt;
+            console.log('[初始化] 订单加载完成，状态:', lastKnownOrderStatus, '开始实时同步...');
+          }
+        }).catch(error => {
+          console.error('[初始化] 加载订单出错:', error);
+          isPageLoading = false;
+          showDemoOrder();
+        });
+        startRealTimeTracking();
+        
+        // 10秒后如果还在加载，强制结束
+        setTimeout(() => {
+          if (isPageLoading) {
+            console.warn('[超时] 页面加载超时，强制显示');
+            isPageLoading = false;
+            // 再次尝试加载
+            const ordersStr = localStorage.getItem('orders');
+            const currentOrderStr = localStorage.getItem('currentOrder');
+            if (ordersStr || currentOrderStr) {
+              loadFromLocalStorageSync();
+            } else {
+              showDemoOrder();
+            }
+          }
+        }, 10000);
+      }
+    }
+    
+    // 加载用户记忆的信息
+    function loadUserInfo() {
+      const savedInfo = localStorage.getItem('userDeliveryInfo');
+      if (savedInfo) {
+        const info = JSON.parse(savedInfo);
+        if (document.getElementById('deliveryAddress')) {
+          document.getElementById('deliveryAddress').value = info.pickupAddress || '';
+        }
+        if (document.getElementById('deliveryContact')) {
+          document.getElementById('deliveryContact').value = info.contactName || '';
+        }
+        if (document.getElementById('deliveryPhone')) {
+          document.getElementById('deliveryPhone').value = info.contactPhone || '';
+        }
+      }
+    }
+    
+    // 保存用户信息到localStorage
+    function saveUserInfo() {
+      const info = {
+        contactName: document.getElementById('deliveryContact')?.value || '',
+        contactPhone: document.getElementById('deliveryPhone')?.value || '',
+        pickupAddress: document.getElementById('deliveryAddress')?.value || '',
+        updateTime: Date.now()
+      };
+      localStorage.setItem('userDeliveryInfo', JSON.stringify(info));
+    }
+    
+    // 加载订单详情
+    async function loadOrderDetail() {
+      try {
+        console.log('[加载] 开始加载订单, orderId:', orderId);
+        
+        // 首先从localStorage加载最新状态（M端会实时更新这里）
+        const loaded = loadFromLocalStorageSync();
+        if (loaded && currentOrder) {
+          console.log('[加载] 已从localStorage加载订单，状态:', currentOrder.status);
+          // 即使有本地数据，也尝试从API获取最新状态（不阻塞）
+          fetchApiStatus().catch(err => console.warn('[加载] API同步失败:', err.message));
+          return currentOrder;
+        }
+        
+        console.log('[加载] localStorage未找到订单，尝试从API获取');
+        
+        // 如果localStorage没有，直接从API获取
+        try {
+          const apiOrder = await fetchApiOrder();
+          if (apiOrder) {
+            currentOrder = apiOrder;
+            updateOrderUI(currentOrder);
+            console.log('[加载] 从API加载成功，状态:', currentOrder.status);
+            return currentOrder;
+          }
+        } catch (apiError) {
+          console.error('[加载] API请求失败:', apiError.message);
+        }
+        
+        // 最后尝试：查看currentOrder localStorage中是否有任何订单
+        const currentOrderStr = localStorage.getItem('currentOrder');
+        if (currentOrderStr) {
+          try {
+            const anyOrder = JSON.parse(currentOrderStr);
+            if (anyOrder && anyOrder.orderId) {
+              console.log('[备用] 使用currentOrder中的订单:', anyOrder.status);
+              currentOrder = anyOrder;
+              updateOrderUI(currentOrder);
+              return currentOrder;
+            }
+          } catch (parseError) {
+            console.error('[备用] 解析currentOrder失败:', parseError);
+          }
+        }
+        
+        // 所有方法都失败了，显示演示订单
+        console.warn('[加载] 未找到任何订单数据，显示演示数据');
+        showDemoOrder();
+        return null;
+        
+      } catch (error) {
+        console.error('[加载] 加载订单失败:', error);
+        showDemoOrder();
+        return null;
+      }
+    }
+    
+    // 从API获取订单状态（带超时）
+    async function fetchApiStatus() {
+      try {
+        console.log('[API] 正在获取订单状态:', orderId);
+        
+        // 创建超时Promise
+        const timeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('API请求超时')), 5000)
+        );
+        
+        const response = await Promise.race([
+          fetch(`http://localhost:3000/api/cleaning/orders/${orderId}/status`, {
+            headers: {
+              'Cache-Control': 'no-cache',
+              'Pragma': 'no-cache'
+            }
+          }),
+          timeoutPromise
+        ]);
+        
+        const result = await response.json();
+        console.log('[API] 返回结果:', result);
+        
+        if (result.success && result.data) {
+          const apiOrder = result.data;
+          
+          // 比较时间戳，确保使用最新状态
+          const localUpdatedAt = currentOrder?.updatedAt ? new Date(currentOrder.updatedAt) : null;
+          const apiUpdatedAt = apiOrder.updatedAt ? new Date(apiOrder.updatedAt) : null;
+          
+          // 重要：localStorage 是 M 端实时更新的，应该优先于 API
+          // 只有当 localStorage 没有数据，或者 API 的数据比 localStorage 更新时，才使用 API 数据
+          const shouldUseApi = !currentOrder || !localUpdatedAt || (apiUpdatedAt && apiUpdatedAt > localUpdatedAt);
+          
+          if (shouldUseApi) {
+            console.log('[API] 使用API的订单状态:', apiOrder.status, '| localStorage状态:', currentOrder?.status);
+            
+            if (currentOrder) {
+              currentOrder.status = apiOrder.status || currentOrder.status;
+              currentOrder.deliveryStatus = apiOrder.deliveryStatus || currentOrder.deliveryStatus;
+              currentOrder.deliveryMethod = apiOrder.deliveryMethod || currentOrder.deliveryMethod;
+              currentOrder.selectedProvider = apiOrder.selectedProvider || currentOrder.selectedProvider;
+              currentOrder.deliveryFee = apiOrder.deliveryFee || currentOrder.deliveryFee;
+              currentOrder.deliveryFeePaid = apiOrder.deliveryFeePaid || currentOrder.deliveryFeePaid;
+              currentOrder.updatedAt = apiOrder.updatedAt || currentOrder.updatedAt;
+            } else {
+              currentOrder = apiOrder;
+            }
+            
+            // 更新items数据
+            if (apiOrder.items && apiOrder.items.length > 0) {
+              currentOrder.items = apiOrder.items;
+              currentOrder.services = apiOrder.items;
+            }
+            
+            console.log('[最终] 订单状态:', currentOrder.status);
+            updateOrderUI(currentOrder);
+          } else {
+            console.log('[最终] 保留localStorage的订单状态:', currentOrder.status, '（比API更新）');
+            updateOrderUI(currentOrder); // 关键：即使保留数据也要更新UI
+          }
+        }
+      } catch (error) {
+        console.warn('[API] 获取失败，使用本地数据:', error.message);
+        // API失败时，确保仍然显示本地数据
+        if (currentOrder) {
+          console.log('[本地] 保留本地的订单状态:', currentOrder.status);
+          updateOrderUI(currentOrder);
+        }
+      }
+    }
+    
+    // 从API获取完整订单
+    async function fetchApiOrder() {
+      try {
+        console.log('[API] 正在获取完整订单:', orderId);
+        
+        const timeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('API请求超时')), 8000)
+        );
+        
+        const response = await Promise.race([
+          fetch(`http://localhost:3000/api/cleaning/orders/${orderId}`, {
+            headers: {
+              'Authorization': 'Bearer ' + (localStorage.getItem('authToken') || ''),
+              'Cache-Control': 'no-cache'
+            }
+          }),
+          timeoutPromise
+        ]);
+        
+        const result = await response.json();
+        if (result.success && result.data) {
+          console.log('[API] 成功获取订单，状态:', result.data.status);
+          return result.data;
+        }
+        return null;
+      } catch (error) {
+        console.error('[API] 获取完整订单失败:', error.message);
+        return null;
+      }
+    }
+    
+    // 同步从localStorage加载订单（返回是否成功）
+    function loadFromLocalStorageSync() {
+      try {
+        console.log('[本地] 开始从localStorage加载订单, 目标orderId:', orderId);
+        
+        // 尝试从orders列表获取（支持多种ID格式匹配）
+        const ordersStr = localStorage.getItem('orders');
+        if (ordersStr) {
+          const orders = JSON.parse(ordersStr);
+          console.log('[本地] orders列表中有', orders.length, '个订单');
+          
+          const order = orders.find(o => 
+            o.orderId === orderId || 
+            o.id === orderId || 
+            o._id === orderId ||
+            o.orderNo === orderId
+          );
+          
+          if (order) {
+            console.log('[本地] ✓ 从orders找到订单!', {
+              orderId: order.orderId,
+              id: order.id,
+              _id: order._id,
+              orderNo: order.orderNo,
+              status: order.status
+            });
+            currentOrder = order;
+            updateOrderUI(currentOrder);
+            return true;
+          } else {
+            console.log('[本地] orders列表中没有匹配的订单');
+            // 列出所有订单的ID以便调试
+            console.log('[本地] orders列表中的订单IDs:', orders.map(o => ({
+              orderId: o.orderId,
+              id: o.id,
+              orderNo: o.orderNo,
+              status: o.status
+            })));
+          }
+        } else {
+          console.log('[本地] orders localStorage为空或不存在');
+        }
+        
+        // 尝试从currentOrder获取
+        const currentOrderStr = localStorage.getItem('currentOrder');
+        if (currentOrderStr) {
+          const order = JSON.parse(currentOrderStr);
+          console.log('[本地] currentOrder数据:', {
+            orderId: order.orderId,
+            id: order.id,
+            orderNo: order.orderNo,
+            status: order.status
+          });
+          
+          if (
+            order.orderId === orderId || 
+            order.id === orderId ||
+            order._id === orderId ||
+            order.orderNo === orderId
+          ) {
+            console.log('[本地] ✓ 从currentOrder找到订单!');
+            currentOrder = order;
+            updateOrderUI(currentOrder);
+            return true;
+          } else {
+            console.log('[本地] currentOrder的ID不匹配 (current:', order.orderId || order.id, 'vs target:', orderId, ')');
+          }
+        } else {
+          console.log('[本地] currentOrder localStorage为空或不存在');
+        }
+        
+        console.warn('[本地] ✗ 未找到订单数据');
+        return false;
+      } catch (error) {
+        console.error('[本地] 加载订单失败:', error);
+        return false;
+      }
+    }
+    
+    // 从localStorage加载订单（异步版本，用于错误处理）
+    function loadFromLocalStorage() {
+      const loaded = loadFromLocalStorageSync();
+      if (!loaded) {
+        console.log('未找到匹配订单，使用演示数据');
+        showDemoOrder();
+      }
+    }
+    
+    // 开始实时追踪（使用refreshOrderData，不使用order-tracker避免冲突）
+    function startRealTimeTracking() {
+      document.getElementById('liveIndicator').style.display = 'inline-flex';
+      console.log('[实时追踪] 已启动，使用refreshOrderData轮询');
+      // 不启动order-tracker，因为refreshOrderData已经每3秒检查一次且正确处理localStorage优先
+      // tracker.startTracking(orderId); // 已禁用
+    }
+    
+    // 更新订单UI
+    function updateOrderUI(order) {
+      // 更新状态卡片
+      const config = STATUS_CONFIG[order.status] || STATUS_CONFIG.pending;
+      document.getElementById('statusCard').style.background = config.gradient;
+      document.getElementById('statusIcon').innerHTML = `<i class="fas ${config.icon}"></i>`;
+      document.getElementById('statusText').textContent = config.text;
+      document.getElementById('statusDesc').textContent = order.statusDescription || '';
+      
+      // 更新进度条
+      const currentStep = STEPS_ORDER.indexOf(order.status);
+      const progressPercent = currentStep >= 0 ? (currentStep / (STEPS_ORDER.length - 1)) * 100 : 0;
+      document.getElementById('progressFill').style.width = `${progressPercent}%`;
+      
+      // 更新步骤高亮
+      document.querySelectorAll('.progress-step').forEach((step, index) => {
+        const stepKey = step.dataset.step;
+        const stepIndex = STEPS_ORDER.indexOf(stepKey);
+        if (stepIndex <= currentStep) {
+          step.classList.add('active');
+        } else {
+          step.classList.remove('active');
+        }
+        if (stepIndex === currentStep) {
+          step.classList.add('current');
+        } else {
+          step.classList.remove('current');
+        }
+      });
+      
+      // 更新物品列表（优先使用items，如果没有则使用services）
+      const items = order.items || order.services || [];
+      if (items.length > 0) {
+        document.getElementById('itemList').innerHTML = items.map(item => {
+          const quantity = item.quantity || 1;
+          const price = item.price || 0;
+          const total = price * quantity;
+          const name = item.name || item.serviceName || '未知物品';
+          return `
+          <div class="item-card">
+            <div class="item-icon">
+              <i class="fas fa-tshirt"></i>
+            </div>
+            <div class="item-info">
+              <div class="item-name">${name} ${quantity > 1 ? 'x' + quantity : ''}</div>
+              <div class="item-desc">¥${price} ${quantity > 1 ? 'x ' + quantity + ' = ¥' + total : ''}</div>
+            </div>
+            <div class="item-price">¥${total}</div>
+          </div>
+        `}).join('');
+      }
+      
+      // 更新订单信息
+      document.getElementById('orderNo').textContent = order.orderNo || orderId;
+      document.getElementById('createTime').textContent = order.createTime ? new Date(order.createTime).toLocaleString('zh-CN') : '-';
+      
+      // 计算并更新总金额（优先使用items/services计算，确保修改后的金额正确）
+      let totalAmount = 0;
+      const itemsForCalc = order.items || order.services || [];
+      if (itemsForCalc.length > 0) {
+        totalAmount = itemsForCalc.reduce((sum, item) => sum + (item.price || 0) * (item.quantity || 1), 0);
+      } else if (order.fees?.total) {
+        totalAmount = order.fees.total;
+      } else if (order.total) {
+        totalAmount = order.total;
+      }
+      document.getElementById('totalAmount').textContent = '¥' + totalAmount;
+      
+      // 更新门店信息（显示详细门店信息）
+      const storeInfo = order.store || {};
+      const storeName = storeInfo.name || order.storeName || '系统分配';
+      const storeAddress = storeInfo.address || '';
+      const storePhone = storeInfo.phone || '';
+      const storeSpecialty = storeInfo.specialty || '';
+      
+      let storeDisplay = storeName;
+      if (storeSpecialty) {
+        storeDisplay += ` <span style="color:#667eea;font-size:12px;">(${storeSpecialty})</span>`;
+      }
+      if (storeAddress) {
+        storeDisplay += `<br><span style="color:#666;font-size:12px;">📍 ${storeAddress}</span>`;
+      }
+      if (storePhone) {
+        storeDisplay += `<br><span style="color:#666;font-size:12px;">📞 ${storePhone}</span>`;
+      }
+      
+      document.getElementById('storeName').innerHTML = storeDisplay;
+      
+      // 更新时间线
+      if (order.latestHistory) {
+        document.getElementById('timeline').innerHTML = `
+          <div class="timeline-item active">
+            <div class="timeline-dot"><i class="fas fa-check"></i></div>
+            <div class="timeline-content">
+              <div class="timeline-title">${order.latestHistory.note}</div>
+              <div class="timeline-time">${formatTime(order.latestHistory.time)}</div>
+            </div>
+          </div>
+        `;
+      }
+      
+      // 恢复之前选择的取件方式（必须在updateBottomActions之前执行）
+      if (order.status === 'ready') {
+        document.getElementById('pickupMethodSection').style.display = 'block';
+        
+        // 根据订单的deliveryMethod恢复选择状态
+        if (order.deliveryMethod === 'courier') {
+          selectedPickupMethod = 'home_delivery';
+          document.querySelectorAll('.pickup-method-option').forEach(option => {
+            option.classList.remove('selected');
+            if (option.dataset.method === 'home_delivery') {
+              option.classList.add('selected');
+            }
+          });
+          document.getElementById('deliveryForm').classList.add('show');
+        } else {
+          selectedPickupMethod = 'store_pickup';
+          document.querySelectorAll('.pickup-method-option').forEach(option => {
+            option.classList.remove('selected');
+            if (option.dataset.method === 'store_pickup') {
+              option.classList.add('selected');
+            }
+          });
+          document.getElementById('deliveryForm').classList.remove('show');
+        }
+      } else {
+        document.getElementById('pickupMethodSection').style.display = 'none';
+      }
+      
+      // 更新配送信息（跑腿配送时显示）
+      updateDeliveryInfo(order);
+      
+      // 更新底部按钮（在恢复取件方式之后执行）
+      updateBottomActions(order.status);
+      
+      // 显示/隐藏订单操作栏（取消/修改）
+      updateOrderActionsBar(order.status);
+    }
+    
+    // 更新配送信息显示
+    function updateDeliveryInfo(order) {
+      // 兼容处理：优先使用 deliveryMethod，否则根据 selectedProvider 或 courier 判断
+      const deliveryMethod = order.deliveryMethod || 
+        (order.selectedProvider ? 'courier' : null) || 
+        (order.courier?.provider ? 'courier' : null);
+      const selectedProvider = order.selectedProvider || order.courier?.provider;
+      const deliveryFee = order.deliveryFee || order.courier?.fee || 0;
+      const deliveryFeePaid = order.deliveryFeePaid;
+      
+      // 显示/隐藏配送信息行
+      const deliveryInfoRow = document.getElementById('deliveryInfoRow');
+      const courierProviderRow = document.getElementById('courierProviderRow');
+      
+      if (deliveryMethod === 'courier') {
+        // 跑腿配送
+        deliveryInfoRow.style.display = 'flex';
+        document.getElementById('deliveryMethodText').innerHTML = '<span style="color:#667eea;">跑腿上门取件</span>';
+        
+        // 显示服务商信息（如果已选择）
+        if (selectedProvider) {
+          courierProviderRow.style.display = 'flex';
+          const providerConfig = {
+            'meituan': { name: '美团跑腿', icon: '🛵', color: '#ff6633' },
+            'sf': { name: '顺丰跑腿', icon: '✈️', color: '#e62029' },
+            'jd': { name: '京东秒送', icon: '🚚', color: '#c4161c' },
+            'taobao': { name: '淘宝闪购', icon: '📦', color: '#ff5000' }
+          };
+          const provider = providerConfig[selectedProvider] || { name: selectedProvider, icon: '🚴', color: '#667eea' };
+          document.getElementById('courierProviderText').innerHTML = `<span style="color:${provider.color};">${provider.icon} ${provider.name}</span>`;
+        } else {
+          courierProviderRow.style.display = 'none';
+        }
+        
+        // 显示/隐藏配送费支付区域
+        const deliveryFeeSection = document.getElementById('deliveryFeeSection');
+        // 只要是跑腿配送且未支付配送费，就显示服务商选择或支付界面
+        if (!deliveryFeePaid) {
+          deliveryFeeSection.style.display = 'block';
+          
+          const providerSelection = document.getElementById('courierProviderSelection');
+          const providerSelected = document.getElementById('courierProviderSelected');
+          
+          if (!selectedProvider) {
+            // 还未选择服务商，显示服务商选择列表
+            providerSelection.style.display = 'block';
+            providerSelected.style.display = 'none';
+          } else {
+            // 已选择服务商，显示支付按钮
+            providerSelection.style.display = 'none';
+            providerSelected.style.display = 'block';
+            
+            // 设置配送费金额
+            const providerFees = {
+              'meituan': { actual: 12, original: 15, discount: '新用户首单立减3元' },
+              'sf': { actual: 15, original: 20, discount: '满50元减5元' },
+              'jd': { actual: 18, original: 18, discount: '准时必达' },
+              'taobao': { actual: 16, original: 16, discount: '急速送达' }
+            };
+            
+            const feeInfo = providerFees[selectedProvider] || { actual: deliveryFee || 15, original: deliveryFee || 15, discount: '' };
+            document.getElementById('deliveryFeeAmount').textContent = feeInfo.actual;
+            
+            const providerConfig = {
+              'meituan': '美团跑腿 · 新用户首单立减3元',
+              'sf': '顺丰跑腿 · 满50元减5元',
+              'jd': '京东秒送 · 准时必达',
+              'taobao': '淘宝闪购 · 急速送达'
+            };
+            document.getElementById('courierProviderInfo').textContent = providerConfig[selectedProvider] || '';
+          }
+        } else {
+          deliveryFeeSection.style.display = 'none';
+        }
+      } else if (deliveryMethod === 'pickup') {
+        // 自送到店
+        deliveryInfoRow.style.display = 'flex';
+        document.getElementById('deliveryMethodText').innerHTML = '<span style="color:#4caf50;">自送到店</span>';
+        courierProviderRow.style.display = 'none';
+        document.getElementById('deliveryFeeSection').style.display = 'none';
+      } else {
+        // 默认或未知
+        deliveryInfoRow.style.display = 'none';
+        courierProviderRow.style.display = 'none';
+        document.getElementById('deliveryFeeSection').style.display = 'none';
+      }
+    }
+    
+    // 选择跑腿服务商
+    async function selectCourierProvider(providerId) {
+      if (!currentOrder) {
+        alert('订单信息加载中，请稍候');
+        return;
+      }
+      
+      // 更新本地状态
+      currentOrder.selectedProvider = providerId;
+      
+      // 更新localStorage
+      const orders = JSON.parse(localStorage.getItem('orders') || '[]');
+      const idx = orders.findIndex(o => o.orderId === orderId || o.id === orderId);
+      if (idx > -1) {
+        orders[idx].selectedProvider = providerId;
+        localStorage.setItem('orders', JSON.stringify(orders));
+      }
+      localStorage.setItem('currentOrder', JSON.stringify(currentOrder));
+      
+      // 同时保存到后端
+      try {
+        const response = await fetch(`http://localhost:3000/api/cleaning/orders/${orderId}/select-provider`, {
+          method: 'POST',
+          headers: { 
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + (localStorage.getItem('authToken') || '')
+          },
+          body: JSON.stringify({ provider: providerId })
+        });
+        
+        const result = await response.json();
+        if (!result.success) {
+          console.warn('保存服务商选择失败:', result.error);
+        }
+      } catch (error) {
+        console.warn('保存服务商选择失败，使用本地模式:', error);
+      }
+      
+      // 更新UI：标记选中的服务商
+      document.querySelectorAll('.provider-card').forEach(card => {
+        card.style.borderColor = '#e5e7eb';
+        card.style.background = 'white';
+      });
+      
+      const providerColors = {
+        'meituan': '#ff6633',
+        'sf': '#e62029',
+        'jd': '#c4161c',
+        'taobao': '#ff5000'
+      };
+      
+      const selectedCard = document.getElementById(`provider-${providerId}`);
+      if (selectedCard) {
+        selectedCard.style.borderColor = providerColors[providerId];
+        selectedCard.style.background = '#f9fafb';
+      }
+      
+      // 更新配送费显示并切换到支付界面
+      updateDeliveryInfo(currentOrder);
+      
+      // 显示提示
+      const providerNames = {
+        'meituan': '美团跑腿',
+        'sf': '顺丰跑腿',
+        'jd': '京东秒送',
+        'taobao': '淘宝闪购'
+      };
+      alert(`已选择${providerNames[providerId]}，请完成配送费支付`);
+    }
+    
+    // 支付配送费
+    async function payDeliveryFee() {
+      if (!currentOrder) {
+        alert('订单信息加载中，请稍候');
+        return;
+      }
+      
+      const deliveryFee = currentOrder.deliveryFee || currentOrder.courier?.fee || 0;
+      const selectedProvider = currentOrder.selectedProvider;
+      
+      if (!selectedProvider) {
+        alert('请先选择跑腿服务商');
+        return;
+      }
+      
+      // 获取实际配送费
+      const providerFees = {
+        'meituan': 12,
+        'sf': 15,
+        'jd': 18,
+        'taobao': 16
+      };
+      const actualFee = providerFees[selectedProvider] || deliveryFee;
+      
+      if (!confirm(`确定要支付配送费 ¥${actualFee} 吗？`)) {
+        return;
+      }
+      
+      try {
+        // 调用后端API
+        const response = await fetch(`http://localhost:3000/api/cleaning/orders/${orderId}/pay-delivery-fee`, {
+          method: 'POST',
+          headers: { 
+            'Content-Type': 'application/json',
+            'Cache-Control': 'no-cache',
+            'Authorization': 'Bearer ' + (localStorage.getItem('authToken') || '')
+          },
+          body: JSON.stringify({
+            provider: selectedProvider,
+            fee: actualFee,
+            payTime: new Date().toISOString()
+          })
+        });
+        
+        const result = await response.json();
+        console.log('[支付配送费] 后端返回:', result);
+        if (result.success) {
+          // 更新本地状态
+          currentOrder.deliveryFeePaid = true;
+          currentOrder.deliveryFeePaidAt = new Date().toISOString();
+          currentOrder.deliveryStatus = 'pending_pickup';
+          
+          // 更新localStorage
+          const orders = JSON.parse(localStorage.getItem('orders') || '[]');
+          const idx = orders.findIndex(o => o.orderId === orderId || o.id === orderId);
+          if (idx > -1) {
+            orders[idx].deliveryFeePaid = true;
+            orders[idx].deliveryFeePaidAt = currentOrder.deliveryFeePaidAt;
+            orders[idx].deliveryStatus = 'pending_pickup';
+            localStorage.setItem('orders', JSON.stringify(orders));
+          }
+          localStorage.setItem('currentOrder', JSON.stringify(currentOrder));
+          
+          alert('配送费支付成功！\n\n配送员将尽快上门取件。');
+          
+          // 跳转到配送跟踪页面
+          window.location.href = `c-delivery-tracking.html?orderId=${orderId}`;
+        } else {
+          alert(result.error || '支付失败，请重试');
+        }
+      } catch (error) {
+        console.error('支付配送费失败:', error);
+        // 本地模拟支付
+        alert('配送费支付成功！（本地模式）\n\n配送员将尽快上门取件。');
+        
+        currentOrder.deliveryFeePaid = true;
+        currentOrder.deliveryFeePaidAt = new Date().toISOString();
+        currentOrder.deliveryStatus = 'pending_pickup';
+        
+        // 更新localStorage
+        const orders = JSON.parse(localStorage.getItem('orders') || '[]');
+        const idx = orders.findIndex(o => o.orderId === orderId || o.id === orderId);
+        if (idx > -1) {
+          orders[idx].deliveryFeePaid = true;
+          orders[idx].deliveryFeePaidAt = currentOrder.deliveryFeePaidAt;
+          orders[idx].deliveryStatus = 'pending_pickup';
+          localStorage.setItem('orders', JSON.stringify(orders));
+        }
+        localStorage.setItem('currentOrder', JSON.stringify(currentOrder));
+        
+        // 跳转到配送跟踪页面
+        window.location.href = `c-delivery-tracking.html?orderId=${orderId}`;
+      }
+    }
+    
+    // 更新订单操作栏显示
+    function updateOrderActionsBar(status) {
+      const actionsBar = document.getElementById('orderActionsBar');
+      // 待支付、已支付、待确认状态可以取消/修改
+      const canModify = ['pending', 'paid', 'confirmed', 'awaiting_store_confirm'].includes(status);
+      if (canModify) {
+        actionsBar.style.display = 'flex';
+      } else {
+        actionsBar.style.display = 'none';
+      }
+    }
+    
+    // 取消订单
+    async function cancelOrder() {
+      if (!currentOrder) return;
+      
+      const isPaid = ['paid', 'confirmed', 'awaiting_store_confirm'].includes(currentOrder.status);
+      const totalAmount = currentOrder.fees?.total || currentOrder.total || 0;
+      
+      let confirmMsg = '确定要取消该订单吗？';
+      if (isPaid) {
+        confirmMsg = `确定要取消该订单并申请退款吗？\n订单金额：¥${totalAmount}\n退款将原路返回至您的支付账户，预计1-3个工作日到账。`;
+      }
+      
+      if (!confirm(confirmMsg)) return;
+      
+      const reason = prompt('请输入取消原因（选填）：') || '用户主动取消';
+      
+      try {
+        // 调用后端API
+        const response = await fetch(`http://localhost:3000/api/cleaning/orders/${orderId}/cancel`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            reason: reason,
+            refundMethod: 'original',
+            requestTime: new Date().toISOString()
+          })
+        });
+        const result = await response.json();
+        if (result.success) {
+          alert(isPaid ? '取消申请已提交，退款处理中' : '订单已取消');
+        }
+      } catch (error) {
+        console.warn('API调用失败，本地处理:', error);
+      }
+      
+      // 更新本地状态
+      currentOrder.status = 'cancelled';
+      currentOrder.cancelledAt = new Date().toISOString();
+      currentOrder.cancelReason = reason;
+      if (isPaid) {
+        currentOrder.refundStatus = 'processing';
+        currentOrder.refundAmount = totalAmount;
+      }
+      
+      // 更新localStorage
+      const orders = JSON.parse(localStorage.getItem('orders') || '[]');
+      const idx = orders.findIndex(o => o.orderId === orderId || o.id === orderId);
+      if (idx > -1) {
+        orders[idx] = currentOrder;
+        localStorage.setItem('orders', JSON.stringify(orders));
+      }
+      localStorage.setItem('currentOrder', JSON.stringify(currentOrder));
+      
+      updateOrderUI(currentOrder);
+      alert(isPaid ? '订单已取消，退款将在1-3个工作日到账' : '订单已取消');
+    }
+    
+    // 修改订单
+    function modifyOrder() {
+      if (!currentOrder) return;
+      
+      // 保存当前订单到修改缓存
+      localStorage.setItem('modifyingOrder', JSON.stringify(currentOrder));
+      
+      // 跳转到修改页面
+      window.location.href = 'c-order-modify.html?orderId=' + encodeURIComponent(orderId);
+    }
+    
+    // 选择取件方式
+    function selectPickupMethod(method) {
+      selectedPickupMethod = method;
+      
+      // 更新UI
+      document.querySelectorAll('.pickup-method-option').forEach(option => {
+        option.classList.remove('selected');
+        if (option.dataset.method === method) {
+          option.classList.add('selected');
+        }
+      });
+      
+      // 显示/隐藏配送表单
+      const deliveryForm = document.getElementById('deliveryForm');
+      if (method === 'home_delivery') {
+        deliveryForm.classList.add('show');
+        
+        // 如果是配送到家且订单还没有设置 deliveryMethod，设置为跑腿配送
+        if (currentOrder && currentOrder.status === 'ready') {
+          if (!currentOrder.deliveryMethod || currentOrder.deliveryMethod === 'pickup') {
+            currentOrder.deliveryMethod = 'courier';
+            
+            // 设置默认配送费（会在选择服务商后更新）
+            currentOrder.deliveryFee = 0;
+            
+            // 更新localStorage
+            const orders = JSON.parse(localStorage.getItem('orders') || '[]');
+            const idx = orders.findIndex(o => o.orderId === orderId || o.id === orderId);
+            if (idx > -1) {
+              orders[idx].deliveryMethod = 'courier';
+              orders[idx].deliveryFee = 0;
+              localStorage.setItem('orders', JSON.stringify(orders));
+            }
+            localStorage.setItem('currentOrder', JSON.stringify(currentOrder));
+          }
+        }
+      } else {
+        deliveryForm.classList.remove('show');
+      }
+      
+      // 如果当前是ready状态，更新底部按钮
+      if (currentOrder && currentOrder.status === 'ready') {
+        updateBottomActions('ready');
+      }
+    }
+    
+    // 更新底部操作按钮
+    function updateBottomActions(status) {
+      const mainBtn = document.getElementById('mainAction');
+      const secondaryBtn = document.getElementById('secondaryAction');
+      
+      // 默认左侧按钮为"联系门店"
+      if (secondaryBtn) {
+        secondaryBtn.textContent = '联系门店';
+        secondaryBtn.onclick = viewStore;
+      }
+      
+      switch (status) {
+        case 'pending':
+          mainBtn.textContent = '去支付';
+          mainBtn.className = 'btn-action btn-success';
+          mainBtn.onclick = () => window.location.href = 'c-payment.html';
+          break;
+        case 'paid':
+        case 'delivering':
+          mainBtn.textContent = '查看物流';
+          mainBtn.className = 'btn-action btn-outline';
+          mainBtn.onclick = () => alert('物流功能开发中');
+          break;
+        case 'received':
+        case 'processing':
+        case 'in_progress':
+        case 'cleaning':
+        case 'cleaned':
+          mainBtn.textContent = '催单';
+          mainBtn.className = 'btn-action btn-outline';
+          mainBtn.onclick = () => alert('已通知门店');
+          break;
+        case 'ready':
+          // 待取件状态，根据取件方式显示不同按钮
+          if (selectedPickupMethod === 'store_pickup') {
+            // 门店自取：显示"扫码取件"按钮
+            mainBtn.textContent = '扫码取件';
+            mainBtn.className = 'btn-action btn-success';
+            mainBtn.onclick = scanStoreQRCode;
+            if (secondaryBtn) {
+              secondaryBtn.textContent = '联系门店';
+              secondaryBtn.onclick = viewStore;
+            }
+          } else {
+            // 跑腿配送：显示"联系商家"和"支付配送费"
+            mainBtn.textContent = '支付配送费';
+            mainBtn.className = 'btn-action btn-success';
+            mainBtn.onclick = payDeliveryFee;
+            if (secondaryBtn) {
+              secondaryBtn.textContent = '联系商家';
+              secondaryBtn.onclick = viewStore;
+            }
+          }
+          break;
+        case 'awaiting_pickup_scan':
+          // 等待扫码取件状态
+          mainBtn.textContent = '扫码取件';
+          mainBtn.className = 'btn-action btn-success';
+          mainBtn.onclick = scanStoreQRCode;
+          break;
+        case 'delivering_back':
+          // 配送中状态
+          mainBtn.textContent = '查看配送';
+          mainBtn.className = 'btn-action btn-primary';
+          mainBtn.onclick = () => window.location.href = `c-delivery-tracking.html?orderId=${orderId}`;
+          break;
+        case 'delivering_back':
+          mainBtn.textContent = '查看配送';
+          mainBtn.className = 'btn-action btn-primary';
+          mainBtn.onclick = () => alert('配送信息');
+          break;
+        case 'completed':
+          mainBtn.textContent = '去评价';
+          mainBtn.className = 'btn-action btn-primary';
+          mainBtn.onclick = () => alert('评价功能开发中');
+          break;
+        default:
+          mainBtn.style.display = 'none';
+      }
+    }
+    
+    // 处理主操作（根据状态执行不同操作）
+    async function handleMainAction() {
+      if (currentOrder && currentOrder.status === 'ready') {
+        // 保存用户信息
+        saveUserInfo();
+        
+        // 如果选择配送到家，需要先提交取件方式并支付配送费
+        if (selectedPickupMethod === 'home_delivery') {
+          const address = document.getElementById('deliveryAddress').value;
+          const contact = document.getElementById('deliveryContact').value;
+          const phone = document.getElementById('deliveryPhone').value;
+          
+          if (!address || !contact || !phone) {
+            alert('请填写完整的配送信息');
+            return;
+          }
+          
+          // 提交取件方式并支付配送费
+          await submitPickupMethodAndPay(address, contact, phone);
+        }
+      }
+    }
+    
+    // 扫码取件（门店自取模式）
+    async function scanStoreQRCode() {
+      // 模拟扫码 - 实际应该调用微信扫码API
+      const scanned = confirm('请扫描门店取件二维码\n\n（模拟：点击确定表示扫码成功）');
+      if (!scanned) return;
+      
+      try {
+        // 调用API通知系统用户已扫码
+        const response = await fetch(`http://localhost:3000/api/cleaning/orders/${orderId}/scan-pickup`, {
+          method: 'POST',
+          headers: { 
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + (localStorage.getItem('authToken') || '')
+          },
+          body: JSON.stringify({
+            pickupMethod: 'store_pickup',
+            scanTime: new Date().toISOString()
+          })
+        });
+        
+        const result = await response.json();
+        console.log('[扫码取件] 后端返回:', result);
+        if (result.success) {
+          alert('扫码成功！已通知店员准备您的物品。\n\n请等待店员取出物品并扫码出库。');
+          // 更新订单状态为等待店员出库
+          currentOrder.status = 'awaiting_store_outbound';
+          updateOrderUI(currentOrder);
+        } else {
+          alert(result.error || '扫码失败，请重试');
+        }
+      } catch (error) {
+        console.error('扫码取件失败:', error);
+        // 本地模拟 - 后端没有scan-pickup端点时使用本地模式
+        alert('扫码成功！（本地模式）\n\n已通知店员准备您的物品。\n\n请等待店员取出物品并确认取件。');
+        
+        // 更新本地状态
+        currentOrder.status = 'awaiting_store_outbound';
+        currentOrder.pickupScannedAt = new Date().toISOString();
+        
+        // 更新localStorage
+        const orders = JSON.parse(localStorage.getItem('orders') || '[]');
+        const idx = orders.findIndex(o => o.orderId === orderId || o.id === orderId);
+        if (idx > -1) {
+          orders[idx].status = 'awaiting_store_outbound';
+          orders[idx].pickupScannedAt = currentOrder.pickupScannedAt;
+          localStorage.setItem('orders', JSON.stringify(orders));
+        }
+        localStorage.setItem('currentOrder', JSON.stringify(currentOrder));
+        
+        updateOrderUI(currentOrder);
+      }
+    }
+    
+    // 提交取件方式并支付配送费
+    async function submitPickupMethodAndPay(address, contactName, contactPhone) {
+      try {
+        // 先提交取件方式
+        const response = await fetch(`http://localhost:3000/api/cleaning/orders/${orderId}/pickup-method`, {
+          method: 'POST',
+          headers: { 
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + (localStorage.getItem('authToken') || '')
+          },
+          body: JSON.stringify({
+            method: 'home_delivery',
+            address: address,
+            contactName: contactName,
+            contactPhone: contactPhone
+          })
+        });
+        
+        const result = await response.json();
+        if (result.success) {
+          // 跳转到支付页面支付配送费
+          window.location.href = `c-payment.html?orderId=${orderId}&type=delivery`;
+        } else {
+          alert(result.error || '操作失败');
+        }
+      } catch (error) {
+        console.error('提交取件方式失败:', error);
+        // 本地模拟：直接跳转到配送跟踪页面
+        alert('已选择配送到家，正在为您安排配送...');
+        window.location.href = `c-delivery-tracking.html?orderId=${orderId}`;
+      }
+    }
+    
+    // 提交取件方式
+    async function submitPickupMethod(address, contactName, contactPhone) {
+      try {
+        const response = await fetch(`http://localhost:3000/api/cleaning/orders/${orderId}/pickup-method`, {
+          method: 'POST',
+          headers: { 
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + (localStorage.getItem('authToken') || '')
+          },
+          body: JSON.stringify({
+            method: selectedPickupMethod,
+            address: address,
+            contactName: contactName,
+            contactPhone: contactPhone
+          })
+        });
+        
+        const result = await response.json();
+        if (result.success) {
+          if (selectedPickupMethod === 'home_delivery') {
+            alert('已选择配送到家，配送员稍后将上门取件');
+            // 重新加载订单状态
+            loadOrderDetail();
+          }
+        } else {
+          alert(result.error || '操作失败');
+        }
+      } catch (error) {
+        console.error('提交取件方式失败:', error);
+        alert('操作失败，请重试');
+      }
+    }
+    
+    // 确认取件
+    async function confirmPickup() {
+      if (!confirm('确认已完成取件？')) return;
+      
+      try {
+        const response = await fetch(`http://localhost:3000/api/cleaning/orders/${orderId}/pickup`, {
+          method: 'POST',
+          headers: { 
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + (localStorage.getItem('authToken') || '')
+          }
+        });
+        
+        const result = await response.json();
+        if (result.success) {
+          alert('取件成功，感谢您的使用！');
+          // 更新本地状态
+          currentOrder.status = 'completed';
+          currentOrder.completedAt = new Date().toISOString();
+          
+          // 更新localStorage
+          const orders = JSON.parse(localStorage.getItem('orders') || '[]');
+          const idx = orders.findIndex(o => o.orderId === orderId || o.id === orderId);
+          if (idx > -1) {
+            orders[idx].status = 'completed';
+            orders[idx].completedAt = currentOrder.completedAt;
+            localStorage.setItem('orders', JSON.stringify(orders));
+          }
+          localStorage.setItem('currentOrder', JSON.stringify(currentOrder));
+          
+          updateOrderUI(currentOrder);
+        } else {
+          alert(result.error || '操作失败');
+        }
+      } catch (error) {
+        console.error('确认取件失败:', error);
+        // 本地模拟
+        alert('取件成功！（本地模式）');
+        
+        currentOrder.status = 'completed';
+        currentOrder.completedAt = new Date().toISOString();
+        
+        // 更新localStorage
+        const orders = JSON.parse(localStorage.getItem('orders') || '[]');
+        const idx = orders.findIndex(o => o.orderId === orderId || o.id === orderId);
+        if (idx > -1) {
+          orders[idx].status = 'completed';
+          orders[idx].completedAt = currentOrder.completedAt;
+          localStorage.setItem('orders', JSON.stringify(orders));
+        }
+        localStorage.setItem('currentOrder', JSON.stringify(currentOrder));
+        
+        updateOrderUI(currentOrder);
+      }
+    }
+    
+    // 演示订单
+    function showDemoOrder() {
+      const demoOrder = {
+        orderId: 'demo123',
+        orderNo: 'CL20260422001',
+        status: 'processing',
+        statusText: '处理中',
+        statusDescription: '衣物正在清洗护理中，请耐心等待',
+        items: [
+          { name: '羽绒服', status: '清洗中' },
+          { name: '运动鞋', status: '清洗中' }
+        ],
+        total: 280,
+        storeName: '优衣库干洗店',
+        createTime: new Date().toISOString(),
+        latestHistory: {
+          note: '衣物已进入清洗工序',
+          time: new Date(Date.now() - 3600000).toISOString()
+        }
+      };
+      
+      currentOrder = demoOrder;
+      updateOrderUI(demoOrder);
+      startRealTimeTracking();
+    }
+    
+    // 格式化时间
+    function formatTime(isoString) {
+      if (!isoString) return '';
+      const date = new Date(isoString);
+      return date.toLocaleString('zh-CN', {
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    }
+    
+    // 联系门店
+    function viewStore() {
+      alert('门店电话: 400-888-8888');
+    }
+    
+    // 联系配送员
+    function callDriver() {
+      alert('拨打配送员电话: 138****1234');
+    }
+    
+    // 发消息给配送员
+    function messageDriver() {
+      alert('发送消息功能开发中');
+    }
+    
+    // 监听来自其他页面的数据更新（跨标签页同步）
+    window.addEventListener('storage', (e) => {
+      if (e.key === 'orders' || e.key === 'store_orders' || e.key === 'currentOrder') {
+        console.log('[跨标签同步] 检测到其他标签页更新了订单数据，重新加载...');
+        // 重新从localStorage加载最新订单数据
+        refreshOrderData();
+      }
+    });
+
+    // 定期刷新订单数据（每3秒，更频繁地检查）
+    setInterval(() => {
+      if (orderId && !isPageLoading) {
+        refreshOrderData();
+      }
+    }, 3000);
+
+    // 标记页面是否正在加载
+    let isPageLoading = false;
+    let lastKnownOrderStatus = null;
+    let lastKnownUpdatedAt = null;
+
+    // 刷新订单数据（同时检查localStorage和API）
+    async function refreshOrderData() {
+      if (!orderId) return;
+      
+      try {
+        // 1. 首先检查localStorage是否有更新（M端会实时更新这里）
+        const ordersStr = localStorage.getItem('orders');
+        if (ordersStr) {
+          const orders = JSON.parse(ordersStr);
+          const order = orders.find(o => 
+            o.orderId === orderId || 
+            o.id === orderId || 
+            o._id === orderId ||
+            o.orderNo === orderId
+          );
+          
+          if (order) {
+            const localUpdatedAt = order.updatedAt ? new Date(order.updatedAt) : null;
+            const currentUpdatedAt = lastKnownUpdatedAt ? new Date(lastKnownUpdatedAt) : null;
+            
+            // 无论有没有 lastKnownUpdatedAt，只要找到订单就检查状态变化
+            // 状态变化的条件：(1)之前没记录 或 (2)时间戳更新 或 (3)状态本身变化
+            const timeChanged = !lastKnownUpdatedAt || (localUpdatedAt && (!currentUpdatedAt || localUpdatedAt > currentUpdatedAt));
+            const statusChanged = lastKnownOrderStatus && order.status !== lastKnownOrderStatus;
+            
+            if (timeChanged || statusChanged) {
+              console.log('[同步检测] localStorage订单状态:', order.status, '| 上次状态:', lastKnownOrderStatus, '| 时间:', localUpdatedAt);
+              
+              currentOrder = order;
+              lastKnownOrderStatus = order.status;
+              lastKnownUpdatedAt = order.updatedAt;
+              updateOrderUI(currentOrder);
+              
+              // 更新页面标题显示最新状态
+              document.title = `订单详情 - ${getStatusText(order.status)}`;
+              return;
+            }
+          } else {
+            console.log('[同步检测] localStorage中未找到订单:', orderId);
+          }
+        }
+        
+        // 2. 如果localStorage没有明显更新，再从API获取
+        const response = await fetch(`http://localhost:3000/api/cleaning/orders/${orderId}/status`, {
+          headers: {
+            'Cache-Control': 'no-cache',
+            'Pragma': 'no-cache'
+          }
+        });
+        const result = await response.json();
+        
+        if (result.success && result.data) {
+          const apiOrder = result.data;
+          const apiUpdatedAt = apiOrder.updatedAt ? new Date(apiOrder.updatedAt) : null;
+          
+          // 如果API数据比当前显示的更新
+          if (!lastKnownUpdatedAt || (apiUpdatedAt && apiUpdatedAt > new Date(lastKnownUpdatedAt))) {
+            console.log('[API刷新] 检测到API有新数据:', apiOrder.status, '时间:', apiUpdatedAt);
+            
+            // 合并数据：优先使用API的最新状态
+            if (currentOrder) {
+              currentOrder.status = apiOrder.status || currentOrder.status;
+              currentOrder.deliveryStatus = apiOrder.deliveryStatus || currentOrder.deliveryStatus;
+              currentOrder.deliveryMethod = apiOrder.deliveryMethod || currentOrder.deliveryMethod;
+              currentOrder.selectedProvider = apiOrder.selectedProvider || currentOrder.selectedProvider;
+              currentOrder.deliveryFee = apiOrder.deliveryFee || currentOrder.deliveryFee;
+              currentOrder.deliveryFeePaid = apiOrder.deliveryFeePaid || currentOrder.deliveryFeePaid;
+              currentOrder.updatedAt = apiOrder.updatedAt || currentOrder.updatedAt;
+            } else {
+              currentOrder = apiOrder;
+            }
+            
+            lastKnownOrderStatus = currentOrder.status;
+            lastKnownUpdatedAt = currentOrder.updatedAt;
+            updateOrderUI(currentOrder);
+          }
+        }
+      } catch (error) {
+        console.log('[刷新] 获取失败，保留当前数据:', error.message);
+      }
+    }
+    
+    // 检查登录状态
+    if (!localStorage.getItem('userToken')) {
+        window.location.href = 'c-login.html';
+    } else {
+        document.addEventListener('DOMContentLoaded', init);
+    }
+  </script>
+</body>
+</html>

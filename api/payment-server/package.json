@@ -1,0 +1,25 @@
+{
+  "name": "dry-cleaning-payment-server",
+  "version": "1.0.0",
+  "description": "干洗店支付系统后端服务",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "start:test": "node test-server.js",
+    "test": "node test-payment.js",
+    "dev": "nodemon server.js",
+    "dev:test": "nodemon test-server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "cors": "^2.8.5",
+    "body-parser": "^1.20.2",
+    "crypto": "^1.0.1",
+    "axios": "^1.6.0",
+    "xml2js": "^0.6.2",
+    "qrcode": "^1.5.3"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1"
+  }
+}

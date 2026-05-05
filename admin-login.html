@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>干洗店总后台管理系统 - 登录</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome -->
+    <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#1e40af',
+                        secondary: '#3b82f6',
+                        accent: '#60a5fa',
+                        success: '#10b981',
+                        warning: '#f59e0b',
+                        danger: '#ef4444',
+                        dark: '#1e293b',
+                        light: '#f8fafc',
+                        info: '#3b82f6',
+                        purple: '#8b5cf6',
+                        pink: '#ec4899',
+                        teal: '#14b8a6',
+                        orange: '#f97316'
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', 'sans-serif'],
+                        mono: ['Fira Code', 'monospace']
+                    },
+                    animation: {
+                        'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                        'blink': 'blink 1s step-end infinite',
+                        'float': 'float 3s ease-in-out infinite',
+                        'slide-up': 'slideUp 0.5s ease-out forwards',
+                        'slide-down': 'slideDown 0.5s ease-out forwards',
+                        'fade-in': 'fadeIn 0.5s ease-out forwards',
+                        'zoom-in': 'zoomIn 0.3s ease-out forwards',
+                        'bounce-slow': 'bounce 2s infinite'
+                    },
+                    keyframes: {
+                        blink: {
+                            '0%, 100%': { opacity: '1' },
+                            '50%': { opacity: '0' },
+                        },
+                        float: {
+                            '0%, 100%': { transform: 'translateY(0)' },
+                            '50%': { transform: 'translateY(-10px)' },
+                        },
+                        slideUp: {
+                            '0%': { transform: 'translateY(20px)', opacity: '0' },
+                            '100%': { transform: 'translateY(0)', opacity: '1' },
+                        },
+                        slideDown: {
+                            '0%': { transform: 'translateY(-20px)', opacity: '0' },
+                            '100%': { transform: 'translateY(0)', opacity: '1' },
+                        },
+                        fadeIn: {
+                            '0%': { opacity: '0' },
+                            '100%': { opacity: '1' },
+                        },
+                        zoomIn: {
+                            '0%': { transform: 'scale(0.95)', opacity: '0' },
+                            '100%': { transform: 'scale(1)', opacity: '1' },
+                        }
+                    },
+                    boxShadow: {
+                        'card': '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+                        'card-hover': '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
+                        'btn': '0 2px 4px rgba(0, 0, 0, 0.1)',
+                        'btn-hover': '0 4px 8px rgba(0, 0, 0, 0.15)'
+                    }
+                }
+            }
+        }
+    </script>
+    <style type="text/tailwindcss">
+        @layer utilities {
+            .glass {
+                background: rgba(255, 255, 255, 0.7);
+                backdrop-filter: blur(10px);
+                border: 1px solid rgba(255, 255, 255, 0.1);
+            }
+            .glass-dark {
+                background: rgba(30, 41, 59, 0.7);
+                backdrop-filter: blur(10px);
+                border: 1px solid rgba(255, 255, 255, 0.05);
+            }
+            .text-gradient {
+                background-clip: text;
+                -webkit-background-clip: text;
+                color: transparent;
+                background-image: linear-gradient(to right, #1e40af, #3b82f6);
+            }
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-blue-50 to-indigo-100 min-h-screen flex items-center justify-center">
+    <div class="w-full max-w-md p-6">
+        <div class="bg-white rounded-2xl shadow-card p-8 border border-gray-200 animate-fade-in">
+            <div class="text-center mb-8">
+                <div class="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-4">
+                    <i class="fa fa-tint text-primary text-4xl"></i>
+                </div>
+                <h1 class="text-2xl font-bold text-gray-800 mb-2">干洗店总后台管理系统</h1>
+                <p class="text-gray-600">请登录以继续</p>
+            </div>
+
+            <form id="login-form">
+                <div class="mb-6">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">用户名</label>
+                    <div class="relative">
+                        <input type="text" class="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all duration-300 ease-in-out" placeholder="请输入用户名" value="admin">
+                        <i class="fa fa-user absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
+                    </div>
+                </div>
+
+                <div class="mb-8">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">密码</label>
+                    <div class="relative">
+                        <input type="password" class="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all duration-300 ease-in-out" placeholder="请输入密码" value="admin123">
+                        <i class="fa fa-lock absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
+                    </div>
+                </div>
+
+                <button type="submit" class="w-full bg-primary text-white py-3 rounded-lg hover:bg-primary/90 transition-all duration-300 ease-in-out shadow-btn hover:shadow-btn-hover font-medium">
+                    登录
+                </button>
+
+                <div class="flex items-center justify-between mt-6">
+                    <a href="#" class="text-sm text-gray-600 hover:text-primary transition-all duration-300 ease-in-out">忘记密码？</a>
+                    <a href="welcome.html" class="text-sm text-primary hover:text-primary/80 transition-all duration-300 ease-in-out">返回首页</a>
+                </div>
+            </form>
+        </div>
+
+        <div class="mt-6 text-center text-sm text-gray-500">
+            <p>© 2025 干洗店管理系统. 保留所有权利.</p>
+        </div>
+    </div>
+
+    <script>
+        // 模拟用户数据
+        const users = [
+            { id: 1, username: 'admin', password: 'admin123', role: '总管理员', name: '总管理员' },
+            { id: 2, username: 'region_admin', password: 'region123', role: '区域管理员', name: '区域管理员', region: '广东省' },
+            { id: 3, username: 'store_admin', password: 'store123', role: '门店管理员', name: '门店管理员', storeId: 'ST009' },
+            { id: 4, username: 'finance_admin', password: 'finance123', role: '财务管理员', name: '财务管理员' }
+        ];
+
+        // 页面加载完成后执行
+        document.addEventListener('DOMContentLoaded', function() {
+            // 登录表单提交
+            const loginForm = document.getElementById('login-form');
+            if (loginForm) {
+                loginForm.addEventListener('submit', function(e) {
+                    e.preventDefault();
+                    
+                    const username = loginForm.querySelector('input[type="text"]').value;
+                    const password = loginForm.querySelector('input[type="password"]').value;
+                    
+                    // 验证用户
+                    const user = users.find(u => u.username === username && u.password === password);
+                    
+                    if (user) {
+                        // 存储登录状态
+                        localStorage.setItem('adminUser', JSON.stringify(user));
+                        
+                        // 跳转到主页面
+                        window.location.href = 'admin.html';
+                    } else {
+                        alert('用户名或密码错误');
+                    }
+                });
+            }
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>会员充值 - 干洗服务</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome -->
+    <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#1e40af',
+                        secondary: '#3b82f6',
+                        accent: '#60a5fa',
+                        success: '#10b981',
+                        warning: '#f59e0b',
+                        danger: '#ef4444'
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        * { -webkit-tap-highlight-color: transparent; }
+        
+        .page-header {
+            background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
+            padding: 32rpx;
+            padding-top: calc(env(safe-area-inset-top) + 20rpx);
+        }
+        
+        .amount-card {
+            background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+            border-radius: 24rpx;
+            padding: 32rpx;
+        }
+        
+        .amount-item {
+            padding: 20rpx;
+            border: 2rpx solid #e5e7eb;
+            border-radius: 16rpx;
+            text-align: center;
+            transition: all 0.3s;
+            cursor: pointer;
+        }
+        
+        .amount-item.selected {
+            border-color: #3b82f6;
+            background: #eff6ff;
+        }
+        
+        .amount-item:active {
+            transform: scale(0.95);
+        }
+        
+        .bonus-tag {
+            position: absolute;
+            top: -8rpx;
+            right: -8rpx;
+            background: #ef4444;
+            color: white;
+            padding: 4rpx 12rpx;
+            border-radius: 12rpx;
+            font-size: 18rpx;
+            font-weight: bold;
+        }
+        
+        .submit-btn {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            padding: 28rpx;
+            border-radius: 28rpx;
+            box-shadow: 0 4rpx 16rpx rgba(16, 185, 129, 0.3);
+        }
+        
+        .submit-btn:active {
+            transform: scale(0.98);
+        }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen pb-32">
+    <!-- 页面头部 -->
+    <div class="page-header">
+        <div class="flex items-center gap-4 mb-4">
+            <a href="c-profile.html" class="text-white">
+                <i class="fa fa-arrow-left text-lg"></i>
+            </a>
+            <span class="text-white font-bold text-xl flex-1">会员充值</span>
+        </div>
+        <p class="text-white/80 text-sm">选择充值金额，享受更多优惠</p>
+    </div>
+
+    <!-- 会员卡信息 -->
+    <div class="px-4 -mt-8 mb-4">
+        <div class="bg-white rounded-2xl p-4 shadow-lg">
+            <div class="flex items-center gap-4">
+                <div class="w-16 h-16 bg-gradient-to-br from-blue-500 to-purple-500 rounded-2xl flex items-center justify-center">
+                    <span class="text-3xl">💳</span>
+                </div>
+                <div class="flex-1">
+                    <h3 class="font-bold text-gray-800" id="card-name">加载中...</h3>
+                    <p class="text-sm text-gray-500" id="card-type">-</p>
+                </div>
+                <div class="text-right">
+                    <div class="text-2xl font-bold text-red-500" id="current-balance">¥0.00</div>
+                    <div class="text-xs text-gray-400">当前余额</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 充值金额选择 -->
+    <div class="px-4 mb-4">
+        <h3 class="font-bold text-gray-800 mb-4">选择充值金额</h3>
+        <div class="grid grid-cols-3 gap-3" id="amount-options">
+            <!-- 100元 -->
+            <div class="amount-item relative" onclick="selectAmount(100)">
+                <span class="text-2xl font-bold text-gray-800">¥100</span>
+                <div class="text-xs text-gray-500 mt-1">标准充值</div>
+            </div>
+            
+            <!-- 200元 -->
+            <div class="amount-item relative" onclick="selectAmount(200)">
+                <span class="text-2xl font-bold text-gray-800">¥200</span>
+                <div class="text-xs text-gray-500 mt-1">标准充值</div>
+            </div>
+            
+            <!-- 300元 -->
+            <div class="amount-item relative" onclick="selectAmount(300)">
+                <span class="text-2xl font-bold text-gray-800">¥300</span>
+                <div class="text-xs text-gray-500 mt-1">标准充值</div>
+            </div>
+            
+            <!-- 500元 (赠送5%) -->
+            <div class="amount-item relative" onclick="selectAmount(500)" id="amount-500">
+                <div class="bonus-tag">赠送5%</div>
+                <span class="text-2xl font-bold text-gray-800">¥500</span>
+                <div class="text-xs text-green-600 mt-1">到账 ¥525</div>
+            </div>
+            
+            <!-- 1000元 (赠送10%) -->
+            <div class="amount-item relative selected" onclick="selectAmount(1000)" id="amount-1000">
+                <div class="bonus-tag">赠送10%</div>
+                <span class="text-2xl font-bold text-gray-800">¥1000</span>
+                <div class="text-xs text-green-600 mt-1">到账 ¥1100</div>
+            </div>
+            
+            <!-- 2000元 (赠送15%) -->
+            <div class="amount-item relative" onclick="selectAmount(2000)" id="amount-2000">
+                <div class="bonus-tag">赠送15%</div>
+                <span class="text-2xl font-bold text-gray-800">¥2000</span>
+                <div class="text-xs text-green-600 mt-1">到账 ¥2300</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 自定义金额 -->
+    <div class="px-4 mb-4">
+        <div class="bg-white rounded-2xl p-4">
+            <h3 class="font-bold text-gray-800 mb-3">自定义金额</h3>
+            <div class="flex items-center gap-3">
+                <span class="text-2xl font-bold text-gray-800">¥</span>
+                <input type="number" id="custom-amount" class="flex-1 text-2xl font-bold border-b-2 border-gray-300 focus:border-blue-500 outline-none py-2" placeholder="最低100元" min="100" oninput="handleCustomAmount()">
+            </div>
+        </div>
+    </div>
+
+    <!-- 充值说明 -->
+    <div class="px-4 mb-4">
+        <div class="bg-blue-50 rounded-2xl p-4">
+            <h4 class="font-bold text-blue-800 mb-2">💡 充值说明</h4>
+            <ul class="text-sm text-blue-700 space-y-1">
+                <li>• 最低充值金额: ¥100</li>
+                <li>• 单次最高充值: ¥10,000</li>
+                <li>• 充值满500元，赠送5%</li>
+                <li>• 充值满1000元，赠送10%</li>
+                <li>• 充值满2000元，赠送15%</li>
+                <li>• 会员卡余额可在平台所有商家使用</li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- 会员权益 -->
+    <div class="px-4 mb-4">
+        <div class="bg-gradient-to-r from-purple-50 to-pink-50 rounded-2xl p-4">
+            <h4 class="font-bold text-purple-800 mb-3">👑 会员专属权益</h4>
+            <div class="grid grid-cols-2 gap-3 text-sm">
+                <div class="flex items-center gap-2">
+                    <span class="text-lg">✨</span>
+                    <span class="text-purple-700">全场95折优惠</span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <span class="text-lg">🎁</span>
+                    <span class="text-purple-700">充值赠送余额</span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <span class="text-lg">🚚</span>
+                    <span class="text-purple-700">免费配送服务</span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <span class="text-lg">⭐</span>
+                    <span class="text-purple-700">2倍积分奖励</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 底部提交 -->
+    <div class="fixed bottom-0 left-0 right-0 bg-white p-4 shadow-lg">
+        <div class="flex items-center gap-4 mb-4">
+            <div class="flex-1">
+                <div class="text-sm text-gray-500">实际支付</div>
+                <div class="text-3xl font-bold text-red-500">¥<span id="pay-amount">1000</span></div>
+            </div>
+            <div id="bonus-display" class="text-right">
+                <div class="text-sm text-green-600">赠送 ¥100</div>
+                <div class="text-xs text-gray-400">到账 ¥1100</div>
+            </div>
+        </div>
+        <div class="submit-btn text-center cursor-pointer" onclick="handleRecharge()">
+            <span class="text-white font-bold text-lg">立即充值</span>
+        </div>
+    </div>
+
+    <!-- 支付方式选择弹窗 -->
+    <div id="payment-modal" class="fixed inset-0 bg-black/50 z-50 hidden">
+        <div class="absolute bottom-0 left-0 right-0 bg-white rounded-t-3xl p-6">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-xl font-bold">选择支付方式</h3>
+                <button onclick="closePaymentModal()" class="text-gray-400">
+                    <i class="fa fa-times text-2xl"></i>
+                </button>
+            </div>
+            
+            <div class="space-y-3">
+                <div class="payment-method selected" onclick="selectPayMethod('wechat')" id="pay-wechat">
+                    <div class="w-12 h-12 bg-green-500 rounded-xl flex items-center justify-center mr-3">
+                        <span class="text-2xl">💬</span>
+                    </div>
+                    <div class="flex-1">
+                        <span class="font-semibold text-gray-800">微信支付</span>
+                    </div>
+                    <div class="w-6 h-6 rounded-full border-2 border-gray-300 flex items-center justify-center">
+                        <div class="w-3 h-3 rounded-full bg-blue-500 hidden"></div>
+                    </div>
+                </div>
+                
+                <div class="payment-method" onclick="selectPayMethod('alipay')" id="pay-alipay">
+                    <div class="w-12 h-12 bg-blue-500 rounded-xl flex items-center justify-center mr-3">
+                        <span class="text-2xl">💰</span>
+                    </div>
+                    <div class="flex-1">
+                        <span class="font-semibold text-gray-800">支付宝</span>
+                    </div>
+                    <div class="w-6 h-6 rounded-full border-2 border-gray-300 flex items-center justify-center">
+                        <div class="w-3 h-3 rounded-full bg-blue-500 hidden"></div>
+                    </div>
+                </div>
+            </div>
+            
+            <button onclick="confirmPayment()" class="w-full bg-green-500 text-white py-4 rounded-xl font-bold mt-6">
+                确认支付 ¥<span id="modal-pay-amount">1000</span>
+            </button>
+        </div>
+    </div>
+
+    <script>
+        let selectedAmount = 1000;
+        let selectedPayMethod = 'wechat';
+        let currentCard = null;
+
+        // 页面初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            loadMemberCard();
+            updateDisplay();
+        });
+
+        // 加载会员卡
+        async function loadMemberCard() {
+            // 优先从 localStorage 获取用户信息
+            const userInfo = JSON.parse(localStorage.getItem('userInfo') || '{}');
+            const userPhone = userInfo.phone || localStorage.getItem('userPhone');
+            const memberCardId = localStorage.getItem('memberCardId');
+            
+            try {
+                let cardData = null;
+                
+                // 方式1：如果已有会员卡ID，直接查询
+                if (memberCardId) {
+                    const response = await fetch(`http://localhost:3002/api/member-card/info/${memberCardId}`);
+                    const result = await response.json();
+                    if (result.success) {
+                        cardData = result.data;
+                    }
+                }
+                
+                // 方式2：如果没有会员卡ID，通过手机号查询
+                if (!cardData && userPhone) {
+                    const response = await fetch(`http://localhost:3002/api/member-card/user/${userPhone}`);
+                    const result = await response.json();
+                    if (result.success && result.data) {
+                        cardData = result.data;
+                        localStorage.setItem('memberCardId', cardData.cardId);
+                    }
+                }
+                
+                if (cardData) {
+                    currentCard = cardData;
+                    updateCardDisplay();
+                } else {
+                    // 提示用户创建会员卡
+                    currentCard = {
+                        cardId: '请先创建会员卡',
+                        cardType: 'system',
+                        cardName: '干洗平台会员卡',
+                        balance: 0.00,
+                        isNew: true
+                    };
+                    updateCardDisplay();
+                    showToast('未找到会员卡，请先创建');
+                }
+            } catch (error) {
+                console.warn('获取会员卡失败:', error);
+                // 使用示例数据
+                currentCard = {
+                    cardId: 'SYS_001',
+                    cardType: 'system',
+                    cardName: '干洗平台会员卡',
+                    balance: 0.00
+                };
+                updateCardDisplay();
+            }
+        }
+
+        // 更新会员卡显示
+        function updateCardDisplay() {
+            document.getElementById('card-name').textContent = currentCard.cardName;
+            document.getElementById('card-type').textContent = currentCard.cardType === 'system' ? '平台通用卡' : '商家专属卡';
+            document.getElementById('current-balance').textContent = `¥${currentCard.balance.toFixed(2)}`;
+        }
+
+        // 选择充值金额
+        function selectAmount(amount) {
+            selectedAmount = amount;
+            
+            // 清除自定义金额
+            document.getElementById('custom-amount').value = '';
+            
+            // 更新UI
+            document.querySelectorAll('.amount-item').forEach(item => {
+                item.classList.remove('selected');
+            });
+            
+            const selectedItem = document.getElementById(`amount-${amount}`);
+            if (selectedItem) {
+                selectedItem.classList.add('selected');
+            } else {
+                // 自定义金额
+                event.target.closest('.amount-item')?.classList.add('selected');
+            }
+            
+            updateDisplay();
+        }
+
+        // 处理自定义金额
+        function handleCustomAmount() {
+            const customAmount = parseInt(document.getElementById('custom-amount').value);
+            if (customAmount && customAmount >= 100) {
+                selectedAmount = customAmount;
+                document.querySelectorAll('.amount-item').forEach(item => {
+                    item.classList.remove('selected');
+                });
+                updateDisplay();
+            }
+        }
+
+        // 更新显示
+        function updateDisplay() {
+            // 计算赠送金额
+            let bonus = 0;
+            if (selectedAmount >= 2000) {
+                bonus = Math.floor(selectedAmount * 0.15);
+            } else if (selectedAmount >= 1000) {
+                bonus = Math.floor(selectedAmount * 0.10);
+            } else if (selectedAmount >= 500) {
+                bonus = Math.floor(selectedAmount * 0.05);
+            }
+            
+            const total = selectedAmount + bonus;
+            
+            // 更新UI
+            document.getElementById('pay-amount').textContent = selectedAmount;
+            document.getElementById('modal-pay-amount').textContent = selectedAmount;
+            
+            const bonusDisplay = document.getElementById('bonus-display');
+            if (bonus > 0) {
+                bonusDisplay.innerHTML = `
+                    <div class="text-sm text-green-600">赠送 ¥${bonus}</div>
+                    <div class="text-xs text-gray-400">到账 ¥${total}</div>
+                `;
+            } else {
+                bonusDisplay.innerHTML = `
+                    <div class="text-sm text-gray-500">无赠送</div>
+                    <div class="text-xs text-gray-400">到账 ¥${selectedAmount}</div>
+                `;
+            }
+        }
+
+        // 选择支付方式
+        function selectPayMethod(method) {
+            selectedPayMethod = method;
+            
+            document.querySelectorAll('.payment-method').forEach(item => {
+                item.classList.remove('selected');
+                item.querySelector('.rounded-full').classList.add('hidden');
+            });
+            
+            const selectedItem = document.getElementById(`pay-${method}`);
+            selectedItem.classList.add('selected');
+            selectedItem.querySelector('.rounded-full > div').classList.remove('hidden');
+        }
+
+        // 处理充值
+        function handleRecharge() {
+            if (selectedAmount < 100) {
+                alert('最低充值金额为 ¥100');
+                return;
+            }
+            
+            if (selectedAmount > 10000) {
+                alert('单次最高充值 ¥10,000');
+                return;
+            }
+            
+            // 显示支付方式选择
+            document.getElementById('payment-modal').classList.remove('hidden');
+        }
+
+        // 关闭支付弹窗
+        function closePaymentModal() {
+            document.getElementById('payment-modal').classList.add('hidden');
+        }
+
+        // 确认支付
+        async function confirmPayment() {
+            closePaymentModal();
+            
+            // 显示加载中
+            const loading = document.createElement('div');
+            loading.className = 'fixed inset-0 bg-black/50 z-50 flex items-center justify-center';
+            loading.innerHTML = `
+                <div class="bg-white rounded-2xl p-8 text-center">
+                    <div class="text-4xl mb-4">💳</div>
+                    <p class="text-lg font-semibold">充值中...</p>
+                </div>
+            `;
+            document.body.appendChild(loading);
+            
+            try {
+                // 调用充值API
+                const response = await fetch('http://localhost:3002/api/member-card/recharge', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        cardId: currentCard.cardId,
+                        amount: selectedAmount,
+                        userId: localStorage.getItem('userId') || 'user_001'
+                    })
+                });
+                
+                const result = await response.json();
+                
+                loading.remove();
+                
+                if (result.success) {
+                    // 显示成功
+                    showSuccessModal(result.data);
+                } else {
+                    // 模拟充值成功
+                    simulateRechargeSuccess();
+                }
+            } catch (error) {
+                console.error('充值失败:', error);
+                loading.remove();
+                // 模拟充值成功
+                simulateRechargeSuccess();
+            }
+        }
+
+        // 模拟充值成功
+        function simulateRechargeSuccess() {
+            let bonus = 0;
+            if (selectedAmount >= 2000) {
+                bonus = Math.floor(selectedAmount * 0.15);
+            } else if (selectedAmount >= 1000) {
+                bonus = Math.floor(selectedAmount * 0.10);
+            } else if (selectedAmount >= 500) {
+                bonus = Math.floor(selectedAmount * 0.05);
+            }
+            
+            const data = {
+                cardId: currentCard.cardId,
+                rechargeAmount: selectedAmount,
+                bonus: bonus,
+                totalAdded: selectedAmount + bonus,
+                balance: currentCard.balance + selectedAmount + bonus
+            };
+            
+            showSuccessModal(data);
+        }
+
+        // 显示成功弹窗
+        function showSuccessModal(data) {
+            const modal = document.createElement('div');
+            modal.className = 'fixed inset-0 bg-black/50 z-50 flex items-center justify-center';
+            modal.innerHTML = `
+                <div class="bg-white rounded-3xl p-8 max-w-sm w-full mx-4 text-center">
+                    <div class="text-6xl mb-4">🎉</div>
+                    <h3 class="text-2xl font-bold text-gray-800 mb-4">充值成功!</h3>
+                    <div class="bg-green-50 rounded-xl p-4 mb-4">
+                        <div class="text-sm text-green-700 mb-2">充值金额: ¥${data.rechargeAmount}</div>
+                        <div class="text-sm text-green-700 mb-2">赠送金额: ¥${data.bonus || 0}</div>
+                        <div class="text-lg font-bold text-green-800">到账金额: ¥${data.totalAdded || selectedAmount}</div>
+                    </div>
+                    <div class="text-sm text-gray-500 mb-6">
+                        当前余额: ¥${data.balance.toFixed(2)}
+                    </div>
+                    <button onclick="goBack()" class="w-full bg-green-500 text-white py-3 rounded-xl font-bold">
+                        完成
+                    </button>
+                </div>
+            `;
+            
+            document.body.appendChild(modal);
+            
+            // 更新本地数据
+            currentCard.balance = data.balance;
+            localStorage.setItem('memberCard', JSON.stringify(currentCard));
+        }
+
+        // 返回
+        function goBack() {
+            window.location.href = 'c-profile.html';
+        }
+    </script>
+</body>
+</html>

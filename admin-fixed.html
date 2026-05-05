@@ -1,0 +1,602 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>总后台管理</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome -->
+    <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#1e40af',
+                        secondary: '#3b82f6',
+                        success: '#10b981',
+                        warning: '#f59e0b',
+                        danger: '#ef4444',
+                        info: '#3b82f6',
+                    },
+                    boxShadow: {
+                        'card': '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+                        'card-hover': '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
+                    },
+                    animation: {
+                        'fade-in': 'fadeIn 0.5s ease-in-out',
+                        'slide-in': 'slideIn 0.5s ease-in-out',
+                    },
+                    keyframes: {
+                        fadeIn: {
+                            '0%': { opacity: '0' },
+                            '100%': { opacity: '1' },
+                        },
+                        slideIn: {
+                            '0%': { transform: 'translateY(20px)', opacity: '0' },
+                            '100%': { transform: 'translateY(0)', opacity: '1' },
+                        },
+                    },
+                    transitionProperty: {
+                        'height': 'height',
+                        'spacing': 'margin, padding',
+                    },
+                },
+            },
+        };
+    </script>
+</head>
+<body class="bg-gray-50 font-sans">
+    <div class="flex h-screen overflow-hidden">
+        <!-- 侧边栏 -->
+        <aside class="w-64 bg-white shadow-sm fixed inset-y-0 left-0 z-20 md:translate-x-0 transform transition-transform duration-300 ease-in-out">
+            <nav class="flex-1 px-4 py-6">
+                <div class="flex items-center space-x-2 mb-8">
+                    <div class="w-10 h-10 rounded-lg bg-primary flex items-center justify-center">
+                        <i class="fa fa-cogs text-white"></i>
+                    </div>
+                    <h1 class="text-lg font-semibold text-gray-800">总后台管理</h1>
+                </div>
+                
+                <ul class="space-y-1">
+                    <!-- 总仪表盘 -->
+                    <li>
+                        <a href="#dashboard" class="nav-link flex items-center space-x-3 p-3 rounded-lg text-gray-700 hover:bg-blue-50 hover:text-primary transition-all duration-300 ease-in-out hover:translate-x-1">
+                            <i class="fa fa-tachometer w-5 text-center"></i>
+                            <span>总仪表盘</span>
+                        </a>
+                    </li>
+                    
+                    <!-- 业务管理 -->
+                    <li class="menu-item">
+                        <a href="#business" class="nav-link flex items-center space-x-3 p-3 rounded-lg text-gray-700 hover:bg-blue-50 hover:text-primary transition-all duration-300 ease-in-out hover:translate-x-1">
+                            <i class="fa fa-briefcase w-5 text-center"></i>
+                            <span>业务管理</span>
+                            <i class="fa fa-chevron-down ml-auto text-xs transition-transform duration-300"></i>
+                        </a>
+                        <ul class="submenu pl-6 mt-1 space-y-1 hidden">
+                            <li>
+                                <a href="#orders" class="nav-link flex items-center space-x-3 p-2 rounded-lg text-gray-600 hover:bg-blue-50 hover:text-primary transition-all duration-300 ease-in-out hover:translate-x-1">
+                                    <i class="fa fa-shopping-cart w-5 text-center"></i>
+                                    <span>订单管理</span>
+                                </a>
+                            </li>
+                            <li>
+                                <a href="#customers" class="nav-link flex items-center space-x-3 p-2 rounded-lg text-gray-600 hover:bg-blue-50 hover:text-primary transition-all duration-300 ease-in-out hover:translate-x-1">
+                                    <i class="fa fa-users w-5 text-center"></i>
+                                    <span>客户管理</span>
+                                </a>
+                            </li>
+                            <li>
+                                <a href="#items" class="nav-link flex items-center space-x-3 p-2 rounded-lg text-gray-600 hover:bg-blue-50 hover:text-primary transition-all duration-300 ease-in-out hover:translate-x-1">
+                                    <i class="fa fa-list w-5 text-center"></i>
+                                    <span>物品管理</span>
+                                </a>
+                            </li>
+                            <li>
+                                <a href="#members" class="nav-link flex items-center space-x-3 p-2 rounded-lg text-gray-600 hover:bg-blue-50 hover:text-primary transition-all duration-300 ease-in-out hover:translate-x-1">
+                                    <i class="fa fa-user-circle w-5 text-center"></i>
+                                    <span>会员管理</span>
+                                </a>
+                            </li>
+                        </ul>
+                    </li>
+                    
+                    <!-- 门店管理 -->
+                    <li class="menu-item">
+                        <a href="#store-management" class="nav-link flex items-center space-x-3 p-3 rounded-lg text-gray-700 hover:bg-blue-50 hover:text-primary transition-all duration-300 ease-in-out hover:translate-x-1">
+                            <i class="fa fa-shopping-bag w-5 text-center"></i>
+                            <span>门店管理</span>
+                            <i class="fa fa-chevron-down ml-auto text-xs transition-transform duration-300"></i>
+                        </a>
+                        <ul class="submenu pl-6 mt-1 space-y-1 hidden">
+                            <li>
+                                <a href="#stores" class="nav-link flex items-center space-x-3 p-2 rounded-lg text-gray-600 hover:bg-blue-50 hover:text-primary transition-all duration-300 ease-in-out hover:translate-x-1">
+                                    <i class="fa fa-building w-5 text-center"></i>
+                                    <span>门店列表</span>
+                                </a>
+                            </li>
+                            <li>
+                                <a href="#provincial-summary" class="nav-link flex items-center space-x-3 p-2 rounded-lg text-gray-600 hover:bg-blue-50 hover:text-primary transition-all duration-300 ease-in-out hover:translate-x-1">
+                                    <i class="fa fa-map w-5 text-center"></i>
+                                    <span>区域汇总</span>
+                                </a>
+                            </li>
+                            <li>
+                                <a href="#light-system" class="nav-link flex items-center space-x-3 p-2 rounded-lg text-gray-600 hover:bg-blue-50 hover:text-primary transition-all duration-300 ease-in-out hover:translate-x-1">
+                                    <i class="fa fa-lightbulb-o w-5 text-center"></i>
+                                    <span>智能灯条系统</span>
+                                </a>
+                            </li>
+                        </ul>
+                    </li>
+                    
+                    <!-- 系统管理 -->
+                    <li class="menu-item">
+                        <a href="#system" class="nav-link flex items-center space-x-3 p-3 rounded-lg text-gray-700 hover:bg-blue-50 hover:text-primary transition-all duration-300 ease-in-out hover:translate-x-1">
+                            <i class="fa fa-cog w-5 text-center"></i>
+                            <span>系统管理</span>
+                            <i class="fa fa-chevron-down ml-auto text-xs transition-transform duration-300"></i>
+                        </a>
+                        <ul class="submenu pl-6 mt-1 space-y-1 hidden">
+                            <li>
+                                <a href="#users" class="nav-link flex items-center space-x-3 p-2 rounded-lg text-gray-600 hover:bg-blue-50 hover:text-primary transition-all duration-300 ease-in-out hover:translate-x-1">
+                                    <i class="fa fa-users w-5 text-center"></i>
+                                    <span>用户管理</span>
+                                </a>
+                            </li>
+                            <li>
+                                <a href="#messages" class="nav-link flex items-center space-x-3 p-2 rounded-lg text-gray-600 hover:bg-blue-50 hover:text-primary transition-all duration-300 ease-in-out hover:translate-x-1">
+                                    <i class="fa fa-envelope w-5 text-center"></i>
+                                    <span>消息中心</span>
+                                </a>
+                            </li>
+                            <li>
+                                <a href="#statistics" class="nav-link flex items-center space-x-3 p-2 rounded-lg text-gray-600 hover:bg-blue-50 hover:text-primary transition-all duration-300 ease-in-out hover:translate-x-1">
+                                    <i class="fa fa-bar-chart w-5 text-center"></i>
+                                    <span>统计分析</span>
+                                </a>
+                            </li>
+                            <li>
+                                <a href="#settings" class="nav-link flex items-center space-x-3 p-2 rounded-lg text-gray-600 hover:bg-blue-50 hover:text-primary transition-all duration-300 ease-in-out hover:translate-x-1">
+                                    <i class="fa fa-sliders w-5 text-center"></i>
+                                    <span>系统设置</span>
+                                </a>
+                            </li>
+                            <li>
+                                <a href="#backup" class="nav-link flex items-center space-x-3 p-2 rounded-lg text-gray-600 hover:bg-blue-50 hover:text-primary transition-all duration-300 ease-in-out hover:translate-x-1">
+                                    <i class="fa fa-database w-5 text-center"></i>
+                                    <span>数据备份</span>
+                                </a>
+                            </li>
+                            <li>
+                                <a href="#miniprogram" class="nav-link flex items-center space-x-3 p-2 rounded-lg text-gray-600 hover:bg-blue-50 hover:text-primary transition-all duration-300 ease-in-out hover:translate-x-1">
+                                    <i class="fa fa-weixin w-5 text-center"></i>
+                                    <span>C端小程序</span>
+                                </a>
+                            </li>
+                        </ul>
+                    </li>
+                </ul>
+                
+                <div class="border-t border-gray-200 my-4 pt-4">
+                    <h3 class="text-xs uppercase text-gray-500 font-semibold px-3 mb-2">快捷访问</h3>
+                    <ul class="space-y-2">
+                        <li>
+                            <a href="index.html" class="flex items-center space-x-3 p-3 rounded-lg text-gray-700 hover:bg-blue-50 hover:text-primary transition-all duration-300 ease-in-out hover:translate-x-1">
+                                <i class="fa fa-home w-5 text-center"></i>
+                                <span>单店管理端</span>
+                            </a>
+                        </li>
+                        <li>
+                            <a href="c-index.html" class="flex items-center space-x-3 p-3 rounded-lg text-gray-700 hover:bg-blue-50 hover:text-primary transition-all duration-300 ease-in-out hover:translate-x-1">
+                                <i class="fa fa-mobile w-5 text-center"></i>
+                                <span>C端用户界面</span>
+                            </a>
+                        </li>
+                        <li>
+                            <a href="#miniprogram" class="flex items-center space-x-3 p-3 rounded-lg text-gray-700 hover:bg-blue-50 hover:text-primary transition-all duration-300 ease-in-out hover:translate-x-1" onclick="openMiniApp()">
+                                <i class="fa fa-weixin w-5 text-center"></i>
+                                <span>微信小程序管理</span>
+                            </a>
+                        </li>
+                    </ul>
+                </div>
+            </nav>
+        </aside>
+        
+        <!-- 主内容区 -->
+        <div class="flex-1 flex flex-col overflow-hidden md:ml-64">
+            <!-- 顶部导航栏 -->
+            <header class="bg-white shadow-sm z-10">
+                <div class="flex items-center justify-between px-4 py-3">
+                    <div class="flex items-center">
+                        <h1 class="text-xl font-semibold text-gray-800">总后台管理系统</h1>
+                    </div>
+                    <div class="flex items-center space-x-4">
+                        <button class="flex items-center space-x-1 text-gray-600 hover:text-primary transition-colors">
+                            <i class="fa fa-bell-o"></i>
+                            <span class="bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">3</span>
+                        </button>
+                        <div class="relative">
+                            <button class="flex items-center space-x-2 text-gray-600 hover:text-primary transition-colors">
+                                <div class="w-8 h-8 rounded-full bg-gray-300 flex items-center justify-center">
+                                    <i class="fa fa-user text-gray-600"></i>
+                                </div>
+                                <span class="text-sm font-medium">总管理员</span>
+                                <i class="fa fa-chevron-down text-xs"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </header>
+            
+            <!-- 内容区域 -->
+            <main class="flex-1 overflow-y-auto p-6">
+                <!-- 总仪表盘 -->
+                <div id="dashboard-content" class="content-section">
+                    <div class="mb-6">
+                        <h2 class="text-2xl font-bold text-gray-800">总仪表盘</h2>
+                        <p class="text-gray-600">系统概览和关键指标</p>
+                    </div>
+                    <p>总仪表盘内容</p>
+                </div>
+                
+                <!-- 订单管理 -->
+                <div id="orders-content" class="content-section hidden">
+                    <div class="mb-6">
+                        <h2 class="text-2xl font-bold text-gray-800">订单管理</h2>
+                        <p class="text-gray-600">管理所有订单</p>
+                    </div>
+                    <p>订单管理内容</p>
+                </div>
+                
+                <!-- 客户管理 -->
+                <div id="customers-content" class="content-section hidden">
+                    <div class="mb-6">
+                        <h2 class="text-2xl font-bold text-gray-800">客户管理</h2>
+                        <p class="text-gray-600">管理客户信息</p>
+                    </div>
+                    <p>客户管理内容</p>
+                </div>
+                
+                <!-- 物品管理 -->
+                <div id="items-content" class="content-section hidden">
+                    <div class="mb-6">
+                        <h2 class="text-2xl font-bold text-gray-800">物品管理</h2>
+                        <p class="text-gray-600">管理物品信息</p>
+                    </div>
+                    <p>物品管理内容</p>
+                </div>
+                
+                <!-- 会员管理 -->
+                <div id="members-content" class="content-section hidden">
+                    <div class="mb-6">
+                        <h2 class="text-2xl font-bold text-gray-800">会员管理</h2>
+                        <p class="text-gray-600">管理会员信息</p>
+                    </div>
+                    <p>会员管理内容</p>
+                </div>
+                
+                <!-- 门店列表 -->
+                <div id="stores-content" class="content-section hidden">
+                    <div class="mb-6">
+                        <h2 class="text-2xl font-bold text-gray-800">门店列表</h2>
+                        <p class="text-gray-600">管理所有门店</p>
+                    </div>
+                    <p>门店列表内容</p>
+                </div>
+                
+                <!-- 区域汇总 -->
+                <div id="provincial-summary-content" class="content-section hidden">
+                    <div class="mb-6">
+                        <h2 class="text-2xl font-bold text-gray-800">区域汇总</h2>
+                        <p class="text-gray-600">区域业务汇总</p>
+                    </div>
+                    <p>区域汇总内容</p>
+                </div>
+                
+                <!-- 智能灯条系统 -->
+                <div id="light-system-content" class="content-section hidden">
+                    <div class="mb-6">
+                        <h2 class="text-2xl font-bold text-gray-800">智能灯条系统</h2>
+                        <p class="text-gray-600">管理智能灯条</p>
+                    </div>
+                    <p>智能灯条系统内容</p>
+                </div>
+                
+                <!-- 用户管理 -->
+                <div id="users-content" class="content-section hidden">
+                    <div class="mb-6">
+                        <h2 class="text-2xl font-bold text-gray-800">用户管理</h2>
+                        <p class="text-gray-600">管理系统用户</p>
+                    </div>
+                    <p>用户管理内容</p>
+                </div>
+                
+                <!-- 消息中心 -->
+                <div id="messages-content" class="content-section hidden">
+                    <div class="mb-6">
+                        <h2 class="text-2xl font-bold text-gray-800">消息中心</h2>
+                        <p class="text-gray-600">管理系统消息</p>
+                    </div>
+                    <p>消息中心内容</p>
+                </div>
+                
+                <!-- 统计分析 -->
+                <div id="statistics-content" class="content-section hidden">
+                    <div class="mb-6">
+                        <h2 class="text-2xl font-bold text-gray-800">统计分析</h2>
+                        <p class="text-gray-600">系统统计数据</p>
+                    </div>
+                    <p>统计分析内容</p>
+                </div>
+                
+                <!-- 系统设置 -->
+                <div id="settings-content" class="content-section hidden">
+                    <div class="mb-6">
+                        <h2 class="text-2xl font-bold text-gray-800">系统设置</h2>
+                        <p class="text-gray-600">系统配置</p>
+                    </div>
+                    <p>系统设置内容</p>
+                </div>
+                
+                <!-- 数据备份 -->
+                <div id="backup-content" class="content-section hidden">
+                    <div class="mb-6">
+                        <h2 class="text-2xl font-bold text-gray-800">数据备份</h2>
+                        <p class="text-gray-600">系统数据备份</p>
+                    </div>
+                    <p>数据备份内容</p>
+                </div>
+                
+                <!-- C端小程序 -->
+                <div id="miniprogram-content" class="content-section hidden">
+                    <div class="mb-6">
+                        <h2 class="text-2xl font-bold text-gray-800">C端小程序</h2>
+                        <p class="text-gray-600">管理微信小程序</p>
+                    </div>
+                    <p>C端小程序内容</p>
+                </div>
+            </main>
+        </div>
+    </div>
+    
+    <script>
+        // 权限配置
+        const permissions = {
+            '总管理员': {
+                navigation: ['dashboard', 'orders', 'customers', 'items', 'members', 'stores', 'provincial-summary', 'light-system', 'users', 'messages', 'statistics', 'settings', 'backup', 'miniprogram'],
+                canViewAllData: true,
+                canManageUsers: true,
+                canManageStores: true,
+                canManageMembers: true,
+                canViewStatistics: true,
+                canSendMessages: true,
+                canChangeSettings: true
+            },
+            '区域管理员': {
+                navigation: ['dashboard', 'provincial-summary', 'stores', 'members', 'statistics', 'messages', 'miniprogram'],
+                canViewAllData: false,
+                canManageUsers: false,
+                canManageStores: true,
+                canManageMembers: true,
+                canViewStatistics: true,
+                canSendMessages: true,
+                canChangeSettings: false
+            },
+            '门店管理员': {
+                navigation: ['dashboard', 'orders', 'customers', 'members', 'items', 'light-system', 'statistics', 'messages', 'settings', 'backup', 'miniprogram'],
+                canViewAllData: false,
+                canManageUsers: false,
+                canManageStores: false,
+                canManageMembers: true,
+                canViewStatistics: true,
+                canSendMessages: true,
+                canChangeSettings: true
+            },
+            '财务管理员': {
+                navigation: ['dashboard', 'statistics', 'messages', 'miniprogram'],
+                canViewAllData: false,
+                canManageUsers: false,
+                canManageStores: false,
+                canManageMembers: false,
+                canViewStatistics: true,
+                canSendMessages: true,
+                canChangeSettings: false
+            }
+        };
+        
+        // 检查登录状态
+        function checkLogin() {
+            const user = localStorage.getItem('adminUser');
+            if (!user) {
+                // 如果没有用户信息，创建一个默认的总管理员用户
+                const defaultUser = {
+                    id: 1,
+                    username: 'admin',
+                    name: '总管理员',
+                    email: 'admin@example.com',
+                    role: '总管理员',
+                    status: '活跃'
+                };
+                localStorage.setItem('adminUser', JSON.stringify(defaultUser));
+                return defaultUser;
+            } else {
+                return JSON.parse(user);
+            }
+        }
+        
+        // 初始化导航权限
+        function initNavigationPermissions(user) {
+            const navLinks = document.querySelectorAll('.nav-link');
+            const allowedNav = permissions[user.role].navigation;
+            
+            console.log('初始化导航权限，用户角色:', user.role);
+            console.log('允许的导航项:', allowedNav);
+            
+            // 控制导航链接的显示
+            navLinks.forEach(link => {
+                const href = link.getAttribute('href');
+                if (!href || !href.startsWith('#')) {
+                    return;
+                }
+                
+                const target = href.substring(1);
+                
+                // 对于父菜单项（业务管理、门店管理、系统管理），只要有一个子菜单项被允许，就显示该父菜单项
+                if (target === 'business' || target === 'store-management' || target === 'system') {
+                    // 检查是否有子菜单项被允许
+                    const submenu = link.nextElementSibling;
+                    if (submenu && submenu.classList.contains('submenu')) {
+                        const subLinks = submenu.querySelectorAll('a');
+                        let hasAllowedSubLink = false;
+                        
+                        subLinks.forEach(subLink => {
+                            const subHref = subLink.getAttribute('href');
+                            if (subHref && subHref.startsWith('#')) {
+                                const subTarget = subHref.substring(1);
+                                if (allowedNav.includes(subTarget)) {
+                                    hasAllowedSubLink = true;
+                                }
+                            }
+                        });
+                        
+                        if (hasAllowedSubLink) {
+                            link.style.display = 'flex';
+                        } else {
+                            link.style.display = 'none';
+                            submenu.style.display = 'none';
+                        }
+                    } else {
+                        link.style.display = 'none';
+                    }
+                } else {
+                    // 对于子菜单项，直接检查是否被允许
+                    if (allowedNav.includes(target)) {
+                        link.style.display = 'flex';
+                    } else {
+                        link.style.display = 'none';
+                    }
+                }
+            });
+        }
+        
+        // 初始化导航功能
+        function initNavigation() {
+            console.log('初始化导航功能');
+            
+            // 获取所有导航链接
+            const navLinks = document.querySelectorAll('.nav-link');
+            // 获取所有内容区域
+            const contentSections = document.querySelectorAll('.content-section');
+            
+            console.log('导航链接数量:', navLinks.length);
+            console.log('内容区域数量:', contentSections.length);
+            
+            // 为每个导航链接添加点击事件监听器
+            navLinks.forEach(link => {
+                link.addEventListener('click', function(e) {
+                    const href = link.getAttribute('href');
+                    if (href && href.startsWith('#')) {
+                        const target = href.substring(1);
+                        const isParentMenu = (target === 'business' || target === 'store-management' || target === 'system');
+                        
+                        e.preventDefault(); // 阻止默认的锚点行为
+                        
+                        if (isParentMenu) {
+                            // 处理父菜单项点击，展开/折叠子菜单
+                            console.log('点击父菜单项，切换子菜单显示状态:', target);
+                            const menuItem = link.closest('.menu-item');
+                            if (menuItem) {
+                                const submenu = menuItem.querySelector('.submenu');
+                                if (submenu) {
+                                    submenu.classList.toggle('hidden');
+                                    const icon = link.querySelector('.fa-chevron-down');
+                                    if (icon) {
+                                        icon.classList.toggle('rotate-180');
+                                    }
+                                }
+                            }
+                        } else {
+                            // 处理子菜单项点击，导航到对应内容区域
+                            console.log('点击子菜单项，导航到:', target);
+                            
+                            // 更新导航菜单的活跃状态
+                            navLinks.forEach(navLink => {
+                                navLink.classList.remove('text-primary', 'bg-blue-50', 'font-medium', 'border-l-4', 'border-primary');
+                                navLink.classList.add('text-gray-700', 'hover:bg-blue-50', 'hover:text-primary');
+                            });
+                            link.classList.remove('text-gray-700', 'hover:bg-blue-50', 'hover:text-primary');
+                            link.classList.add('text-primary', 'bg-blue-50', 'font-medium', 'border-l-4', 'border-primary');
+                            
+                            // 显示对应的内容区域，隐藏其他内容区域
+                            contentSections.forEach(section => {
+                                section.classList.add('hidden');
+                            });
+                            const targetSection = document.getElementById(`${target}-content`);
+                            if (targetSection) {
+                                console.log('显示内容区域:', `${target}-content`);
+                                targetSection.classList.remove('hidden');
+                            } else {
+                                console.warn('内容区域未找到:', `${target}-content`);
+                            }
+                        }
+                    }
+                });
+            });
+        }
+        
+        // 直接打开微信小程序管理页面
+        window.openMiniApp = function() {
+            console.log('直接打开微信小程序管理页面');
+            
+            // 隐藏所有内容区域
+            const contentSections = document.querySelectorAll('.content-section');
+            contentSections.forEach(section => {
+                section.classList.add('hidden');
+            });
+            
+            // 显示小程序管理页面
+            const miniAppSection = document.getElementById('miniprogram-content');
+            if (miniAppSection) {
+                miniAppSection.classList.remove('hidden');
+            }
+            
+            // 更新导航链接的活跃状态
+            const navLinks = document.querySelectorAll('.nav-link');
+            navLinks.forEach(navLink => {
+                navLink.classList.remove('text-primary', 'bg-blue-50', 'font-medium', 'border-l-4', 'border-primary');
+                navLink.classList.add('text-gray-700', 'hover:bg-blue-50', 'hover:text-primary');
+            });
+            
+            // 高亮小程序管理链接
+            const miniAppLink = document.querySelector('.nav-link[href="#miniprogram"]');
+            if (miniAppLink) {
+                miniAppLink.classList.remove('text-gray-700', 'hover:bg-blue-50', 'hover:text-primary');
+                miniAppLink.classList.add('text-primary', 'bg-blue-50', 'font-medium', 'border-l-4', 'border-primary');
+            }
+        };
+        
+        // 页面加载完成后初始化所有功能
+        window.addEventListener('load', function() {
+            console.log('页面加载完成，开始初始化');
+            
+            // 检查登录状态
+            const currentUser = checkLogin();
+            console.log('登录用户:', currentUser);
+            
+            // 初始化导航权限
+            console.log('初始化导航权限');
+            initNavigationPermissions(currentUser);
+            
+            // 初始化导航功能
+            console.log('初始化导航功能');
+            initNavigation();
+            
+            console.log('所有初始化完成');
+        });
+    </script>
+</body>
+</html>

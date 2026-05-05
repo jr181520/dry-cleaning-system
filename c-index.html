@@ -1,0 +1,702 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>干洗服务 - 首页</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome -->
+    <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#1e40af',
+                        secondary: '#3b82f6',
+                        accent: '#60a5fa',
+                        success: '#10b981',
+                        warning: '#f59e0b',
+                        danger: '#ef4444',
+                        dark: '#1e293b',
+                        light: '#f8fafc',
+                        info: '#3b82f6',
+                        purple: '#8b5cf6',
+                        pink: '#ec4899',
+                        teal: '#14b8a6',
+                        orange: '#f97316'
+                    },
+                    boxShadow: {
+                        'card': '0 4rpx 20rpx rgba(0, 0, 0, 0.06)',
+                        'card-hover': '0 10rpx 30rpx rgba(0, 0, 0, 0.1)',
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        * {
+            -webkit-tap-highlight-color: transparent;
+        }
+        
+        /* Banner轮播 */
+        .banner-swiper {
+            height: 360rpx;
+            overflow: hidden;
+        }
+        
+        .banner-item {
+            width: 100%;
+            height: 360rpx;
+        }
+        
+        /* 快捷入口图标 */
+        .entry-icon-wrapper {
+            width: 96rpx;
+            height: 96rpx;
+            border-radius: 24rpx;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 8rpx;
+            box-shadow: 0 4rpx 12rpx rgba(0, 0, 0, 0.15);
+        }
+        
+        /* 待取件通知 */
+        .notice-card {
+            background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+            border-radius: 24rpx;
+            padding: 28rpx;
+            box-shadow: 0 4rpx 16rpx rgba(245, 158, 11, 0.2);
+        }
+        
+        /* 服务卡片 */
+        .service-card {
+            background: #ffffff;
+            border-radius: 24rpx;
+            padding: 28rpx;
+            box-shadow: 0 4rpx 20rpx rgba(0, 0, 0, 0.06);
+            transition: transform 0.3s, box-shadow 0.3s;
+        }
+        
+        .service-card:active {
+            transform: scale(0.98);
+            box-shadow: 0 2rpx 10rpx rgba(0, 0, 0, 0.1);
+        }
+        
+        .service-icon-wrapper {
+            width: 88rpx;
+            height: 88rpx;
+            background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+            border-radius: 22rpx;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 20rpx;
+        }
+        
+        /* 门店卡片 */
+        .store-card {
+            background: #ffffff;
+            border-radius: 24rpx;
+            padding: 28rpx;
+            box-shadow: 0 4rpx 20rpx rgba(0, 0, 0, 0.06);
+            transition: transform 0.3s, box-shadow 0.3s;
+        }
+        
+        .store-card:active {
+            transform: scale(0.99);
+        }
+        
+        .store-status {
+            display: inline-flex;
+            align-items: center;
+            gap: 6rpx;
+            padding: 6rpx 12rpx;
+            border-radius: 12rpx;
+            font-size: 20rpx;
+            font-weight: 600;
+        }
+        
+        .store-status.online {
+            background: #dcfce7;
+            color: #10b981;
+        }
+        
+        .store-status.offline {
+            background: #f3f4f6;
+            color: #9ca3af;
+        }
+        
+        /* 标签 */
+        .tag {
+            display: inline-flex;
+            align-items: center;
+            gap: 6rpx;
+            padding: 8rpx 16rpx;
+            border-radius: 14rpx;
+            font-size: 22rpx;
+            font-weight: 600;
+        }
+        
+        .tag.promotion {
+            background: #fee2e2;
+            color: #ef4444;
+        }
+        
+        .tag.recommended {
+            background: #dbeafe;
+            color: #1e40af;
+        }
+        
+        /* 底部导航 */
+        .tab-bar {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: #ffffff;
+            box-shadow: 0 -4rpx 20rpx rgba(0, 0, 0, 0.08);
+            z-index: 100;
+            padding-bottom: env(safe-area-inset-bottom);
+        }
+        
+        .tab-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4rpx;
+        }
+        
+        .tab-item.active {
+            color: #1e40af;
+        }
+        
+        .tab-item.active .tab-icon {
+            color: #1e40af;
+        }
+        
+        /* 渐变背景 */
+        .bg-gradient {
+            background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
+        }
+        
+        .bg-gradient-green {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+        }
+        
+        .bg-gradient-purple {
+            background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
+        }
+        
+        .bg-gradient-orange {
+            background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+        }
+        
+        /* 搜索框 */
+        .search-box {
+            flex: 1;
+            height: 72rpx;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 36rpx;
+            display: flex;
+            align-items: center;
+            padding: 0 32rpx;
+            box-shadow: 0 4rpx 16rpx rgba(0, 0, 0, 0.1);
+        }
+        
+        /* 价格样式 */
+        .price-tag {
+            font-size: 36rpx;
+            font-weight: 700;
+            color: #ef4444;
+        }
+        
+        /* 按钮样式 */
+        .btn-primary {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            padding: 12rpx 28rpx;
+            border-radius: 20rpx;
+            box-shadow: 0 2rpx 8rpx rgba(16, 185, 129, 0.3);
+        }
+        
+        /* 动画 */
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .animate-fadeIn {
+            animation: fadeIn 0.5s ease-out forwards;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen pb-24">
+    <!-- 顶部搜索栏 -->
+    <header class="bg-gradient sticky top-0 z-50 px-4 py-5">
+        <div class="flex items-center gap-4">
+            <div class="search-box">
+                <span class="text-gray-400 mr-2">🔍</span>
+                <span class="text-gray-400 text-sm">搜索干洗服务...</span>
+            </div>
+            <div class="relative">
+                <div class="w-12 h-12 bg-white/95 rounded-full flex items-center justify-center shadow-md">
+                    <span class="text-xl">🔔</span>
+                </div>
+                <div id="notification-dot" class="hidden absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full border-2 border-white"></div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Banner轮播 -->
+    <div class="banner-swiper px-4 mb-6 -mt-32 relative z-10">
+        <div class="banner-item bg-gradient-to-br from-blue-600 to-purple-600 rounded-3xl relative overflow-hidden">
+            <div class="absolute top-0 right-0 w-40 h-40 bg-white/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/4"></div>
+            <div class="relative z-10 h-full flex flex-col justify-center px-8 py-12">
+                <h2 class="text-white text-2xl font-bold mb-2">新用户首单立减</h2>
+                <p class="text-white/80 text-sm mb-4">立即下单，享受专属优惠</p>
+                <div class="inline-flex">
+                    <span class="px-6 py-2 bg-white text-blue-600 font-semibold rounded-full text-sm shadow-lg">立即体验</span>
+                </div>
+            </div>
+            <div class="absolute bottom-0 left-0 right-0 h-24 bg-gradient-to-t from-black/20 to-transparent"></div>
+        </div>
+    </div>
+
+    <!-- 快捷入口 -->
+    <div class="px-4 mb-6 relative z-20 -mt-4">
+        <div class="bg-white rounded-3xl p-6 shadow-card">
+            <div class="grid grid-cols-4 gap-4">
+                <div class="entry-item flex flex-col items-center gap-2 cursor-pointer" onclick="goToOrder()">
+                    <div class="entry-icon-wrapper bg-gradient-green">
+                        <span class="text-2xl">📦</span>
+                    </div>
+                    <span class="text-xs font-semibold text-gray-800">线上下单</span>
+                    <span class="text-xs text-gray-400">快速便捷</span>
+                </div>
+                <div class="entry-item flex flex-col items-center gap-2 cursor-pointer" onclick="goToPickup()">
+                    <div class="entry-icon-wrapper bg-gradient">
+                        <span class="text-2xl">📱</span>
+                    </div>
+                    <span class="text-xs font-semibold text-gray-800">扫码取件</span>
+                    <span class="text-xs text-gray-400">一扫即取</span>
+                </div>
+                <div class="entry-item flex flex-col items-center gap-2 cursor-pointer" onclick="goToOrders()">
+                    <div class="entry-icon-wrapper bg-gradient-purple">
+                        <span class="text-2xl">📋</span>
+                    </div>
+                    <span class="text-xs font-semibold text-gray-800">我的订单</span>
+                    <span class="text-xs text-gray-400">随时查看</span>
+                </div>
+                <div class="entry-item flex flex-col items-center gap-2 cursor-pointer" onclick="goToProfile()">
+                    <div class="entry-icon-wrapper bg-gradient-orange">
+                        <span class="text-2xl">👑</span>
+                    </div>
+                    <span class="text-xs font-semibold text-gray-800">会员中心</span>
+                    <span class="text-xs text-gray-400">专属权益</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 待取件通知 -->
+    <div id="pending-notice" class="hidden px-4 mb-6">
+        <div class="notice-card flex items-center gap-4">
+            <div class="relative">
+                <div class="w-20 h-20 bg-white rounded-2xl flex items-center justify-center shadow-sm">
+                    <span class="text-3xl">📦</span>
+                </div>
+                <span id="badge-count" class="absolute -top-2 -right-2 min-w-8 h-8 bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center px-1">0</span>
+            </div>
+            <div class="flex-1">
+                <span id="notice-title" class="text-base font-bold text-amber-800 block mb-2">您有 0 件待取件</span>
+                <div id="notice-orders" class="flex gap-3">
+                    <!-- 订单预览 -->
+                </div>
+            </div>
+            <div onclick="goToPickup()" class="bg-white px-4 py-3 rounded-2xl shadow-sm flex items-center gap-2 cursor-pointer">
+                <span class="text-sm font-semibold text-amber-600">取件</span>
+                <span class="text-amber-600">→</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- 热门服务 -->
+    <div class="px-4 mb-6">
+        <div class="flex items-center justify-between mb-4">
+            <div class="flex items-center gap-2">
+                <span class="text-2xl">✨</span>
+                <span class="text-lg font-bold text-gray-800">热门服务</span>
+            </div>
+            <div onclick="goToServices()" class="flex items-center gap-1 text-gray-500 cursor-pointer">
+                <span class="text-sm">查看全部</span>
+                <span>→</span>
+            </div>
+        </div>
+        <div class="grid grid-cols-2 gap-4" id="services-grid">
+            <!-- 服务项将通过JavaScript动态加载 -->
+        </div>
+    </div>
+
+    <!-- 附近门店 -->
+    <div class="px-4 mb-6">
+        <div class="flex items-center justify-between mb-4">
+            <div class="flex items-center gap-2">
+                <span class="text-2xl">📍</span>
+                <span class="text-lg font-bold text-gray-800">附近门店</span>
+            </div>
+            <div onclick="goToStores()" class="flex items-center gap-1 text-gray-500 cursor-pointer">
+                <span class="text-sm">查看全部</span>
+                <span>→</span>
+            </div>
+        </div>
+        <div class="flex flex-col gap-4" id="stores-list">
+            <!-- 门店将通过JavaScript动态加载 -->
+        </div>
+    </div>
+
+    <!-- 底部TabBar（动态） -->
+    <div class="tab-bar" id="tab-bar">
+        <div class="flex justify-around items-center py-3">
+            <div class="tab-item active flex flex-col items-center gap-1" onclick="switchTab('index')">
+                <i class="fa fa-home text-xl"></i>
+                <span class="text-xs">首页</span>
+            </div>
+            <div class="tab-item flex flex-col items-center gap-1 text-gray-500" onclick="switchTab('order')">
+                <i class="fa fa-plus-circle text-xl"></i>
+                <span class="text-xs">下单</span>
+            </div>
+            <div class="tab-item flex flex-col items-center gap-1 text-gray-500" onclick="switchTab('orders')">
+                <i class="fa fa-shopping-bag text-xl"></i>
+                <span class="text-xs">订单</span>
+            </div>
+            <div class="tab-item flex flex-col items-center gap-1 text-gray-500" onclick="switchTab('profile')">
+                <i class="fa fa-user text-xl"></i>
+                <span class="text-xs">我的</span>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 服务数据（与小程序同步）
+        const services = [
+            { id: 1, icon: '👔', name: '西装干洗', desc: '专业熨烫定型', price: 50, category: '衣物清洗' },
+            { id: 2, icon: '👕', name: '衬衫清洗', desc: '轻柔手洗护理', price: 30, category: '衣物清洗' },
+            { id: 3, icon: '🧥', name: '羽绒服清洗', desc: '杀菌除螨护理', price: 80, category: '衣物清洗' },
+            { id: 4, icon: '👟', name: '运动鞋清洗', desc: '深度清洁保养', price: 40, category: '鞋子护理' },
+            { id: 5, icon: '👜', name: '皮包护理', desc: '奢侈品级养护', price: 100, category: '箱包洗护' },
+            { id: 6, icon: '🛏️', name: '床单被罩', desc: '高温杀菌洗涤', price: 60, category: '家纺清洗' }
+        ];
+
+        // 门店数据（与小程序同步）
+        const stores = [
+            { id: 1, name: '干洗店旗舰店', address: '朝阳区建国路88号', distance: '1.2km', isOnline: true, isPromotion: true, isRecommended: true, serviceCount: 12, minPrice: 30, rating: 4.8 },
+            { id: 2, name: '干洗店中心店', address: '海淀区中关村大街1号', distance: '2.5km', isOnline: true, isPromotion: false, isRecommended: true, serviceCount: 10, minPrice: 35, rating: 4.6 },
+            { id: 3, name: '干洗店东门店', address: '东城区王府井大街5号', distance: '3.8km', isOnline: false, isPromotion: false, isRecommended: false, serviceCount: 8, minPrice: 40, rating: 4.5 }
+        ];
+
+        // 待取件订单数据
+        let pendingOrders = [];
+
+        // 模块配置
+        let moduleConfig = {
+            cleaning: { enabled: true },
+            recycle: { enabled: false, message: '即将上线' },
+            rental: { enabled: false, message: '即将上线' }
+        };
+
+        // 页面初始化
+        document.addEventListener('DOMContentLoaded', async function() {
+            // 检查登录状态
+            if (!localStorage.getItem('userToken')) {
+                window.location.href = 'c-login.html';
+                return;
+            }
+            
+            await loadModuleConfig();
+            loadServices();
+            loadStores();
+            loadPendingOrders();
+            renderDynamicNav();
+        });
+
+        // 加载模块配置
+        async function loadModuleConfig() {
+            try {
+                const response = await fetch('http://localhost:3000/api/system/modules');
+                const result = await response.json();
+                if (result.success && result.data) {
+                    moduleConfig = result.data.modules || moduleConfig;
+                    console.log('[模块配置] 已加载:', moduleConfig);
+                }
+            } catch (error) {
+                console.error('[模块配置] 加载失败:', error);
+            }
+        }
+
+        // 渲染动态导航
+        function renderDynamicNav() {
+            const navItems = [];
+            
+            // 首页
+            navItems.push({
+                id: 'index', name: '首页', icon: 'fa-home', path: 'index', active: true
+            });
+            
+            // 下单（干洗模块）
+            if (moduleConfig.cleaning?.enabled !== false) {
+                navItems.push({
+                    id: 'order', name: '下单', icon: 'fa-plus-circle', path: 'order', active: false
+                });
+            }
+            
+            // 订单
+            navItems.push({
+                id: 'orders', name: '订单', icon: 'fa-shopping-bag', path: 'orders', active: false
+            });
+            
+            // 我的
+            navItems.push({
+                id: 'profile', name: '我的', icon: 'fa-user', path: 'profile', active: false
+            });
+            
+            // 渲染TabBar
+            const tabBar = document.getElementById('tab-bar');
+            if (tabBar) {
+                tabBar.innerHTML = `
+                    <div class="flex justify-around items-center py-3">
+                        ${navItems.map(item => `
+                            <div class="tab-item ${item.active ? 'active' : ''} flex flex-col items-center gap-1" 
+                                 onclick="switchTab('${item.path}')">
+                                <i class="fa ${item.icon} text-xl"></i>
+                                <span class="text-xs">${item.name}</span>
+                            </div>
+                        `).join('')}
+                    </div>
+                `;
+            }
+        }
+
+        // 加载服务列表
+        function loadServices() {
+            const container = document.getElementById('services-grid');
+            container.innerHTML = services.map(service => `
+                <div class="service-card cursor-pointer" onclick="selectService(${service.id})">
+                    <div class="service-icon-wrapper">
+                        <span class="text-4xl">${service.icon}</span>
+                    </div>
+                    <div class="mb-4">
+                        <span class="text-lg font-bold text-gray-800 block mb-1">${service.name}</span>
+                        <span class="text-sm text-gray-500">${service.desc}</span>
+                    </div>
+                    <div class="flex items-center justify-between pt-4 border-t border-gray-100">
+                        <span class="price-tag">¥${service.price}</span>
+                        <div class="btn-primary">
+                            <span class="text-white text-sm font-semibold">预约</span>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // 加载门店列表
+        function loadStores() {
+            const container = document.getElementById('stores-list');
+            container.innerHTML = stores.map(store => `
+                <div class="store-card flex gap-4 cursor-pointer" onclick="selectStore(${store.id})">
+                    <div class="flex-1">
+                        <div class="flex items-center gap-2 mb-2">
+                            <span class="font-bold text-gray-800">${store.name}</span>
+                            <span class="store-status ${store.isOnline ? 'online' : 'offline'}">
+                                <span class="w-2 h-2 rounded-full ${store.isOnline ? 'bg-green-500' : 'bg-gray-400'}"></span>
+                                ${store.isOnline ? '营业中' : '休息中'}
+                            </span>
+                        </div>
+                        <div class="flex items-center gap-1 text-sm text-gray-500 mb-1">
+                            <span>📍</span>
+                            <span>${store.distance}</span>
+                        </div>
+                        <div class="text-sm text-gray-500 mb-2">${store.address}</div>
+                        <div class="flex items-center gap-2">
+                            ${store.isPromotion ? '<span class="tag promotion"><span>🔥</span><span>促销中</span></span>' : ''}
+                            ${store.isRecommended ? '<span class="tag recommended"><span>⭐</span><span>推荐</span></span>' : ''}
+                            <span class="text-sm text-gray-500">${store.serviceCount}项服务</span>
+                            <span class="text-gray-300">|</span>
+                            <span class="text-sm font-semibold text-red-500">¥${store.minPrice}起</span>
+                        </div>
+                    </div>
+                    <div class="flex flex-col items-center gap-3">
+                        <div class="w-14 h-14 bg-blue-50 rounded-full flex items-center justify-center">
+                            <span class="text-2xl">📞</span>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // 加载待取件订单
+        function loadPendingOrders() {
+            // 从localStorage获取待取件订单
+            const orders = JSON.parse(localStorage.getItem('orders') || '[]');
+            pendingOrders = orders.filter(order => order.status === 'ready' || order.status === 'delivered');
+            
+            const noticeEl = document.getElementById('pending-notice');
+            const badgeEl = document.getElementById('badge-count');
+            const titleEl = document.getElementById('notice-title');
+            const ordersEl = document.getElementById('notice-orders');
+            const dotEl = document.getElementById('notification-dot');
+            
+            if (pendingOrders.length > 0) {
+                noticeEl.classList.remove('hidden');
+                badgeEl.textContent = pendingOrders.length;
+                titleEl.textContent = `您有 ${pendingOrders.length} 件待取件`;
+                dotEl.classList.remove('hidden');
+                
+                ordersEl.innerHTML = pendingOrders.slice(0, 3).map(order => `
+                    <div class="flex flex-col gap-1">
+                        <span class="text-xs font-semibold text-amber-800">${order.orderId}</span>
+                        <span class="text-xs text-amber-600">${order.createTime || ''}</span>
+                    </div>
+                `).join('');
+            } else {
+                noticeEl.classList.add('hidden');
+                dotEl.classList.add('hidden');
+            }
+        }
+
+        // 选择服务
+        function selectService(serviceId) {
+            const service = services.find(s => s.id === serviceId);
+            if (service) {
+                localStorage.setItem('selectedService', JSON.stringify(service));
+                window.location.href = 'c-order.html';
+            }
+        }
+
+        // 选择门店
+        function selectStore(storeId) {
+            const store = stores.find(s => s.id === storeId);
+            if (store) {
+                localStorage.setItem('selectedStore', JSON.stringify(store));
+                window.location.href = 'c-order.html';
+            }
+        }
+
+        // 页面跳转函数
+        function goToOrder() {
+            window.location.href = 'c-order.html';
+        }
+
+        function goToPickup() {
+            // 弹出门店选择对话框
+            showStoreSelectModal();
+        }
+        
+        // 显示门店选择弹窗
+        function showStoreSelectModal() {
+            const stores = JSON.parse(localStorage.getItem('stores') || '[]');
+            const recentStoreId = localStorage.getItem('recentPickupStore');
+            
+            // 如果有最近使用的门店，直接跳转
+            if (recentStoreId) {
+                window.location.href = `c-store-scan.html?store=${recentStoreId}`;
+                return;
+            }
+            
+            // 显示门店选择弹窗
+            const modalHtml = `
+                <div id="store-select-modal" style="position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;" onclick="closeStoreModal(event)">
+                    <div style="background:white;border-radius:16px;max-width:400px;width:100%;max-height:80vh;overflow:hidden;" onclick="event.stopPropagation()">
+                        <div style="padding:20px;border-bottom:1px solid #e5e7eb;">
+                            <h3 style="font-size:18px;font-weight:bold;text-align:center;">选择门店取件</h3>
+                        </div>
+                        <div style="padding:16px;max-height:400px;overflow-y:auto;">
+                            ${stores.length > 0 ? stores.map(store => `
+                                <div style="padding:16px;border:1px solid #e5e7eb;border-radius:12px;margin-bottom:12px;cursor:pointer;" onclick="selectPickupStore('${store.id}')">
+                                    <div style="font-weight:600;margin-bottom:4px;">${store.name}</div>
+                                    <div style="font-size:12px;color:#6b7280;">${store.address}</div>
+                                </div>
+                            `).join('') : `
+                                <div style="text-align:center;padding:40px;color:#9ca3af;">
+                                    <div style="font-size:48px;margin-bottom:12px;">🏪</div>
+                                    <div>暂无门店信息</div>
+                                    <div style="font-size:12px;margin-top:8px;">请到店扫描门店二维码</div>
+                                </div>
+                            `}
+                            <div style="margin-top:16px;padding:16px;background:#f3f4f6;border-radius:12px;text-align:center;">
+                                <div style="font-size:14px;color:#6b7280;margin-bottom:8px;">或者直接扫描门店二维码</div>
+                                <div style="font-size:12px;color:#9ca3af;">打开微信扫一扫，扫描门店二维码</div>
+                            </div>
+                        </div>
+                        <div style="padding:16px;border-top:1px solid #e5e7eb;">
+                            <button onclick="closeStoreModal()" style="width:100%;padding:12px;background:#f3f4f6;color:#6b7280;border:none;border-radius:8px;font-size:14px;">取消</button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            const modal = document.createElement('div');
+            modal.innerHTML = modalHtml;
+            document.body.appendChild(modal);
+        }
+        
+        // 选择取件门店
+        function selectPickupStore(storeId) {
+            localStorage.setItem('recentPickupStore', storeId);
+            closeStoreModal();
+            window.location.href = `c-store-scan.html?store=${storeId}`;
+        }
+        
+        // 关闭门店弹窗
+        function closeStoreModal(event) {
+            if (!event || event.target.id === 'store-select-modal') {
+                const modal = document.getElementById('store-select-modal');
+                if (modal) modal.remove();
+            }
+        }
+
+        function goToOrders() {
+            window.location.href = 'c-orders.html';
+        }
+
+        function goToProfile() {
+            window.location.href = 'c-profile.html';
+        }
+
+        function goToServices() {
+            window.location.href = 'c-services.html';
+        }
+
+        function goToStores() {
+            window.location.href = 'c-stores.html';
+        }
+
+        function switchTab(tab) {
+            // 更新TabBar状态
+            document.querySelectorAll('.tab-item').forEach(item => {
+                item.classList.remove('active');
+                item.classList.add('text-gray-500');
+            });
+            event.currentTarget.classList.add('active');
+            event.currentTarget.classList.remove('text-gray-500');
+            
+            switch(tab) {
+                case 'index':
+                    window.location.href = 'c-index.html';
+                    break;
+                case 'order':
+                    window.location.href = 'c-order.html';
+                    break;
+                case 'orders':
+                    window.location.href = 'c-orders.html';
+                    break;
+                case 'profile':
+                    window.location.href = 'c-profile.html';
+                    break;
+            }
+        }
+    </script>
+</body>
+</html>

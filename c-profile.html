@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>会员中心 - 干洗服务</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome -->
+    <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#1e40af',
+                        secondary: '#3b82f6',
+                        accent: '#60a5fa',
+                        success: '#10b981',
+                        warning: '#f59e0b',
+                        danger: '#ef4444',
+                        dark: '#1e293b',
+                        light: '#f8fafc',
+                        info: '#3b82f6',
+                        purple: '#8b5cf6',
+                        pink: '#ec4899',
+                        teal: '#14b8a6',
+                        orange: '#f97316'
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        * {
+            -webkit-tap-highlight-color: transparent;
+        }
+        
+        /* 会员卡片 */
+        .member-card {
+            background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
+            border-radius: 24rpx;
+            padding: 32rpx;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .member-card::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            right: -30%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 60%);
+        }
+        
+        /* 统计卡片 */
+        .stat-card {
+            background: #ffffff;
+            border-radius: 20rpx;
+            padding: 24rpx;
+            box-shadow: 0 4rpx 16rpx rgba(0, 0, 0, 0.06);
+        }
+        
+        /* 菜单项 */
+        .menu-item {
+            display: flex;
+            align-items: center;
+            padding: 24rpx;
+            background: #ffffff;
+            border-radius: 16rpx;
+            transition: all 0.3s;
+            cursor: pointer;
+        }
+        
+        .menu-item:active {
+            background: #f9fafb;
+        }
+        
+        .menu-icon {
+            width: 80rpx;
+            height: 80rpx;
+            border-radius: 20rpx;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: 24rpx;
+        }
+        
+        /* 底部导航 */
+        .bottom-tab-bar {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: #ffffff;
+            box-shadow: 0 -4rpx 20rpx rgba(0, 0, 0, 0.08);
+            z-index: 100;
+            padding-bottom: env(safe-area-inset-bottom);
+        }
+        
+        .tab-icon {
+            width: 48rpx;
+            height: 48rpx;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 4rpx;
+        }
+        
+        .tab-icon.active {
+            background: #eff6ff;
+            color: #1e40af;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen pb-24">
+    <!-- 会员卡片 -->
+    <div class="px-4 pt-6 pb-20">
+        <div class="member-card text-white">
+            <div class="flex items-center gap-4 mb-6 relative z-10">
+                <div class="w-20 h-20 bg-white/20 rounded-full flex items-center justify-center">
+                    <span class="text-4xl">👤</span>
+                </div>
+                <div class="flex-1">
+                    <h2 class="text-xl font-bold mb-1" id="user-name">尊敬的用户</h2>
+                    <p class="text-white/80 text-sm" id="user-phone">未登录</p>
+                    <p class="text-white/60 text-xs mt-1" id="user-level">会员等级：金牌会员</p>
+                </div>
+                <div class="text-right">
+                    <div class="text-3xl">👑</div>
+                </div>
+            </div>
+            
+            <div class="grid grid-cols-3 gap-4 relative z-10">
+                <div class="text-center">
+                    <div class="text-2xl font-bold mb-1" id="balance">0.00</div>
+                    <div class="text-white/80 text-sm">账户余额</div>
+                </div>
+                <div class="text-center">
+                    <div class="text-2xl font-bold mb-1" id="points">0</div>
+                    <div class="text-white/80 text-sm">积分</div>
+                </div>
+                <div class="text-center">
+                    <div class="text-2xl font-bold mb-1" id="discount">9.5折</div>
+                    <div class="text-white/80 text-sm">会员折扣</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 统计数据 -->
+    <div class="px-4 -mt-16 mb-6">
+        <div class="bg-white rounded-2xl p-4 shadow-sm">
+            <div class="grid grid-cols-4 divide-x divide-gray-100">
+                <div class="text-center">
+                    <div class="text-xl font-bold text-gray-800">12</div>
+                    <div class="text-xs text-gray-500">全部订单</div>
+                </div>
+                <div class="text-center">
+                    <div class="text-xl font-bold text-gray-800">3</div>
+                    <div class="text-xs text-gray-500">待支付</div>
+                </div>
+                <div class="text-center">
+                    <div class="text-xl font-bold text-gray-800">2</div>
+                    <div class="text-xs text-gray-500">进行中</div>
+                </div>
+                <div class="text-center">
+                    <div class="text-xl font-bold text-gray-800">7</div>
+                    <div class="text-xs text-gray-500">已完成</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 快捷功能 -->
+    <div class="px-4 mb-6">
+        <div class="bg-white rounded-2xl p-4 shadow-sm">
+            <h3 class="font-bold text-gray-800 mb-4">快捷功能</h3>
+            <div class="grid grid-cols-4 gap-4">
+                <div class="text-center cursor-pointer" onclick="goToPage('c-orders.html')">
+                    <div class="menu-icon bg-blue-50 mx-auto mb-2">
+                        <span class="text-2xl">📋</span>
+                    </div>
+                    <span class="text-xs text-gray-600">我的订单</span>
+                </div>
+                <div class="text-center cursor-pointer" onclick="window.location.href='c-recharge.html'">
+                    <div class="menu-icon bg-green-50 mx-auto mb-2">
+                        <span class="text-2xl">💰</span>
+                    </div>
+                    <span class="text-xs text-gray-600">充值</span>
+                </div>
+                <div class="text-center cursor-pointer">
+                    <div class="menu-icon bg-amber-50 mx-auto mb-2">
+                        <span class="text-2xl">🎫</span>
+                    </div>
+                    <span class="text-xs text-gray-600">优惠券</span>
+                </div>
+                <div class="text-center cursor-pointer">
+                    <div class="menu-icon bg-purple-50 mx-auto mb-2">
+                        <span class="text-2xl">📍</span>
+                    </div>
+                    <span class="text-xs text-gray-600">地址管理</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 菜单列表 -->
+    <div class="px-4">
+        <div class="bg-white rounded-2xl shadow-sm overflow-hidden">
+            <div class="menu-item border-b border-gray-100" onclick="goToPage('c-orders.html')">
+                <div class="menu-icon bg-blue-50">
+                    <span class="text-2xl">📋</span>
+                </div>
+                <div class="flex-1">
+                    <span class="font-medium text-gray-800">我的订单</span>
+                </div>
+                <i class="fa fa-chevron-right text-gray-400"></i>
+            </div>
+            
+            <div class="menu-item border-b border-gray-100">
+                <div class="menu-icon bg-green-50">
+                    <span class="text-2xl">💰</span>
+                </div>
+                <div class="flex-1">
+                    <span class="font-medium text-gray-800">余额充值</span>
+                </div>
+                <i class="fa fa-chevron-right text-gray-400"></i>
+            </div>
+            
+            <div class="menu-item border-b border-gray-100">
+                <div class="menu-icon bg-amber-50">
+                    <span class="text-2xl">🎫</span>
+                </div>
+                <div class="flex-1">
+                    <span class="font-medium text-gray-800">我的优惠券</span>
+                </div>
+                <i class="fa fa-chevron-right text-gray-400"></i>
+            </div>
+            
+            <div class="menu-item border-b border-gray-100">
+                <div class="menu-icon bg-purple-50">
+                    <span class="text-2xl">⭐</span>
+                </div>
+                <div class="flex-1">
+                    <span class="font-medium text-gray-800">我的积分</span>
+                </div>
+                <i class="fa fa-chevron-right text-gray-400"></i>
+            </div>
+            
+            <div class="menu-item border-b border-gray-100">
+                <div class="menu-icon bg-teal-50">
+                    <span class="text-2xl">📍</span>
+                </div>
+                <div class="flex-1">
+                    <span class="font-medium text-gray-800">地址管理</span>
+                </div>
+                <i class="fa fa-chevron-right text-gray-400"></i>
+            </div>
+            
+            <div class="menu-item" id="logout-item" onclick="handleLogout()">
+                <div class="menu-icon bg-red-50">
+                    <span class="text-2xl">🚪</span>
+                </div>
+                <div class="flex-1">
+                    <span class="font-medium text-gray-800">切换账号 / 退出登录</span>
+                </div>
+                <i class="fa fa-chevron-right text-gray-400"></i>
+            </div>
+        </div>
+    </div>
+
+    <!-- 底部TabBar -->
+    <div class="bottom-tab-bar">
+        <div class="flex justify-around items-center py-3">
+            <div class="flex flex-col items-center gap-1 text-gray-500" onclick="goToPage('c-index.html')">
+                <div class="tab-icon">
+                    <i class="fa fa-home text-lg"></i>
+                </div>
+                <span class="text-xs">首页</span>
+            </div>
+            <div class="flex flex-col items-center gap-1 text-gray-500" onclick="goToPage('c-order.html')">
+                <div class="tab-icon">
+                    <i class="fa fa-plus-circle text-lg"></i>
+                </div>
+                <span class="text-xs">下单</span>
+            </div>
+            <div class="flex flex-col items-center gap-1 text-gray-500" onclick="goToPage('c-orders.html')">
+                <div class="tab-icon">
+                    <i class="fa fa-shopping-bag text-lg"></i>
+                </div>
+                <span class="text-xs">订单</span>
+            </div>
+            <div class="flex flex-col items-center gap-1 text-primary" onclick="goToPage('c-profile.html')">
+                <div class="tab-icon active">
+                    <i class="fa fa-user text-lg"></i>
+                </div>
+                <span class="text-xs">我的</span>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:3000/api/auth';
+        
+        // 页面初始化
+        document.addEventListener('DOMContentLoaded', async function() {
+            const token = localStorage.getItem('userToken');
+            const userInfo = localStorage.getItem('userInfo');
+            
+            if (!token) {
+                // 未登录，跳转到登录页
+                showToast('请先登录', 'warning');
+                setTimeout(() => window.location.href = 'c-login.html', 1500);
+                return;
+            }
+            
+            // 显示用户信息
+            if (userInfo) {
+                try {
+                    const user = JSON.parse(userInfo);
+                    document.getElementById('user-name').textContent = user.name || '用户';
+                    document.getElementById('user-phone').textContent = user.phone ? maskPhone(user.phone) : '';
+                    document.getElementById('user-level').textContent = '会员等级：金牌会员';
+                    
+                    // 尝试获取最新用户信息
+                    fetchUserProfile(token);
+                } catch (e) {
+                    console.error('解析用户信息失败', e);
+                }
+            }
+        });
+
+        // 获取用户信息
+        async function fetchUserProfile(token) {
+            try {
+                const response = await fetch(`${API_BASE}/profile`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const result = await response.json();
+                
+                if (result.success) {
+                    const user = result.data;
+                    document.getElementById('user-name').textContent = user.name || user.phone || '用户';
+                    document.getElementById('user-phone').textContent = user.phone ? maskPhone(user.phone) : '';
+                    document.getElementById('balance').textContent = parseFloat(user.balance || 0).toFixed(2);
+                    document.getElementById('points').textContent = user.points || 0;
+                    
+                    // 更新本地存储
+                    localStorage.setItem('userInfo', JSON.stringify(user));
+                    
+                    // 从支付服务器获取会员卡余额
+                    fetchMemberCardBalance(user.phone);
+                }
+            } catch (error) {
+                console.error('获取用户信息失败:', error);
+            }
+        }
+        
+        // 从支付服务器获取会员卡余额
+        async function fetchMemberCardBalance(phone) {
+            if (!phone) return;
+            
+            try {
+                // 尝试通过手机号查找会员卡
+                const response = await fetch(`http://localhost:3002/api/member-card/user/${phone}`);
+                const result = await response.json();
+                
+                if (result.success && result.data) {
+                    // 使用会员卡余额更新页面显示
+                    const memberCard = result.data;
+                    document.getElementById('balance').textContent = parseFloat(memberCard.balance || 0).toFixed(2);
+                    localStorage.setItem('memberCardId', memberCard.cardId);
+                }
+            } catch (error) {
+                console.error('获取会员卡余额失败:', error);
+                // 静默失败，不影响主流程
+            }
+        }
+
+        // 手机号脱敏
+        function maskPhone(phone) {
+            return phone.replace(/(\d{3})\d{4}(\d{4})/, '$1****$2');
+        }
+
+        // 页面跳转
+        function goToPage(url) {
+            window.location.href = url;
+        }
+
+        // 登出处理
+        async function handleLogout() {
+            const token = localStorage.getItem('userToken');
+            const isMockUser = localStorage.getItem('isMockUser');
+            
+            // 如果是模拟用户，直接清除存储
+            if (isMockUser === 'true') {
+                localStorage.removeItem('userToken');
+                localStorage.removeItem('userInfo');
+                localStorage.removeItem('userPhone');
+                localStorage.removeItem('isMockUser');
+                showToast('已退出登录');
+                setTimeout(() => window.location.href = 'c-login.html', 1000);
+                return;
+            }
+            
+            // 真实用户，调用后端登出接口
+            try {
+                if (token) {
+                    await fetch(`${API_BASE}/logout`, {
+                        method: 'POST',
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+                }
+            } catch (error) {
+                console.error('登出请求失败:', error);
+            }
+            
+            // 清除本地存储
+            localStorage.removeItem('userToken');
+            localStorage.removeItem('userInfo');
+            localStorage.removeItem('userPhone');
+            
+            showToast('已退出登录');
+            setTimeout(() => window.location.href = 'c-login.html', 1000);
+        }
+
+        // Toast提示
+        function showToast(message, type = 'success') {
+            const toast = document.createElement('div');
+            toast.className = `fixed top-4 left-1/2 transform -translate-x-1/2 px-6 py-3 rounded-lg shadow-lg z-50 ${
+                type === 'success' ? 'bg-green-500' : 
+                type === 'error' ? 'bg-red-500' : 
+                type === 'warning' ? 'bg-amber-500' : 'bg-blue-500'
+            } text-white font-medium`;
+            toast.textContent = message;
+            document.body.appendChild(toast);
+            setTimeout(() => toast.remove(), 2500);
+        }
+    </script>
+</body>
+</html>

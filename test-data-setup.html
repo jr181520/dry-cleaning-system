@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>测试数据设置工具</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gradient-to-br from-blue-50 to-purple-50 min-h-screen p-8">
+    <div class="max-w-4xl mx-auto">
+        <h1 class="text-3xl font-bold text-center text-gray-800 mb-8">🔧 测试数据设置工具</h1>
+        
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+            <!-- 门店端 -->
+            <div class="bg-white rounded-xl p-6 shadow-lg">
+                <h2 class="text-xl font-bold mb-4 text-green-600">🏪 门店端测试数据</h2>
+                <div class="space-y-3">
+                    <div>
+                        <label class="block text-sm text-gray-600 mb-1">选择门店</label>
+                        <select id="storeSelect" class="w-full px-3 py-2 border rounded-lg">
+                            <option value="ST001">朝阳区干洗店</option>
+                            <option value="ST002">海淀区干洗店</option>
+                            <option value="ST003">丰台区干洗店</option>
+                        </select>
+                    </div>
+                    <button onclick="setupStoreTestData()" class="w-full bg-green-500 text-white py-2 px-4 rounded-lg hover:bg-green-600 font-medium">
+                        设置门店测试数据
+                    </button>
+                </div>
+            </div>
+
+            <!-- 管理后台 -->
+            <div class="bg-white rounded-xl p-6 shadow-lg">
+                <h2 class="text-xl font-bold mb-4 text-purple-600">💼 管理后台测试数据</h2>
+                <div class="space-y-3">
+                    <p class="text-sm text-gray-600">为管理后台设置测试订单数据</p>
+                    <button onclick="setupAdminTestData()" class="w-full bg-purple-500 text-white py-2 px-4 rounded-lg hover:bg-purple-600 font-medium">
+                        设置管理后台数据
+                    </button>
+                </div>
+            </div>
+
+            <!-- 查看数据 -->
+            <div class="bg-white rounded-xl p-6 shadow-lg">
+                <h2 class="text-xl font-bold mb-4 text-blue-600">📊 查看localStorage</h2>
+                <div class="space-y-3">
+                    <button onclick="viewLocalStorage()" class="w-full bg-blue-500 text-white py-2 px-4 rounded-lg hover:bg-blue-600 font-medium">
+                        查看数据
+                    </button>
+                    <button onclick="clearAllData()" class="w-full bg-red-500 text-white py-2 px-4 rounded-lg hover:bg-red-600 font-medium">
+                        清除所有数据
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 快速链接 -->
+        <div class="bg-white rounded-xl p-6 shadow-lg">
+            <h2 class="text-xl font-bold mb-4">🚀 快速访问</h2>
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <a href="c-orders.html" target="_blank" class="block text-center py-3 px-4 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 font-medium">
+                    📱 C端订单
+                </a>
+                <a href="m-index.html" target="_blank" class="block text-center py-3 px-4 bg-green-100 text-green-700 rounded-lg hover:bg-green-200 font-medium">
+                    🏪 门店端
+                </a>
+                <a href="admin.html" target="_blank" class="block text-center py-3 px-4 bg-purple-100 text-purple-700 rounded-lg hover:bg-purple-200 font-medium">
+                    💼 管理后台
+                </a>
+                <a href="test-full-simulation.html" target="_blank" class="block text-center py-3 px-4 bg-orange-100 text-orange-700 rounded-lg hover:bg-orange-200 font-medium">
+                    🎯 完整模拟
+                </a>
+            </div>
+        </div>
+
+        <!-- 数据查看区 -->
+        <div id="dataDisplay" class="mt-8 bg-gray-900 text-green-400 p-6 rounded-xl font-mono text-sm hidden">
+            <h3 class="font-bold mb-4">localStorage 数据内容：</h3>
+            <pre id="dataContent"></pre>
+        </div>
+
+        <!-- 日息区 -->
+        <div id="logArea" class="mt-8 bg-white rounded-xl p-6 shadow-lg">
+            <h3 class="font-bold mb-4">操作日志</h3>
+            <div id="logs" class="space-y-2 text-sm"></div>
+        </div>
+    </div>
+
+    <script>
+        function addLog(message, type = 'info') {
+            const logs = document.getElementById('logs');
+            const colors = {
+                info: 'text-blue-600',
+                success: 'text-green-600',
+                error: 'text-red-600',
+                warning: 'text-yellow-600'
+            };
+            
+            const time = new Date().toLocaleTimeString();
+            const log = document.createElement('div');
+            log.className = colors[type];
+            log.innerHTML = `<span class="text-gray-400">[${time}]</span> ${message}`;
+            logs.appendChild(log);
+            logs.scrollTop = logs.scrollHeight;
+        }
+
+        // 门店端测试数据
+        function setupStoreTestData() {
+            const storeId = document.getElementById('storeSelect').value;
+            const storeNames = {
+                'ST001': '朝阳区干洗店',
+                'ST002': '海淀区干洗店',
+                'ST003': '丰台区干洗店'
+            };
+            
+            // 设置门店登录
+            const storeUser = {
+                token: 'store_token_' + Date.now(),
+                storeId: storeId,
+                storeName: storeNames[storeId],
+                role: 'store_manager',
+                username: storeId === 'ST001' ? 'chaoyang001' : 
+                         storeId === 'ST002' ? 'haidian001' : 'fengtai001'
+            };
+            localStorage.setItem('storeUser', JSON.stringify(storeUser));
+            addLog(`✅ 门店登录已设置: ${storeNames[storeId]}`, 'success');
+            
+            // 创建示例订单
+            const storeOrders = [
+                {
+                    orderId: 'ORD' + new Date().getFullYear() + String(new Date().getMonth()+1).padStart(2,'0') + '001',
+                    storeId: storeId,
+                    items: [
+                        { name: '西装干洗', price: 50, quantity: 1 },
+                        { name: '衬衫清洗', price: 30, quantity: 1 }
+                    ],
+                    status: 'pending',
+                    total: 80,
+                    createdAt: new Date().toISOString(),
+                    customerName: '李明',
+                    customerPhone: '138****8001'
+                },
+                {
+                    orderId: 'ORD' + new Date().getFullYear() + String(new Date().getMonth()+1).padStart(2,'0') + '002',
+                    storeId: storeId,
+                    items: [
+                        { name: '羽绒服清洗', price: 80, quantity: 1 }
+                    ],
+                    status: 'paid',
+                    total: 80,
+                    createdAt: new Date(Date.now() - 86400000).toISOString(),
+                    customerName: '王芳',
+                    customerPhone: '139****9002'
+                }
+            ];
+            
+            localStorage.setItem('store_orders', JSON.stringify(storeOrders));
+            addLog(`✅ 门店订单已创建: ${storeOrders.length} 条`, 'success');
+            alert(`✅ 门店测试数据设置完成！\n\n门店：${storeNames[storeId]}\n订单：${storeOrders.length} 条\n\n请打开门店端查看。`);
+        }
+
+        // 管理后台测试数据
+        function setupAdminTestData() {
+            // 设置管理员登录
+            const adminUser = {
+                token: 'admin_token_' + Date.now(),
+                username: 'admin',
+                role: '总管理员',
+                name: '系统管理员'
+            };
+            localStorage.setItem('adminUser', JSON.stringify(adminUser));
+            localStorage.setItem('adminToken', adminUser.token);
+            addLog('✅ 管理员登录已设置', 'success');
+            
+            // 创建示例订单
+            const adminOrders = [
+                {
+                    orderId: 'ORD20260426001',
+                    orderNo: 'ORD20260426001',
+                    userId: 'user_001',
+                    storeId: 'ST001',
+                    storeName: '朝阳区干洗店',
+                    items: [
+                        { name: '西装干洗', price: 50, quantity: 1, subtotal: 50 }
+                    ],
+                    amounts: {
+                        subtotal: 50,
+                        discount: 0,
+                        deliveryFee: 0,
+                        total: 50
+                    },
+                    status: 'pending',
+                    paymentStatus: 'unpaid',
+                    createdAt: new Date().toISOString(),
+                    customerName: '李明',
+                    customerPhone: '13800138001'
+                },
+                {
+                    orderId: 'ORD20260426002',
+                    orderNo: 'ORD20260426002',
+                    userId: 'user_002',
+                    storeId: 'ST002',
+                    storeName: '海淀区干洗店',
+                    items: [
+                        { name: '羽绒服清洗', price: 80, quantity: 1, subtotal: 80 },
+                        { name: '运动鞋清洗', price: 40, quantity: 1, subtotal: 40 }
+                    ],
+                    amounts: {
+                        subtotal: 120,
+                        discount: 10,
+                        deliveryFee: 0,
+                        total: 110
+                    },
+                    status: 'paid',
+                    paymentStatus: 'paid',
+                    createdAt: new Date(Date.now() - 86400000).toISOString(),
+                    customerName: '王芳',
+                    customerPhone: '13900139002'
+                }
+            ];
+            
+            localStorage.setItem('admin_orders', JSON.stringify(adminOrders));
+            addLog(`✅ 管理后台订单已创建: ${adminOrders.length} 条`, 'success');
+            alert(`✅ 管理后台测试数据设置完成！\n\n账号：admin (总管理员)\n订单：${adminOrders.length} 条\n\n请打开管理后台查看。`);
+        }
+
+        // 查看localStorage
+        function viewLocalStorage() {
+            const data = {
+                'storeUser': localStorage.getItem('storeUser'),
+                'store_orders': localStorage.getItem('store_orders'),
+                'adminUser': localStorage.getItem('adminUser'),
+                'admin_orders': localStorage.getItem('admin_orders'),
+                'userToken': localStorage.getItem('userToken'),
+                'orders': localStorage.getItem('orders')
+            };
+            
+            const display = document.getElementById('dataDisplay');
+            const content = document.getElementById('dataContent');
+            
+            let html = '';
+            for (const [key, value] of Object.entries(data)) {
+                if (value) {
+                    try {
+                        const parsed = JSON.parse(value);
+                        html += `\n📦 ${key}:\n${JSON.stringify(parsed, null, 2)}\n`;
+                    } catch {
+                        html += `\n📦 ${key}: ${value}\n`;
+                    }
+                } else {
+                    html += `\n📦 ${key}: (空)\n`;
+                }
+            }
+            
+            content.textContent = html || 'localStorage 中没有数据';
+            display.classList.remove('hidden');
+            addLog('📊 已显示localStorage数据', 'info');
+        }
+
+        // 清除所有数据
+        function clearAllData() {
+            if (!confirm('确定要清除所有测试数据吗？')) return;
+            
+            [
+                'storeUser', 'storeToken', 'store_orders',
+                'adminUser', 'adminToken', 'admin_orders',
+                'userToken', 'orders'
+            ].forEach(key => localStorage.removeItem(key));
+            
+            addLog('🗑️ 所有测试数据已清除', 'warning');
+            alert('✅ 所有测试数据已清除！');
+        }
+    </script>
+</body>
+</html>

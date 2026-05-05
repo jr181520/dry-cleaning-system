@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>测试环境设置 - 干洗店管理系统</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gradient-to-br from-blue-50 to-indigo-100 min-h-screen flex items-center justify-center p-8">
+    <div class="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full">
+        <div class="text-center mb-8">
+            <h1 class="text-3xl font-bold text-gray-800 mb-2">🔧 测试环境设置</h1>
+            <p class="text-gray-600">为订单同步测试准备测试数据</p>
+        </div>
+
+        <!-- 当前状态 -->
+        <div class="bg-gray-50 rounded-xl p-4 mb-6">
+            <h3 class="font-semibold text-gray-700 mb-3 flex items-center">
+                <span class="mr-2">📊</span> 当前状态
+            </h3>
+            <div class="space-y-2 text-sm">
+                <div class="flex justify-between">
+                    <span class="text-gray-600">C端用户令牌：</span>
+                    <span id="userTokenStatus" class="font-mono">检查中...</span>
+                </div>
+                <div class="flex justify-between">
+                    <span class="text-gray-600">C端订单数量：</span>
+                    <span id="cOrdersCount" class="font-mono">检查中...</span>
+                </div>
+                <div class="flex justify-between">
+                    <span class="text-gray-600">门店端令牌：</span>
+                    <span id="storeTokenStatus" class="font-mono">检查中...</span>
+                </div>
+                <div class="flex justify-between">
+                    <span class="text-gray-600">门店端订单：</span>
+                    <span id="mOrdersCount" class="font-mono">检查中...</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- 操作按钮 -->
+        <div class="space-y-3">
+            <button onclick="setupTestData()" 
+                class="w-full bg-gradient-to-r from-blue-500 to-indigo-600 text-white py-3 px-4 rounded-xl font-semibold hover:shadow-lg transition transform hover:-translate-y-0.5">
+                🚀 一键设置测试环境
+            </button>
+            
+            <button onclick="clearAllTestData()" 
+                class="w-full bg-gray-200 text-gray-700 py-3 px-4 rounded-xl font-semibold hover:bg-gray-300 transition">
+                🗑️ 清除所有测试数据
+            </button>
+        </div>
+
+        <!-- 快速链接 -->
+        <div class="mt-8 pt-6 border-t border-gray-200">
+            <h3 class="font-semibold text-gray-700 mb-3">📱 快速访问</h3>
+            <div class="grid grid-cols-2 gap-3">
+                <a href="c-orders.html" target="_blank" 
+                    class="block text-center py-2 px-4 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition text-sm font-medium">
+                    C端订单页面
+                </a>
+                <a href="m-index.html" target="_blank" 
+                    class="block text-center py-2 px-4 bg-green-50 text-green-600 rounded-lg hover:bg-green-100 transition text-sm font-medium">
+                    门店端页面
+                </a>
+                <a href="admin.html" target="_blank" 
+                    class="block text-center py-2 px-4 bg-purple-50 text-purple-600 rounded-lg hover:bg-purple-100 transition text-sm font-medium">
+                    管理后台
+                </a>
+                <a href="test-order-sync.html" target="_blank" 
+                    class="block text-center py-2 px-4 bg-orange-50 text-orange-600 rounded-lg hover:bg-orange-100 transition text-sm font-medium">
+                    订单同步测试
+                </a>
+            </div>
+        </div>
+
+        <!-- 说明 -->
+        <div class="mt-6 p-4 bg-yellow-50 rounded-xl border-l-4 border-yellow-400">
+            <h4 class="font-semibold text-yellow-800 mb-2">⚠️ 测试说明</h4>
+            <ul class="text-sm text-yellow-700 space-y-1">
+                <li>• 点击"一键设置"后会创建测试令牌和示例订单</li>
+                <li>• 设置完成后即可访问各系统的订单页面</li>
+                <li>• 使用完成后建议点击"清除测试数据"</li>
+                <li>• 正式环境请勿使用此工具</li>
+            </ul>
+        </div>
+    </div>
+
+    <script>
+        // 检查当前状态
+        function checkStatus() {
+            // C端用户令牌
+            const userToken = localStorage.getItem('userToken');
+            document.getElementById('userTokenStatus').innerHTML = userToken 
+                ? '<span class="text-green-600">✓ 已设置</span>' 
+                : '<span class="text-red-600">✗ 未设置</span>';
+            
+            // C端订单
+            const cOrders = JSON.parse(localStorage.getItem('orders') || '[]');
+            document.getElementById('cOrdersCount').innerHTML = cOrders.length > 0 
+                ? `<span class="text-green-600">✓ ${cOrders.length} 条</span>` 
+                : '<span class="text-gray-400">0 条</span>';
+            
+            // 门店端令牌
+            const storeToken = localStorage.getItem('storeToken');
+            document.getElementById('storeTokenStatus').innerHTML = storeToken 
+                ? '<span class="text-green-600">✓ 已设置</span>' 
+                : '<span class="text-red-600">✗ 未设置</span>';
+            
+            // 门店端订单
+            const mOrders = JSON.parse(localStorage.getItem('store_orders') || '[]');
+            document.getElementById('mOrdersCount').innerHTML = mOrders.length > 0 
+                ? `<span class="text-green-600">✓ ${mOrders.length} 条</span>` 
+                : '<span class="text-gray-400">0 条</span>';
+        }
+
+        // 设置测试数据
+        function setupTestData() {
+            // 1. 设置 C端用户令牌
+            const testUser = {
+                token: 'test_token_' + Date.now(),
+                userId: 'test_user_001',
+                name: '测试用户',
+                phone: '13800138000',
+                avatar: null
+            };
+            localStorage.setItem('userToken', JSON.stringify(testUser));
+            console.log('✅ C端用户令牌已设置:', testUser);
+
+            // 2. 创建示例订单
+            const sampleOrders = [
+                {
+                    orderId: 'ORD' + new Date().getFullYear() + 
+                             String(new Date().getMonth() + 1).padStart(2, '0') + 
+                             String(new Date().getDate()).padStart(2, '0') + 
+                             '001',
+                    services: [
+                        { name: '西装干洗', price: 50 },
+                        { name: '衬衫清洗', price: 30 }
+                    ],
+                    store: { id: 'ST002', name: '海淀区干洗店' },
+                    status: 'pending',
+                    total: 80,
+                    createdAt: new Date().toISOString(),
+                    contact: {
+                        name: '测试用户',
+                        phone: '13800138000',
+                        address: '北京市海淀区中关村大街1号'
+                    }
+                },
+                {
+                    orderId: 'ORD' + new Date().getFullYear() + 
+                             String(new Date().getMonth() + 1).padStart(2, '0') + 
+                             String(new Date().getDate()).padStart(2, '0') + 
+                             '002',
+                    services: [
+                        { name: '羽绒服清洗', price: 80 },
+                        { name: '运动鞋清洗', price: 40 }
+                    ],
+                    store: { id: 'ST001', name: '朝阳区干洗店' },
+                    status: 'paid',
+                    total: 120,
+                    createdAt: new Date(Date.now() - 86400000).toISOString(),
+                    contact: {
+                        name: '测试用户',
+                        phone: '13800138000'
+                    }
+                }
+            ];
+            localStorage.setItem('orders', JSON.stringify(sampleOrders));
+            console.log('✅ C端示例订单已创建:', sampleOrders.length, '条');
+
+            // 3. 设置门店端令牌
+            const testStore = {
+                token: 'store_token_' + Date.now(),
+                storeId: 'ST002',
+                storeName: '海淀区干洗店',
+                role: 'store_manager'
+            };
+            localStorage.setItem('storeToken', JSON.stringify(testStore));
+            console.log('✅ 门店端令牌已设置:', testStore);
+
+            // 4. 创建门店端订单
+            const storeOrders = sampleOrders.map(order => ({
+                ...order,
+                storeId: order.store.id
+            }));
+            localStorage.setItem('store_orders', JSON.stringify(storeOrders));
+            console.log('✅ 门店端订单已创建:', storeOrders.length, '条');
+
+            // 5. 更新状态显示
+            checkStatus();
+            
+            alert('🎉 测试环境设置完成！\n\n' +
+                  '✅ C端用户令牌：已设置\n' +
+                  '✅ 示例订单：' + sampleOrders.length + ' 条\n' +
+                  '✅ 门店端令牌：已设置\n' +
+                  '\n请访问各系统页面查看订单。');
+        }
+
+        // 清除所有测试数据
+        function clearAllTestData() {
+            if (!confirm('确定要清除所有测试数据吗？\n这将删除：\n- C端用户令牌\n- 所有订单\n- 门店端令牌')) {
+                return;
+            }
+            
+            localStorage.removeItem('userToken');
+            localStorage.removeItem('orders');
+            localStorage.removeItem('storeToken');
+            localStorage.removeItem('store_orders');
+            localStorage.removeItem('currentOrder');
+            
+            checkStatus();
+            alert('🗑️ 所有测试数据已清除！');
+        }
+
+        // 页面加载时检查状态
+        document.addEventListener('DOMContentLoaded', checkStatus);
+    </script>
+</body>
+</html>

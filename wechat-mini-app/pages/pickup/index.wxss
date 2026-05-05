@@ -1,0 +1,413 @@
+/* 扫码取件页面样式 */
+
+.scan-header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 60rpx 40rpx 40rpx;
+  background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
+  color: #ffffff;
+}
+
+.scan-icon {
+  width: 160rpx;
+  height: 160rpx;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 24rpx;
+}
+
+.scan-icon .iconfont {
+  font-size: 80rpx;
+}
+
+.scan-title {
+  font-size: 40rpx;
+  font-weight: 600;
+  margin-bottom: 12rpx;
+}
+
+.scan-desc {
+  font-size: 28rpx;
+  opacity: 0.9;
+}
+
+/* 手动输入区域 */
+.manual-input {
+  padding: 40rpx 32rpx;
+  background: #ffffff;
+  margin: -30rpx 24rpx 24rpx;
+  border-radius: 16rpx;
+  box-shadow: 0 4rpx 16rpx rgba(0, 0, 0, 0.1);
+}
+
+.input-section {
+  margin-bottom: 32rpx;
+}
+
+.input-label {
+  display: block;
+  font-size: 28rpx;
+  color: #374151;
+  margin-bottom: 16rpx;
+  font-weight: 500;
+}
+
+.input {
+  width: 100%;
+  height: 96rpx;
+  padding: 0 24rpx;
+  border: 2rpx solid #e5e7eb;
+  border-radius: 12rpx;
+  font-size: 32rpx;
+  background: #f9fafb;
+  transition: all 0.3s;
+}
+
+.input:focus {
+  border-color: #3b82f6;
+  background: #ffffff;
+}
+
+.btn-block {
+  width: 100%;
+  height: 96rpx;
+  border-radius: 12rpx;
+  font-size: 32rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-outline {
+  background: transparent;
+  border: 2rpx solid #d1d5db;
+  color: #6b7280;
+  margin-top: 16rpx;
+}
+
+.btn-outline:active {
+  background: #f3f4f6;
+}
+
+.divider-text {
+  display: flex;
+  align-items: center;
+  margin: 40rpx 0;
+  padding: 0 40rpx;
+}
+
+.divider-line {
+  flex: 1;
+  height: 1rpx;
+  background: #e5e7eb;
+}
+
+.divider-text-content {
+  padding: 0 24rpx;
+  color: #9ca3af;
+  font-size: 26rpx;
+}
+
+/* 取件结果卡片 */
+.pickup-result {
+  margin: 24rpx;
+}
+
+.result-card {
+  background: #ffffff;
+  border-radius: 20rpx;
+  padding: 48rpx 32rpx;
+  box-shadow: 0 4rpx 20rpx rgba(0, 0, 0, 0.1);
+  text-align: center;
+}
+
+.result-card.success {
+  border-top: 6rpx solid #10b981;
+}
+
+.result-card.error {
+  border-top: 6rpx solid #ef4444;
+}
+
+.result-icon {
+  width: 120rpx;
+  height: 120rpx;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 24rpx;
+}
+
+.result-card.success .result-icon {
+  background: #d1fae5;
+  color: #10b981;
+}
+
+.result-card.error .result-icon {
+  background: #fee2e2;
+  color: #ef4444;
+}
+
+.result-icon .iconfont {
+  font-size: 60rpx;
+}
+
+.result-title {
+  display: block;
+  font-size: 36rpx;
+  font-weight: 600;
+  color: #1f2937;
+  margin-bottom: 12rpx;
+}
+
+.result-message {
+  display: block;
+  font-size: 28rpx;
+  color: #6b7280;
+  margin-bottom: 32rpx;
+}
+
+/* 订单详情 */
+.order-detail {
+  background: #f9fafb;
+  border-radius: 12rpx;
+  padding: 24rpx;
+  margin: 24rpx 0;
+  text-align: left;
+}
+
+.detail-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 12rpx 0;
+  border-bottom: 1rpx solid #e5e7eb;
+}
+
+.detail-row:last-child {
+  border-bottom: none;
+}
+
+.detail-label {
+  font-size: 26rpx;
+  color: #6b7280;
+}
+
+.detail-value {
+  font-size: 26rpx;
+  color: #1f2937;
+  font-weight: 500;
+}
+
+.detail-value.highlight {
+  color: #1e40af;
+  font-size: 32rpx;
+  font-weight: 600;
+}
+
+/* 灯光提示 */
+.light-indicator {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16rpx;
+  padding: 20rpx;
+  background: #fef3c7;
+  border-radius: 12rpx;
+  margin: 24rpx 0;
+  color: #92400e;
+  font-size: 26rpx;
+}
+
+.light-icon {
+  width: 24rpx;
+  height: 24rpx;
+  border-radius: 50%;
+  background: #f59e0b;
+}
+
+.light-icon.pulsing {
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { 
+    opacity: 1; 
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.7);
+  }
+  50% { 
+    opacity: 0.8; 
+    transform: scale(1.1);
+    box-shadow: 0 0 0 10rpx rgba(245, 158, 11, 0);
+  }
+}
+
+/* 操作按钮 */
+.result-actions {
+  margin-top: 32rpx;
+}
+
+/* 待取件列表 */
+.pending-orders {
+  padding: 0 24rpx;
+  margin-top: 40rpx;
+}
+
+.order-list {
+  background: #ffffff;
+  border-radius: 12rpx;
+  overflow: hidden;
+  box-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.05);
+}
+
+.order-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 24rpx;
+  border-bottom: 1rpx solid #f3f4f6;
+}
+
+.order-item:last-child {
+  border-bottom: none;
+}
+
+.order-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8rpx;
+}
+
+.order-code {
+  font-size: 28rpx;
+  font-weight: 600;
+  color: #1f2937;
+  font-family: monospace;
+}
+
+.order-name {
+  font-size: 26rpx;
+  color: #6b7280;
+}
+
+.order-items {
+  font-size: 24rpx;
+  color: #9ca3af;
+}
+
+.order-actions {
+  margin-left: 20rpx;
+}
+
+.btn-sm {
+  padding: 12rpx 24rpx;
+  font-size: 24rpx;
+  border-radius: 8rpx;
+}
+
+/* 最近取件记录 */
+.recent-records {
+  padding: 0 24rpx;
+  margin-top: 40rpx;
+}
+
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20rpx;
+}
+
+.section-title {
+  font-size: 32rpx;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.section-more {
+  font-size: 26rpx;
+  color: #3b82f6;
+}
+
+.record-list {
+  background: #ffffff;
+  border-radius: 12rpx;
+  overflow: hidden;
+}
+
+.record-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 24rpx;
+  border-bottom: 1rpx solid #f3f4f6;
+}
+
+.record-item:last-child {
+  border-bottom: none;
+}
+
+.record-info {
+  display: flex;
+  flex-direction: column;
+  gap: 8rpx;
+}
+
+.record-code {
+  font-size: 28rpx;
+  font-weight: 600;
+  color: #1f2937;
+  font-family: monospace;
+}
+
+.record-time {
+  font-size: 24rpx;
+  color: #9ca3af;
+}
+
+.record-status {
+  font-size: 24rpx;
+  padding: 6rpx 16rpx;
+  border-radius: 8rpx;
+}
+
+.record-status.completed {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.record-status.pending {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+/* 动画效果 */
+.slide-up {
+  animation: slideUp 0.4s ease-out;
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(40rpx);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.fade-in {
+  animation: fadeIn 0.3s ease-in;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}

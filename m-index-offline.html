@@ -1,0 +1,1056 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>干洗店管理系统 - 手机终端（离线版）</title>
+    
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; background: #f3f4f6; min-height: 100vh; }
+        
+        /* 固定定位 */
+        .fixed { position: fixed; }
+        .fixed-top { top: 0; left: 0; right: 0; }
+        .fixed-bottom { bottom: 0; left: 0; right: 0; }
+        .fixed-left { top: 0; left: 0; bottom: 0; }
+        
+        /* 层级 */
+        .z-40 { z-index: 40; }
+        .z-50 { z-index: 50; }
+        
+        /* Flex布局 */
+        .flex { display: flex; }
+        .flex-col { flex-direction: column; }
+        .items-center { align-items: center; }
+        .items-start { align-items: flex-start; }
+        .justify-between { justify-content: space-between; }
+        .justify-around { justify-content: space-around; }
+        .flex-1 { flex: 1; }
+        .flex-wrap { flex-wrap: wrap; }
+        
+        /* 间距 */
+        .p-2 { padding: 0.5rem; }
+        .p-3 { padding: 0.75rem; }
+        .p-4 { padding: 1rem; }
+        .p-6 { padding: 1.5rem; }
+        .px-2 { padding-left: 0.5rem; padding-right: 0.5rem; }
+        .px-3 { padding-left: 0.75rem; padding-right: 0.75rem; }
+        .px-4 { padding-left: 1rem; padding-right: 1rem; }
+        .py-1 { padding-top: 0.25rem; padding-bottom: 0.25rem; }
+        .py-1\.5 { padding-top: 0.375rem; padding-bottom: 0.375rem; }
+        .py-2 { padding-top: 0.5rem; padding-bottom: 0.5rem; }
+        .py-3 { padding-top: 0.75rem; padding-bottom: 0.75rem; }
+        .pt-4 { padding-top: 1rem; }
+        .mt-1 { margin-top: 0.25rem; }
+        .mt-4 { margin-top: 1rem; }
+        .mb-2 { margin-bottom: 0.5rem; }
+        .mb-4 { margin-bottom: 1rem; }
+        .mb-6 { margin-bottom: 1.5rem; }
+        .mr-2 { margin-right: 0.5rem; }
+        .space-x-2 > * + * { margin-left: 0.5rem; }
+        .space-x-3 > * + * { margin-left: 0.75rem; }
+        
+        /* 尺寸 */
+        .w-64 { width: 16rem; }
+        .w-full { width: 100%; }
+        .w-8 { width: 2rem; }
+        .w-10 { width: 2.5rem; }
+        .w-32 { width: 8rem; }
+        .w-2 { width: 0.5rem; }
+        .h-2 { height: 0.5rem; }
+        .h-6 { height: 1.5rem; }
+        .h-8 { height: 2rem; }
+        .h-64 { height: 16rem; }
+        .h-2\.5 { height: 0.625rem; }
+        .min-h-screen { min-height: 100vh; }
+        .max-w-md { max-width: 28rem; }
+        
+        /* 颜色 */
+        .bg-white { background-color: white; }
+        .bg-gray-50 { background-color: #f9fafb; }
+        .bg-gray-100 { background-color: #f3f4f6; }
+        .bg-gray-200 { background-color: #e5e7eb; }
+        .bg-primary { background-color: #1e40af; }
+        .bg-green-50 { background-color: #ecfdf5; }
+        .bg-green-500 { background-color: #22c55e; }
+        .bg-red-50 { background-color: #fef2f2; }
+        .bg-red-500 { background-color: #ef4444; }
+        .bg-yellow-100 { background-color: #fef9c3; }
+        .bg-blue-50 { background-color: #eff6ff; }
+        .bg-blue-100 { background-color: #dbeafe; }
+        .bg-blue-500 { background-color: #3b82f6; }
+        .bg-purple-50 { background-color: #faf5ff; }
+        .bg-purple-500 { background-color: #a855f7; }
+        .bg-orange-50 { background-color: #fff7ed; }
+        .bg-orange-500 { background-color: #f97316; }
+        .bg-teal-50 { background-color: #f0fdfa; }
+        .bg-teal-500 { background-color: #14b8a6; }
+        
+        .text-white { color: white; }
+        .text-gray-400 { color: #9ca3af; }
+        .text-gray-500 { color: #6b7280; }
+        .text-gray-600 { color: #4b5563; }
+        .text-gray-700 { color: #374151; }
+        .text-gray-800 { color: #1f2937; }
+        .text-primary { color: #1e40af; }
+        .text-green-600 { color: #16a34a; }
+        .text-red-600 { color: #dc2626; }
+        .text-yellow-600 { color: #ca8a04; }
+        .text-yellow-800 { color: #854d0e; }
+        .text-blue-600 { color: #2563eb; }
+        .text-blue-800 { color: #1e40af; }
+        
+        /* 边框 */
+        .border { border-width: 1px; border-style: solid; }
+        .border-gray-200 { border-color: #e5e7eb; }
+        .border-gray-300 { border-color: #d1d5db; }
+        .border-green-200 { border-color: #bbf7d0; }
+        .border-blue-200 { border-color: #bfdbfe; }
+        .border-t { border-top-width: 1px; border-top-style: solid; }
+        .border-b { border-bottom-width: 1px; border-bottom-style: solid; }
+        .rounded-lg { border-radius: 0.5rem; }
+        .rounded-xl { border-radius: 0.75rem; }
+        .rounded-full { border-radius: 9999px; }
+        .rounded { border-radius: 0.25rem; }
+        
+        /* 阴影 */
+        .shadow-md { box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06); }
+        .shadow-lg { box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05); }
+        .shadow-sm { box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05); }
+        
+        /* 文字 */
+        .text-xs { font-size: 0.75rem; line-height: 1rem; }
+        .text-sm { font-size: 0.875rem; line-height: 1.25rem; }
+        .text-lg { font-size: 1.125rem; line-height: 1.75rem;; }
+        .text-xl { font-size: 1.25rem; line-height: 1.75rem; }
+        .text-2xl { font-size: 1.5rem; line-height: 2rem; }
+        .text-3xl { font-size: 1.875rem; line-height: 2.25rem; }
+        .text-4xl { font-size: 2.25rem; line-height: 2.5rem; }
+        .font-medium { font-weight: 500; }
+        .font-semibold { font-weight: 600; }
+        .font-bold { font-weight: 700; }
+        .text-center { text-align: center; }
+        .text-left { text-align: left; }
+        
+        /* 间距计算 */
+        .pt-16 { padding-top: 4rem; }
+        .pb-20 { padding-bottom: 5rem; }
+        .pb-4 { padding-bottom: 1rem; }
+        .gap-2 { gap: 0.5rem; }
+        .gap-3 { gap: 0.75rem; }
+        .gap-4 { gap: 1rem; }
+        .gap-1\.5 { gap: 0.375rem; }
+        
+        /* 网格 */
+        .grid { display: grid; }
+        .grid-cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        .grid-cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+        .grid-cols-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+        
+        /* 显示 */
+        .block { display: block; }
+        .hidden { display: none !important; }
+        .inline-block { display: inline-block; }
+        .overflow-hidden { overflow: hidden; }
+        .overflow-x-auto { overflow-x: auto; }
+        .overflow-y-auto { overflow-y: auto; }
+        .max-h-96 { max-height: 24rem; }
+        
+        /* 位置 */
+        .relative { position: relative; }
+        .absolute { position: absolute; }
+        .top-0 { top: 0; }
+        .right-0 { right: 0; }
+        .top-16 { top: 4rem; }
+        .right-4 { right: 1rem; }
+        .bottom-20 { bottom: 5rem; }
+        
+        /* 动画 */
+        .transition-all { transition: all 0.3s ease; }
+        .transition-colors { transition: color 0.15s ease-in-out, background-color 0.15s ease-in-out; }
+        .transform { transform: translateX(0); }
+        .-translate-x-full { transform: translateX(-100%); }
+        .translate-x-0 { transform: translateX(0); }
+        
+        /* 鼠标 */
+        .cursor-pointer { cursor: pointer; }
+        .hover\:bg-gray-100:hover { background-color: #f3f4f6; }
+        .hover\:bg-gray-50:hover { background-color: #f9fafb; }
+        .hover\:bg-blue-50:hover { background-color: #eff6ff; }
+        .hover\:bg-red-50:hover { background-color: #fef2f2; }
+        .hover\:bg-red-600:hover { background-color: #dc2626; }
+        .hover\:bg-primary:hover { background-color: rgba(30, 64, 175, 0.9); }
+        .hover\:bg-green-600:hover { background-color: #16a34a; }
+        .hover\:text-primary:hover { color: #1e40af; }
+        .hover\:underline:hover { text-decoration: underline; }
+        
+        /* 过渡效果 */
+        .duration-300 { transition-duration: 300ms; }
+        .ease-in-out { transition-timing-function: ease-in-out; }
+        
+        /* 按钮样式 */
+        .btn { display: inline-block; padding: 0.5rem 1rem; border-radius: 0.5rem; border: none; cursor: pointer; font-size: 0.875rem; transition: all 0.2s; }
+        .btn-primary { background: #1e40af; color: white; }
+        .btn-primary:hover { background: rgba(30, 64, 175, 0.9); }
+        .btn-success { background: #22c55e; color: white; }
+        .btn-success:hover { background: #16a34a; }
+        .btn-danger { background: #ef4444; color: white; }
+        .btn-danger:hover { background: #dc2626; }
+        .btn-warning { background: #f59e0b; color: white; }
+        .btn-warning:hover { background: #d97706; }
+        .btn-sm { padding: 0.375rem 0.75rem; font-size: 0.75rem; }
+        
+        /* 输入框 */
+        .input { width: 100%; padding: 0.5rem; border: 1px solid #d1d5db; border-radius: 0.5rem; font-size: 0.875rem; }
+        .input:focus { outline: none; border-color: #1e40af; box-shadow: 0 0 0 2px rgba(30, 64, 175, 0.2); }
+        
+        /* 状态徽章 */
+        .badge { display: inline-block; padding: 0.125rem 0.5rem; border-radius: 9999px; font-size: 0.75rem; }
+        .badge-primary { background: #dbeafe; color: #1e40af; }
+        .badge-success { background: #dcfce7; color: #166534; }
+        .badge-warning { background: #fef9c3; color: #854d0e; }
+        .badge-danger { background: #fee2e2; color: #991b1b; }
+        .badge-green { background: #bbf7d0; color: #166534; }
+        
+        /* 卡片 */
+        .card { background: white; border-radius: 0.75rem; padding: 1rem; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+        
+        /* 表格 */
+        .table { width: 100%; border-collapse: collapse; }
+        .table th, .table td { padding: 0.5rem; text-align: left; border-bottom: 1px solid #e5e7eb; }
+        .table th { font-weight: 500; color: #6b7280; font-size: 0.75rem; }
+        
+        /* 进度条 */
+        .progress-bar { height: 0.5rem; background: #e5e7eb; border-radius: 9999px; overflow: hidden; }
+        .progress-bar-fill { height: 100%; background: linear-gradient(to right, #3b82f6, #8b5cf6); border-radius: 9999px; transition: width 0.3s; }
+        
+        /* 颜色选择器 */
+        input[type="color"] { width: 2.5rem; height: 2rem; border: 1px solid #d1d5db; border-radius: 0.25rem; cursor: pointer; }
+        
+        /* 滑块 */
+        input[type="range"] { width: 100%; height: 0.375rem; background: #e5e7eb; border-radius: 9999px; appearance: none; cursor: pointer; }
+        input[type="range"]::-webkit-slider-thumb { appearance: none; width: 1rem; height: 1rem; background: #1e40af; border-radius: 50%; cursor: pointer; }
+        
+        /* 点击效果 */
+        .active\:bg-blue-100:active { background-color: #dbeafe; }
+        
+        /* 内容区域 */
+        .content-section { padding: 1rem; }
+        
+        /* 灯条 */
+        .light-bar { height: 1.5rem; background: #e5e7eb; }
+        .light-bar-active { background: linear-gradient(to right, #fbbf24, #f59e0b); box-shadow: 0 0 10px rgba(251, 191, 36, 0.5); }
+        
+        /* 遮罩 */
+        .overlay { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.5); z-index: 45; }
+        
+        /* 动画 */
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        .animate-pulse { animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
+        
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0; }
+        }
+        .animate-blink { animation: blink 1s step-end infinite; }
+        
+        /* 滚动条 */
+        ::-webkit-scrollbar { width: 4px; height: 4px; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 2px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <!-- 顶部导航栏 -->
+    <header class="fixed top-0 left-0 right-0 bg-white shadow-md z-40">
+        <div class="flex items-center justify-between p-4">
+            <div class="flex items-center space-x-2">
+                <button id="menu-btn" class="p-2 rounded-lg hover:bg-gray-100 transition-all duration-300 ease-in-out" onclick="toggleSidebar()" aria-label="打开菜单">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="3" y1="6" x2="21" y2="6"></line>
+                        <line x1="3" y1="12" x2="21" y2="12"></line>
+                        <line x1="3" y1="18" x2="21" y2="18"></line>
+                    </svg>
+                </button>
+                <h1 class="text-lg font-semibold text-gray-800">干洗店管理</h1>
+            </div>
+            <div class="flex items-center space-x-3">
+                <button id="notification-btn" class="relative p-2 rounded-lg hover:bg-gray-100 transition-all duration-300 ease-in-out">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+                        <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+                    </svg>
+                    <span class="absolute top-0 right-0 w-2 h-2 bg-red-500 rounded-full animate-pulse"></span>
+                </button>
+                <div class="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-white">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                        <circle cx="12" cy="7" r="4"></circle>
+                    </svg>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- 侧边栏 -->
+    <div id="sidebar" class="fixed top-0 left-0 bottom-0 w-64 bg-white shadow-lg z-50 transform -translate-x-full transition-transform duration-300 ease-in-out">
+        <div class="p-4 border-b border-gray-200">
+            <div class="flex items-center space-x-3">
+                <div class="w-10 h-10 rounded-full bg-primary flex items-center justify-center text-white">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"></path>
+                    </svg>
+                </div>
+                <div>
+                    <h2 class="font-semibold text-gray-800">干洗店管理系统</h2>
+                    <p class="text-sm text-gray-500">旗舰店</p>
+                </div>
+            </div>
+        </div>
+        
+        <nav class="p-4 overflow-y-auto" style="max-height: calc(100vh - 80px);">
+            <ul class="space-y-1">
+                <li>
+                    <a href="#dashboard" class="nav-link flex items-center space-x-3 p-3 rounded-lg text-primary" onclick="navigateTo('dashboard')">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="3" y="3" width="7" height="7"></rect>
+                            <rect x="14" y="3" width="7" height="7"></rect>
+                            <rect x="14" y="14" width="7" height="7"></rect>
+                            <rect x="3" y="14" width="7" height="7"></rect>
+                        </svg>
+                        <span>仪表盘</span>
+                    </a>
+                </li>
+                <li>
+                    <a href="#orders" class="nav-link flex items-center space-x-3 p-3 rounded-lg text-gray-700 hover:bg-blue-50 transition-all duration-300 ease-in-out" onclick="navigateTo('orders')">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="9" cy="21" r="1"></circle>
+                            <circle cx="20" cy="21" r="1"></circle>
+                            <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path>
+                        </svg>
+                        <span>订单管理</span>
+                    </a>
+                </li>
+                <li>
+                    <a href="#inventory" class="nav-link flex items-center space-x-3 p-3 rounded-lg text-gray-700 hover:bg-blue-50 transition-all duration-300 ease-in-out" onclick="navigateTo('inventory')">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="8" y1="6" x2="21" y2="6"></line>
+                            <line x1="8" y1="12" x2="21" y2="12"></line>
+                            <line x1="8" y1="18" x2="21" y2="18"></line>
+                            <line x1="3" y1="6" x2="3.01" y2="6"></line>
+                            <line x1="3" y1="12" x2="3.01" y2="12"></line>
+                            <line x1="3" y1="18" x2="3.01" y2="18"></line>
+                        </svg>
+                        <span>库存管理</span>
+                    </a>
+                </li>
+                <li>
+                    <a href="#customers" class="nav-link flex items-center space-x-3 p-3 rounded-lg text-gray-700 hover:bg-blue-50 transition-all duration-300 ease-in-out" onclick="navigateTo('customers')">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                            <circle cx="9" cy="7" r="4"></circle>
+                            <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                            <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                        </svg>
+                        <span>客户管理</span>
+                    </a>
+                </li>
+                <li>
+                    <a href="#light-system" class="nav-link flex items-center space-x-3 p-3 rounded-lg text-gray-700 hover:bg-blue-50 transition-all duration-300 ease-in-out" onclick="navigateTo('light-system')">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M9 18h6"></path>
+                            <path d="M10 22h4"></path>
+                            <path d="M15.09 14c.18-.98.65-1.74 1.41-2.5A4.65 4.65 0 0 0 18 8 6 6 0 0 0 6 8c0 1 .23 2.23 1.5 3.5A4.61 4.61 0 0 1 8.91 14"></path>
+                        </svg>
+                        <span>智能灯条系统</span>
+                    </a>
+                </li>
+                <li>
+                    <a href="#statistics" class="nav-link flex items-center space-x-3 p-3 rounded-lg text-gray-700 hover:bg-blue-50 transition-all duration-300 ease-in-out" onclick="navigateTo('statistics')">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="18" y1="20" x2="18" y2="10"></line>
+                            <line x1="12" y1="20" x2="12" y2="4"></line>
+                            <line x1="6" y1="20" x2="6" y2="14"></line>
+                        </svg>
+                        <span>统计分析</span>
+                    </a>
+                </li>
+                <li>
+                    <a href="#messages" class="nav-link flex items-center space-x-3 p-3 rounded-lg text-gray-700 hover:bg-blue-50 transition-all duration-300 ease-in-out" onclick="navigateTo('messages')">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
+                            <polyline points="22,6 12,13 2,6"></polyline>
+                        </svg>
+                        <span>消息中心</span>
+                        <span class="ml-auto px-2 py-0.5 bg-red-500 text-white text-xs rounded-full">3</span>
+                    </a>
+                </li>
+                <li class="pt-4 mt-4 border-t border-gray-200">
+                    <a href="#settings" class="nav-link flex items-center space-x-3 p-3 rounded-lg text-gray-700 hover:bg-blue-50 transition-all duration-300 ease-in-out" onclick="navigateTo('settings')">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="3"></circle>
+                            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+                        </svg>
+                        <span>系统设置</span>
+                    </a>
+                </li>
+                <li class="pt-4 mt-4 border-t border-gray-200">
+                    <a href="#logout" class="nav-link flex items-center space-x-3 p-3 rounded-lg text-gray-700 hover:bg-red-50 transition-all duration-300 ease-in-out" onclick="logout()">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                            <polyline points="16 17 21 12 16 7"></polyline>
+                            <line x1="21" y1="12" x2="9" y2="12"></line>
+                        </svg>
+                        <span>退出登录</span>
+                    </a>
+                </li>
+            </ul>
+        </nav>
+    </div>
+
+    <!-- 侧边栏遮罩层 -->
+    <div id="sidebar-overlay" class="fixed inset-0 bg-black bg-opacity-50 z-40 hidden" onclick="closeSidebar()"></div>
+
+    <!-- 主内容区 -->
+    <main class="pt-16 pb-20">
+        <!-- 仪表盘 -->
+        <div id="dashboard-content" class="content-section">
+            <div class="mb-6">
+                <h2 class="text-xl font-bold text-gray-800">仪表盘</h2>
+                <p class="text-gray-600">欢迎回来，今天是 <span id="current-date"></span></p>
+            </div>
+            
+            <!-- 快捷统计卡片 -->
+            <div class="grid grid-cols-2 gap-4 mb-6">
+                <div class="card bg-gradient-to-r from-blue-500 to-blue-600 text-white">
+                    <p class="text-xs opacity-80">今日订单</p>
+                    <p class="text-2xl font-bold">24</p>
+                    <p class="text-xs mt-1">↑ 12%</p>
+                </div>
+                <div class="card bg-gradient-to-r from-green-500 to-green-600 text-white">
+                    <p class="text-xs opacity-80">待取件</p>
+                    <p class="text-2xl font-bold">8</p>
+                    <p class="text-xs mt-1">今日新增</p>
+                </div>
+                <div class="card bg-gradient-to-r from-yellow-500 to-yellow-600 text-white">
+                    <p class="text-xs opacity-80">进行中</p>
+                    <p class="text-2xl font-bold">15</p>
+                    <p class="text-xs mt-1">处理中</p>
+                </div>
+                <div class="card bg-gradient-to-r from-purple-500 to-purple-600 text-white">
+                    <p class="text-xs opacity-80">本月收入</p>
+                    <p class="text-2xl font-bold">¥8,560</p>
+                    <p class="text-xs mt-1">↑ 8%</p>
+                </div>
+            </div>
+            
+            <!-- 最新订单 -->
+            <div class="card mb-6">
+                <h3 class="font-semibold text-gray-800 mb-4">最新订单</h3>
+                <div class="space-y-3">
+                    <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                        <div>
+                            <p class="font-medium text-gray-800">张三</p>
+                            <p class="text-xs text-gray-500">西装、衬衫</p>
+                        </div>
+                        <span class="badge badge-warning">处理中</span>
+                    </div>
+                    <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                        <div>
+                            <p class="font-medium text-gray-800">李四</p>
+                            <p class="text-xs text-gray-500">大衣</p>
+                        </div>
+                        <span class="badge badge-success">已完成</span>
+                    </div>
+                    <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                        <div>
+                            <p class="font-medium text-gray-800">王五</p>
+                            <p class="text-xs text-gray-500">羽绒服</p>
+                        </div>
+                        <span class="badge badge-primary">待取件</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 智能灯条系统 -->
+        <div id="light-system-content" class="content-section hidden">
+            <div class="mb-6">
+                <h2 class="text-xl font-bold text-gray-800">智能灯条系统</h2>
+                <p class="text-gray-600">基于WLED协议控制智能灯条，快速定位客户衣物</p>
+            </div>
+            
+            <!-- 模拟模式开关 -->
+            <div class="card mb-6">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="font-semibold text-gray-800">WLED设备配置</h3>
+                    <div class="flex items-center gap-3">
+                        <label class="flex items-center gap-2 cursor-pointer">
+                            <input type="checkbox" id="simulation-mode" class="w-4 h-4" checked onchange="toggleSimulationMode()">
+                            <span class="text-sm text-gray-700">模拟模式</span>
+                        </label>
+                        <button id="add-device-btn" class="btn btn-primary btn-sm" onclick="addDevice()">
+                            + 添加设备
+                        </button>
+                    </div>
+                </div>
+                <div id="devices-list" class="grid grid-cols-2 gap-3">
+                    <!-- 设备列表 -->
+                </div>
+            </div>
+            
+            <!-- 灯条控制面板 -->
+            <div class="card mb-6">
+                <h3 class="font-semibold text-gray-800 mb-4">灯条控制面板</h3>
+                
+                <div class="flex items-center gap-2 mb-4">
+                    <span class="w-2 h-2 rounded-full bg-gray-400" id="status-dot"></span>
+                    <span class="text-xs text-gray-600" id="status-text">未连接</span>
+                </div>
+                
+                <div class="space-y-4">
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-xs font-medium text-gray-700 mb-1">选择设备</label>
+                            <select id="device-select" class="input">
+                                <option value="">-- 选择设备 --</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-gray-700 mb-1">效果模式</label>
+                            <select id="effect-select" class="input">
+                                <option value="0">纯色</option>
+                                <option value="1">闪烁</option>
+                                <option value="2">呼吸</option>
+                                <option value="8">色彩循环</option>
+                                <option value="9">彩虹</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-xs font-medium text-gray-700 mb-1">颜色</label>
+                            <div class="flex gap-2">
+                                <input type="color" id="color-picker" value="#ff5500" class="w-12">
+                                <input type="text" id="color-hex" value="#ff5500" class="input flex-1">
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-gray-700 mb-1">亮度: <span id="brightness-value">255</span></label>
+                            <input type="range" id="brightness-slider" min="0" max="255" value="255" class="w-full">
+                        </div>
+                    </div>
+                    
+                    <div class="flex gap-2">
+                        <button onclick="turnOn()" class="btn btn-success btn-sm">开</button>
+                        <button onclick="turnOff()" class="btn btn-danger btn-sm">关</button>
+                        <button onclick="applySettings()" class="btn btn-primary btn-sm">应用</button>
+                    </div>
+                    
+                    <div>
+                        <span class="text-xs font-medium text-gray-700">预设:</span>
+                        <div class="flex gap-2 mt-2 flex-wrap">
+                            <button onclick="setPreset('#ff0000', 0)" class="w-8 h-8 rounded-full bg-red-500 hover:opacity-80"></button>
+                            <button onclick="setPreset('#00ff00', 0)" class="w-8 h-8 rounded-full bg-green-500 hover:opacity-80"></button>
+                            <button onclick="setPreset('#0000ff', 0)" class="w-8 h-8 rounded-full bg-blue-500 hover:opacity-80"></button>
+                            <button onclick="setPreset('#ffff00', 8)" class="w-8 h-8 rounded-full bg-yellow-500 hover:opacity-80"></button>
+                            <button onclick="setPreset('#ff00ff', 9)" class="w-8 h-8 rounded-full bg-purple-500 hover:opacity-80"></button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 待取件列表 -->
+            <div class="card">
+                <h3 class="font-semibold text-gray-800 mb-4">待取件列表</h3>
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>客户</th>
+                            <th>物品</th>
+                            <th>区域</th>
+                            <th>状态</th>
+                        </tr>
+                    </thead>
+                    <tbody id="pickup-table">
+                        <tr>
+                            <td class="text-gray-800">张三</td>
+                            <td class="text-gray-600">西装、衬衫</td>
+                            <td><span class="badge badge-primary">A1</span></td>
+                            <td><span class="badge badge-warning">待取件</span></td>
+                        </tr>
+                        <tr>
+                            <td class="text-gray-800">李四</td>
+                            <td class="text-gray-600">大衣</td>
+                            <td><span class="badge badge-primary">B2</span></td>
+                            <td><span class="badge badge-warning">待取件</span></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- 其他内容区域 -->
+        <div id="orders-content" class="content-section hidden">
+            <h2 class="text-xl font-bold text-gray-800 mb-6">订单管理</h2>
+            <p class="text-gray-600">订单管理功能开发中...</p>
+        </div>
+
+        <div id="inventory-content" class="content-section hidden">
+            <h2 class="text-xl font-bold text-gray-800 mb-6">库存管理</h2>
+            <p class="text-gray-600">库存管理功能开发中...</p>
+        </div>
+
+        <div id="customers-content" class="content-section hidden">
+            <h2 class="text-xl font-bold text-gray-800 mb-6">客户管理</h2>
+            <p class="text-gray-600">客户管理功能开发中...</p>
+        </div>
+
+        <div id="statistics-content" class="content-section hidden">
+            <h2 class="text-xl font-bold text-gray-800 mb-6">统计分析</h2>
+            <div class="card">
+                <h3 class="font-semibold text-gray-800 mb-4">本周收入趋势</h3>
+                <div class="h-48 flex items-end justify-around gap-2">
+                    <div class="flex flex-col items-center">
+                        <div class="w-8 bg-blue-500 rounded-t" style="height: 60px;"></div>
+                        <span class="text-xs text-gray-500 mt-1">周一</span>
+                    </div>
+                    <div class="flex flex-col items-center">
+                        <div class="w-8 bg-blue-500 rounded-t" style="height: 80px;"></div>
+                        <span class="text-xs text-gray-500 mt-1">周二</span>
+                    </div>
+                    <div class="flex flex-col items-center">
+                        <div class="w-8 bg-blue-500 rounded-t" style="height: 50px;"></div>
+                        <span class="text-xs text-gray-500 mt-1">周三</span>
+                    </div>
+                    <div class="flex flex-col items-center">
+                        <div class="w-8 bg-blue-500 rounded-t" style="height: 90px;"></div>
+                        <span class="text-xs text-gray-500 mt-1">周四</span>
+                    </div>
+                    <div class="flex flex-col items-center">
+                        <div class="w-8 bg-blue-500 rounded-t" style="height: 70px;"></div>
+                        <span class="text-xs text-gray-500 mt-1">周五</span>
+                    </div>
+                    <div class="flex flex-col items-center">
+                        <div class="w-8 bg-blue-500 rounded-t" style="height: 100px;"></div>
+                        <span class="text-xs text-gray-500 mt-1">周六</span>
+                    </div>
+                    <div class="flex flex-col items-center">
+                        <div class="w-8 bg-blue-500 rounded-t" style="height: 85px;"></div>
+                        <span class="text-xs text-gray-500 mt-1">周日</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="messages-content" class="content-section hidden">
+            <h2 class="text-xl font-bold text-gray-800 mb-6">消息中心</h2>
+            <div class="space-y-3">
+                <div class="card">
+                    <div class="flex items-start gap-3">
+                        <div class="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600">📋</div>
+                        <div class="flex-1">
+                            <p class="font-medium text-gray-800">新订单通知</p>
+                            <p class="text-sm text-gray-600">客户张三提交了新订单</p>
+                            <p class="text-xs text-gray-400 mt-1">5分钟前</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="flex items-start gap-3">
+                        <div class="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center text-green-600">✅</div>
+                        <div class="flex-1">
+                            <p class="font-medium text-gray-800">订单完成</p>
+                            <p class="text-sm text-gray-600">李四的订单已完成，请及时通知取件</p>
+                            <p class="text-xs text-gray-400 mt-1">15分钟前</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="flex items-start gap-3">
+                        <div class="w-10 h-10 rounded-full bg-yellow-100 flex items-center justify-center text-yellow-600">⚠️</div>
+                        <div class="flex-1">
+                            <p class="font-medium text-gray-800">库存预警</p>
+                            <p class="text-sm text-gray-600">干洗剂库存不足，请及时补充</p>
+                            <p class="text-xs text-gray-400 mt-1">1小时前</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="settings-content" class="content-section hidden">
+            <h2 class="text-xl font-bold text-gray-800 mb-6">系统设置</h2>
+            <div class="card mb-4">
+                <h3 class="font-semibold text-gray-800 mb-3">门店信息</h3>
+                <div class="space-y-3">
+                    <div>
+                        <label class="block text-xs font-medium text-gray-700 mb-1">门店名称</label>
+                        <input type="text" class="input" value="旗舰店" readonly>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-gray-700 mb-1">联系电话</label>
+                        <input type="text" class="input" value="138-0013-8000">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-gray-700 mb-1">门店地址</label>
+                        <input type="text" class="input" value="北京市朝阳区某某街道">
+                    </div>
+                </div>
+            </div>
+            <div class="card">
+                <h3 class="font-semibold text-gray-800 mb-3">系统信息</h3>
+                <div class="text-sm text-gray-600 space-y-2">
+                    <p>版本号: <span class="text-gray-800">v1.0.0</span></p>
+                    <p>最后更新: <span class="text-gray-800">2026-04-25</span></p>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- 底部导航栏 -->
+    <nav class="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-40">
+        <div class="flex items-center justify-around p-2">
+            <a href="#dashboard" class="nav-link-bottom flex flex-col items-center p-2 rounded-lg text-primary" onclick="navigateTo('dashboard')">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+                    <polyline points="9 22 9 12 15 12 15 22"></polyline>
+                </svg>
+                <span class="text-xs mt-1">首页</span>
+            </a>
+            <a href="#orders" class="nav-link-bottom flex flex-col items-center p-2 rounded-lg text-gray-600 hover:text-primary transition-all duration-300 ease-in-out" onclick="navigateTo('orders')">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="9" cy="21" r="1"></circle>
+                    <circle cx="20" cy="21" r="1"></circle>
+                    <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path>
+                </svg>
+                <span class="text-xs mt-1">订单</span>
+            </a>
+            <a href="#light-system" class="nav-link-bottom flex flex-col items-center p-2 rounded-lg text-gray-600 hover:text-primary transition-all duration-300 ease-in-out" onclick="navigateTo('light-system')">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M9 18h6"></path>
+                    <path d="M10 22h4"></path>
+                    <path d="M15.09 14c.18-.98.65-1.74 1.41-2.5A4.65 4.65 0 0 0 18 8 6 6 0 0 0 6 8c0 1 .23 2.23 1.5 3.5A4.61 4.61 0 0 1 8.91 14"></path>
+                </svg>
+                <span class="text-xs mt-1">灯条</span>
+            </a>
+            <a href="#statistics" class="nav-link-bottom flex flex-col items-center p-2 rounded-lg text-gray-600 hover:text-primary transition-all duration-300 ease-in-out" onclick="navigateTo('statistics')">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="18" y1="20" x2="18" y2="10"></line>
+                    <line x1="12" y1="20" x2="12" y2="4"></line>
+                    <line x1="6" y1="20" x2="6" y2="14"></line>
+                </svg>
+                <span class="text-xs mt-1">统计</span>
+            </a>
+            <a href="#settings" class="nav-link-bottom flex flex-col items-center p-2 rounded-lg text-gray-600 hover:text-primary transition-all duration-300 ease-in-out" onclick="navigateTo('settings')">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="3"></circle>
+                    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+                </svg>
+                <span class="text-xs mt-1">设置</span>
+            </a>
+        </div>
+    </nav>
+
+    <script>
+        // 设备数据
+        let devices = [
+            { id: 'wled-1', name: '前台灯条', ip: '192.168.1.101', status: 'online' },
+            { id: 'wled-2', name: '储物区灯条', ip: '192.168.1.102', status: 'online' },
+            { id: 'wled-3', name: '取件区灯条', ip: '192.168.1.103', status: 'offline' }
+        ];
+        
+        let simulationMode = true;
+        
+        // 初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('✅ 页面加载完成');
+            
+            // 显示当前日期
+            const currentDate = new Date();
+            const options = { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' };
+            document.getElementById('current-date').textContent = currentDate.toLocaleDateString('zh-CN', options);
+            
+            // 初始化设备列表
+            renderDevices();
+            updateDeviceSelect();
+            initColorPicker();
+            initBrightnessSlider();
+            
+            console.log('✅ 初始化完成');
+        });
+        
+        // 侧边栏切换
+        function toggleSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            const overlay = document.getElementById('sidebar-overlay');
+            
+            sidebar.classList.toggle('-translate-x-full');
+            overlay.classList.toggle('hidden');
+            
+            console.log('侧边栏切换完成');
+        }
+        
+        // 关闭侧边栏
+        function closeSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            const overlay = document.getElementById('sidebar-overlay');
+            
+            sidebar.classList.add('-translate-x-full');
+            overlay.classList.add('hidden');
+        }
+        
+        // 导航
+        function navigateTo(target) {
+            console.log('导航到:', target);
+            
+            // 隐藏所有内容区域
+            document.querySelectorAll('.content-section').forEach(section => {
+                section.classList.add('hidden');
+            });
+            
+            // 显示目标区域
+            const targetSection = document.getElementById(target + '-content');
+            if (targetSection) {
+                targetSection.classList.remove('hidden');
+            }
+            
+            // 更新侧边栏导航状态
+            document.querySelectorAll('.nav-link').forEach(link => {
+                link.classList.remove('text-primary');
+                link.classList.add('text-gray-700');
+            });
+            const activeLink = document.querySelector(`.nav-link[href="#${target}"]`);
+            if (activeLink) {
+                activeLink.classList.remove('text-gray-700');
+                activeLink.classList.add('text-primary');
+            }
+            
+            // 更新底部导航状态
+            document.querySelectorAll('.nav-link-bottom').forEach(link => {
+                link.classList.remove('text-primary');
+                link.classList.add('text-gray-600');
+            });
+            const activeBottomLink = document.querySelector(`.nav-link-bottom[href="#${target}"]`);
+            if (activeBottomLink) {
+                activeBottomLink.classList.remove('text-gray-600');
+                activeBottomLink.classList.add('text-primary');
+            }
+            
+            // 关闭侧边栏
+            closeSidebar();
+        }
+        
+        // 渲染设备列表
+        function renderDevices() {
+            const container = document.getElementById('devices-list');
+            if (!container) return;
+            
+            container.innerHTML = devices.map(device => `
+                <div class="p-3 bg-gray-50 rounded-lg border border-gray-200">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="font-medium text-gray-800">${device.name}</span>
+                        <span class="badge ${device.status === 'online' ? 'badge-success' : 'badge-danger'}">
+                            ${device.status === 'online' ? '在线' : '离线'}
+                        </span>
+                    </div>
+                    <p class="text-xs text-gray-500 mb-2">IP: ${device.ip}</p>
+                    <button onclick="deleteDevice('${device.id}')" class="text-xs text-red-600 hover:underline">删除</button>
+                </div>
+            `).join('');
+        }
+        
+        // 更新设备选择下拉框
+        function updateDeviceSelect() {
+            const select = document.getElementById('device-select');
+            if (!select) return;
+            
+            select.innerHTML = '<option value="">-- 选择设备 --</option>' + 
+                devices.filter(d => d.status === 'online').map(d => 
+                    `<option value="${d.ip}">${d.name} (${d.ip})</option>`
+                ).join('');
+        }
+        
+        // 添加设备
+        function addDevice() {
+            const name = prompt('请输入设备名称:');
+            if (!name) return;
+            
+            const ip = prompt('请输入设备IP地址:', '192.168.1.');
+            if (!ip) return;
+            
+            const device = {
+                id: 'wled-' + Date.now(),
+                name: name,
+                ip: ip,
+                status: 'online'
+            };
+            
+            devices.push(device);
+            renderDevices();
+            updateDeviceSelect();
+            alert('设备添加成功！');
+        }
+        
+        // 删除设备
+        function deleteDevice(id) {
+            if (!confirm('确定删除此设备？')) return;
+            
+            devices = devices.filter(d => d.id !== id);
+            renderDevices();
+            updateDeviceSelect();
+        }
+        
+        // 切换模拟模式
+        function toggleSimulationMode() {
+            simulationMode = document.getElementById('simulation-mode').checked;
+            localStorage.setItem('simulationMode', simulationMode.toString());
+            console.log('模拟模式:', simulationMode ? '启用' : '禁用');
+        }
+        
+        // 初始化颜色选择器
+        function initColorPicker() {
+            const colorPicker = document.getElementById('color-picker');
+            const colorHex = document.getElementById('color-hex');
+            
+            if (colorPicker && colorHex) {
+                colorPicker.addEventListener('input', function() {
+                    colorHex.value = this.value;
+                });
+                
+                colorHex.addEventListener('input', function() {
+                    if (/^#[0-9A-Fa-f]{6}$/.test(this.value)) {
+                        colorPicker.value = this.value;
+                    }
+                });
+            }
+        }
+        
+        // 初始化亮度滑块
+        function initBrightnessSlider() {
+            const slider = document.getElementById('brightness-slider');
+            const value = document.getElementById('brightness-value');
+            
+            if (slider && value) {
+                slider.addEventListener('input', function() {
+                    value.textContent = this.value;
+                });
+            }
+        }
+        
+        // 开灯
+        function turnOn() {
+            const ip = document.getElementById('device-select').value;
+            if (!ip) {
+                alert('请先选择一个设备');
+                return;
+            }
+            
+            if (simulationMode) {
+                console.log('【模拟】开灯:', ip);
+                alert('模拟模式：灯条已开启！');
+            } else {
+                console.log('发送开灯命令到:', ip);
+                alert('开灯命令已发送！');
+            }
+            
+            updateLightStatus('online');
+        }
+        
+        // 关灯
+        function turnOff() {
+            const ip = document.getElementById('device-select').value;
+            if (!ip) {
+                alert('请先选择一个设备');
+                return;
+            }
+            
+            if (simulationMode) {
+                console.log('【模拟】关灯:', ip);
+                alert('模拟模式：灯条已关闭！');
+            } else {
+                console.log('发送关灯命令到:', ip);
+                alert('关灯命令已发送！');
+            }
+            
+            updateLightStatus('offline');
+        }
+        
+        // 应用设置
+        function applySettings() {
+            const ip = document.getElementById('device-select').value;
+            if (!ip) {
+                alert('请先选择一个设备');
+                return;
+            }
+            
+            const color = document.getElementById('color-picker').value;
+            const effect = document.getElementById('effect-select').value;
+            const brightness = document.getElementById('brightness-slider').value;
+            
+            if (simulationMode) {
+                console.log('【模拟】应用设置:', { ip, color, effect, brightness });
+                alert(`模拟模式：设置已应用！\n颜色: ${color}\n效果: ${effect}\n亮度: ${brightness}`);
+            } else {
+                console.log('发送设置到:', ip, { color, effect, brightness });
+                alert('设置已发送！');
+            }
+            
+            updateLightStatus('active');
+        }
+        
+        // 预设颜色
+        function setPreset(color, effect) {
+            document.getElementById('color-picker').value = color;
+            document.getElementById('color-hex').value = color;
+            document.getElementById('effect-select').value = effect;
+            
+            const ip = document.getElementById('device-select').value;
+            if (!ip) {
+                alert('请先选择一个设备');
+                return;
+            }
+            
+            if (simulationMode) {
+                console.log('【模拟】预设颜色:', color, '效果:', effect);
+                alert(`模拟模式：预设 ${color} 已应用！`);
+            } else {
+                alert('预设已发送！');
+            }
+            
+            updateLightStatus('active');
+        }
+        
+        // 更新灯条状态
+        function updateLightStatus(status) {
+            const dot = document.getElementById('status-dot');
+            const text = document.getElementById('status-text');
+            
+            dot.className = 'w-2 h-2 rounded-full';
+            
+            if (status === 'online') {
+                dot.classList.add('bg-green-500');
+                text.textContent = '在线';
+            } else if (status === 'active') {
+                dot.classList.add('bg-yellow-500', 'animate-pulse');
+                text.textContent = '工作中';
+            } else {
+                dot.classList.add('bg-gray-400');
+                text.textContent = '离线';
+            }
+        }
+        
+        // 退出登录
+        function logout() {
+            if (confirm('确定退出登录？')) {
+                alert('退出登录');
+            }
+        }
+    </script>
+</body>
+</html>

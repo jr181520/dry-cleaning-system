@@ -1,0 +1,479 @@
+/* pages/order/success/index.wxss */
+
+.container {
+  min-height: 100vh;
+  background: #f5f7fa;
+  padding: 48rpx 32rpx;
+}
+
+/* 成功头部 */
+.success-header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 24rpx;
+  margin-bottom: 48rpx;
+}
+
+.success-icon {
+  width: 160rpx;
+  height: 160rpx;
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  border-radius: 80rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 8rpx 32rpx rgba(16, 185, 129, 0.3);
+}
+
+.icon {
+  font-size: 80rpx;
+  color: #ffffff;
+  font-weight: 700;
+}
+
+.success-title {
+  font-size: 48rpx;
+  font-weight: 700;
+  color: #1f2937;
+}
+
+.success-subtitle {
+  font-size: 28rpx;
+  color: #6b7280;
+}
+
+/* 订单信息 */
+.order-info {
+  margin-bottom: 32rpx;
+}
+
+.info-card {
+  background: #ffffff;
+  border-radius: 24rpx;
+  padding: 32rpx;
+  box-shadow: 0 4rpx 20rpx rgba(0, 0, 0, 0.06);
+}
+
+.info-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20rpx 0;
+  border-bottom: 1rpx solid #f3f4f6;
+}
+
+.info-row:last-child {
+  border-bottom: none;
+}
+
+.info-row.total {
+  margin-top: 16rpx;
+  padding-top: 24rpx;
+  border-top: 2rpx solid #e5e7eb;
+}
+
+.row-label {
+  font-size: 28rpx;
+  color: #6b7280;
+}
+
+.row-value {
+  font-size: 28rpx;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.info-row.total .row-value {
+  font-size: 36rpx;
+  color: #ef4444;
+}
+
+/* 提示信息 */
+.tips-section {
+  margin-bottom: 48rpx;
+}
+
+.tips-card {
+  background: #ffffff;
+  border-radius: 24rpx;
+  padding: 28rpx;
+  box-shadow: 0 4rpx 20rpx rgba(0, 0, 0, 0.06);
+}
+
+.tip-item {
+  display: flex;
+  gap: 20rpx;
+}
+
+.tip-icon {
+  font-size: 48rpx;
+  flex-shrink: 0;
+}
+
+.tip-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 12rpx;
+}
+
+.tip-title {
+  font-size: 30rpx;
+  font-weight: 700;
+  color: #1f2937;
+}
+
+.tip-text {
+  font-size: 26rpx;
+  color: #6b7280;
+  line-height: 1.6;
+}
+
+/* 按钮区域 */
+.button-section {
+  display: flex;
+  flex-direction: column;
+  gap: 20rpx;
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
+  padding: 28rpx;
+  border-radius: 28rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4rpx 16rpx rgba(30, 64, 175, 0.3);
+}
+
+.btn-text {
+  font-size: 32rpx;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.btn-secondary {
+  background: #ffffff;
+  padding: 28rpx;
+  border-radius: 28rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2rpx solid #e5e7eb;
+}
+
+.btn-secondary .btn-text {
+  color: #374151;
+}
+
+/* 配送跟踪模块 */
+.delivery-tracker {
+  margin-bottom: 32rpx;
+}
+
+.tracker-card {
+  background: #ffffff;
+  border-radius: 24rpx;
+  padding: 32rpx;
+  box-shadow: 0 4rpx 20rpx rgba(0, 0, 0, 0.06);
+}
+
+.tracker-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 32rpx;
+}
+
+.tracker-title {
+  font-size: 32rpx;
+  font-weight: 700;
+  color: #1f2937;
+}
+
+.status-badge {
+  padding: 8rpx 20rpx;
+  border-radius: 20rpx;
+  font-size: 24rpx;
+  font-weight: 600;
+}
+
+.status-badge.badge-picking {
+  background: #dbeafe;
+  color: #1e40af;
+}
+
+.status-badge.badge-delivering {
+  background: #fef3c7;
+  color: #b45309;
+}
+
+.status-badge.badge-delivered {
+  background: #dcfce7;
+  color: #059669;
+}
+
+/* 配送员信息 */
+.courier-info {
+  display: flex;
+  align-items: center;
+  gap: 20rpx;
+  padding: 24rpx;
+  background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+  border-radius: 16rpx;
+  margin-bottom: 32rpx;
+}
+
+.courier-avatar {
+  width: 100rpx;
+  height: 100rpx;
+  background: #ffffff;
+  border-radius: 50rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4rpx 12rpx rgba(0, 0, 0, 0.08);
+}
+
+.avatar-icon {
+  font-size: 48rpx;
+}
+
+.courier-details {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8rpx;
+}
+
+.courier-name-row {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+}
+
+.courier-name {
+  font-size: 30rpx;
+  font-weight: 700;
+  color: #1f2937;
+}
+
+.courier-status {
+  font-size: 22rpx;
+  color: #6b7280;
+}
+
+.courier-distance-row {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+}
+
+.distance {
+  font-size: 26rpx;
+  font-weight: 600;
+  color: #1e40af;
+}
+
+.separator {
+  font-size: 22rpx;
+  color: #d1d5db;
+}
+
+.eta {
+  font-size: 24rpx;
+  color: #6b7280;
+}
+
+.courier-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 12rpx;
+}
+
+.action-btn {
+  width: 72rpx;
+  height: 72rpx;
+  border-radius: 36rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.1);
+}
+
+.action-btn.call {
+  background: #10b981;
+}
+
+.action-btn.chat {
+  background: #3b82f6;
+}
+
+.action-icon {
+  font-size: 32rpx;
+}
+
+/* 配送进度 */
+.delivery-progress {
+  margin-bottom: 32rpx;
+}
+
+.progress-labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 24rpx;
+  color: #9ca3af;
+  margin-bottom: 12rpx;
+}
+
+.label-start, .label-end {
+  font-weight: 500;
+}
+
+.progress-bar-container {
+  position: relative;
+  height: 80rpx;
+}
+
+.progress-bar {
+  position: absolute;
+  top: 20rpx;
+  left: 0;
+  right: 0;
+  height: 8rpx;
+  background: #e5e7eb;
+  border-radius: 4rpx;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #3b82f6 0%, #1e40af 100%);
+  border-radius: 4rpx;
+  transition: width 0.5s ease;
+}
+
+.progress-dots {
+  position: absolute;
+  top: 12rpx;
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: space-between;
+  padding: 0 10rpx;
+}
+
+.dot {
+  width: 24rpx;
+  height: 24rpx;
+  background: #d1d5db;
+  border-radius: 12rpx;
+  border: 2rpx solid #ffffff;
+  box-shadow: 0 2rpx 4rpx rgba(0, 0, 0, 0.1);
+  transition: all 0.3s;
+}
+
+.dot.active {
+  background: #10b981;
+}
+
+.status-labels {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 16rpx;
+}
+
+.status-text {
+  font-size: 22rpx;
+  color: #9ca3af;
+  font-weight: 500;
+}
+
+.status-text.active {
+  color: #10b981;
+  font-weight: 600;
+}
+
+/* 配送信息 */
+.delivery-info {
+  display: flex;
+  flex-direction: column;
+  gap: 16rpx;
+}
+
+.info-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 16rpx;
+  padding: 20rpx;
+  background: #f9fafb;
+  border-radius: 12rpx;
+}
+
+.info-icon {
+  font-size: 32rpx;
+  flex-shrink: 0;
+}
+
+.info-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 12rpx;
+}
+
+.info-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.info-label {
+  font-size: 24rpx;
+  color: #6b7280;
+}
+
+.info-value {
+  font-size: 26rpx;
+  font-weight: 500;
+  color: #1f2937;
+  max-width: 380rpx;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.info-text {
+  font-size: 24rpx;
+  color: #6b7280;
+  flex: 1;
+}
+
+.info-badge {
+  font-size: 24rpx;
+  color: #10b981;
+  font-weight: 600;
+}
+
+/* 刷新按钮 */
+.refresh-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12rpx;
+  padding: 24rpx;
+  margin-top: 24rpx;
+  background: #eff6ff;
+  border-radius: 16rpx;
+}
+
+.refresh-icon {
+  font-size: 32rpx;
+}
+
+.refresh-text {
+  font-size: 28rpx;
+  font-weight: 600;
+  color: #1e40af;
+}

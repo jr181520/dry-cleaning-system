@@ -1,0 +1,19 @@
+<view class="container">
+  <!-- WebView -->
+  <web-view 
+    src="{{webViewUrl}}"
+    bind:load="onWebViewLoad"
+    bind:error="onWebViewError"
+    bind:message="onWebViewMessage"
+  ></web-view>
+  
+  <!-- 加载中提示 -->
+  <view class="loading-mask" wx:if="{{!loaded}}">
+    <view class="loading-content">
+      <view class="loading-icon">
+        <text class="icon">{{type === 'alipay' ? '💙' : '💳'}}</text>
+      </view>
+      <text class="loading-text">正在跳转到{{type === 'alipay' ? '支付宝' : '银联'}}支付页面...</text>
+    </view>
+  </view>
+</view>

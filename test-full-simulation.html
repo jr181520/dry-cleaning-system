@@ -1,0 +1,664 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>生产环境模拟测试 - 干洗店管理系统</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        }
+        .system-card {
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            padding: 24px;
+            margin-bottom: 20px;
+            border-left: 5px solid;
+        }
+        .system-c { border-color: #3b82f6; }
+        .system-m { border-color: #10b981; }
+        .system-admin { border-color: #8b5cf6; }
+        .status-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        .status-pending { background: #fef3c7; color: #92400e; }
+        .status-active { background: #d1fae5; color: #065f46; }
+        .status-error { background: #fee2e2; color: #991b1b; }
+        .btn-main {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 16px 32px;
+            border-radius: 12px;
+            border: none;
+            cursor: pointer;
+            font-weight: 700;
+            font-size: 18px;
+            transition: all 0.3s;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+        }
+        .btn-main:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.6);
+        }
+        .btn-secondary {
+            background: #f3f4f6;
+            color: #374151;
+            padding: 10px 20px;
+            border-radius: 8px;
+            border: none;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.2s;
+        }
+        .btn-secondary:hover {
+            background: #e5e7eb;
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-slate-50 to-blue-50 min-h-screen p-8">
+    <div class="max-w-6xl mx-auto">
+        <!-- 页面标题 -->
+        <div class="text-center mb-10">
+            <h1 class="text-4xl font-bold text-gray-800 mb-3">🎯 生产环境模拟测试</h1>
+            <p class="text-gray-600 text-lg">完整模拟：C端下单 → 门店接单 → 管理后台管理</p>
+        </div>
+
+        <!-- 业务流程说明 -->
+        <div class="bg-blue-50 border-l-4 border-blue-500 rounded-lg p-6 mb-8">
+            <h2 class="font-bold text-blue-800 mb-3 flex items-center">
+                <span class="mr-2">📋</span> 完整业务流程
+            </h2>
+            <div class="flex items-center justify-center space-x-4 text-sm">
+                <div class="bg-white px-4 py-2 rounded-lg shadow">
+                    <span class="text-blue-600 font-bold">📱 C端小程序</span>
+                    <div class="text-gray-500 text-xs mt-1">用户下单</div>
+                </div>
+                <span class="text-gray-400 text-2xl">→</span>
+                <div class="bg-white px-4 py-2 rounded-lg shadow">
+                    <span class="text-green-600 font-bold">🏪 门店端</span>
+                    <div class="text-gray-500 text-xs mt-1">接单处理</div>
+                </div>
+                <span class="text-gray-400 text-2xl">→</span>
+                <div class="bg-white px-4 py-2 rounded-lg shadow">
+                    <span class="text-purple-600 font-bold">💼 管理后台</span>
+                    <div class="text-gray-500 text-xs mt-1">监督管理</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 下单配置 -->
+        <div class="bg-white rounded-2xl shadow-lg p-8 mb-8">
+            <h2 class="text-2xl font-bold mb-6 flex items-center">
+                <span class="mr-3">📦</span> 步骤1：创建测试订单
+            </h2>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <!-- 用户信息 -->
+                <div>
+                    <h3 class="font-semibold text-gray-700 mb-3">👤 C端用户信息</h3>
+                    <div class="space-y-3">
+                        <div>
+                            <label class="block text-sm text-gray-600 mb-1">用户名</label>
+                            <input type="text" id="userName" value="李明" 
+                                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                        </div>
+                        <div>
+                            <label class="block text-sm text-gray-600 mb-1">手机号</label>
+                            <input type="text" id="userPhone" value="13800138001" 
+                                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 门店选择 -->
+                <div>
+                    <h3 class="font-semibold text-gray-700 mb-3">🏪 目标门店</h3>
+                    <select id="targetStore" onchange="updateStoreInfo()"
+                        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                        <option value="ST001">🚗 朝阳区干洗店 (账号: chaoyang001)</option>
+                        <option value="ST002" selected>🚗 海淀区干洗店 (账号: haidian001)</option>
+                        <option value="ST003">🚗 丰台区干洗店 (账号: fengtai001)</option>
+                    </select>
+                    <div id="storeInfo" class="mt-3 p-3 bg-green-50 rounded-lg text-sm text-green-800">
+                        <strong>门店账号：</strong>haidian001 / 密码: store123
+                    </div>
+                </div>
+
+                <!-- 服务选择 -->
+                <div>
+                    <h3 class="font-semibold text-gray-700 mb-3">🧺 服务项目</h3>
+                    <div class="space-y-2" id="servicesList">
+                        <label class="flex items-center p-3 border border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50">
+                            <input type="checkbox" class="service-checkbox w-5 h-5 text-blue-600 rounded mr-3" value="西装干洗" data-price="50">
+                            <span class="flex-1">👔 西装干洗</span>
+                            <span class="text-blue-600 font-semibold">¥50</span>
+                        </label>
+                        <label class="flex items-center p-3 border border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50">
+                            <input type="checkbox" class="service-checkbox w-5 h-5 text-blue-600 rounded mr-3" value="羽绒服清洗" data-price="80" checked>
+                            <span class="flex-1">🧥 羽绒服清洗</span>
+                            <span class="text-blue-600 font-semibold">¥80</span>
+                        </label>
+                        <label class="flex items-center p-3 border border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50">
+                            <input type="checkbox" class="service-checkbox w-5 h-5 text-blue-600 rounded mr-3" value="运动鞋清洗" data-price="40">
+                            <span class="flex-1">👟 运动鞋清洗</span>
+                            <span class="text-blue-600 font-semibold">¥40</span>
+                        </label>
+                    </div>
+                    <div class="mt-3 text-right">
+                        <span class="text-gray-600">合计：</span>
+                        <span id="serviceTotal" class="text-2xl font-bold text-blue-600">¥80</span>
+                    </div>
+                </div>
+
+                <!-- 配送方式 -->
+                <div>
+                    <h3 class="font-semibold text-gray-700 mb-3">🚚 配送方式</h3>
+                    <div class="space-y-3">
+                        <label class="flex items-center p-4 border border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50">
+                            <input type="radio" name="delivery" value="pickup" class="w-5 h-5 text-blue-600 mr-3" checked>
+                            <span class="text-lg">🏪 到店自取</span>
+                        </label>
+                        <label class="flex items-center p-4 border border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50">
+                            <input type="radio" name="delivery" value="courier" class="w-5 h-5 text-blue-600 mr-3">
+                            <span class="text-lg">🚚 配送到家（+¥10）</span>
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 下单按钮 -->
+            <div class="mt-8 text-center">
+                <button onclick="simulateFullFlow()" class="btn-main">
+                    🚀 模拟完整下单流程
+                </button>
+            </div>
+        </div>
+
+        <!-- 三个系统的账号配置 -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+            <!-- C端小程序 -->
+            <div class="system-card system-c">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-xl font-bold text-blue-600 flex items-center">
+                        <span class="mr-2">📱</span> C端小程序
+                    </h3>
+                    <span id="c-status" class="status-badge status-pending">待设置</span>
+                </div>
+                <div class="space-y-2 text-sm">
+                    <div class="flex justify-between">
+                        <span class="text-gray-600">用户：</span>
+                        <span id="c-user-name" class="font-medium">-</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-gray-600">手机：</span>
+                        <span id="c-user-phone" class="font-medium">-</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-gray-600">订单：</span>
+                        <span id="c-orders-count" class="font-medium text-blue-600">0 条</span>
+                    </div>
+                </div>
+                <div class="mt-4 space-y-2">
+                    <button onclick="openSystem('c')" class="w-full btn-secondary text-sm">
+                        📱 打开C端订单页
+                    </button>
+                </div>
+            </div>
+
+            <!-- 门店端 -->
+            <div class="system-card system-m">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-xl font-bold text-green-600 flex items-center">
+                        <span class="mr-2">🏪</span> 门店端
+                    </h3>
+                    <span id="m-status" class="status-badge status-pending">待设置</span>
+                </div>
+                <div class="space-y-2 text-sm">
+                    <div class="flex justify-between">
+                        <span class="text-gray-600">门店：</span>
+                        <span id="m-store-name" class="font-medium">-</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-gray-600">门店ID：</span>
+                        <span id="m-store-id" class="font-medium">-</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-gray-600">订单：</span>
+                        <span id="m-orders-count" class="font-medium text-green-600">0 条</span>
+                    </div>
+                </div>
+                <div class="mt-4 space-y-2">
+                    <button onclick="openSystem('m')" class="w-full btn-secondary text-sm">
+                        🏪 打开门店端
+                    </button>
+                    <button onclick="simulateStoreLogin()" class="w-full btn-secondary text-sm bg-green-50 text-green-700">
+                        🔐 登录门店账号
+                    </button>
+                </div>
+            </div>
+
+            <!-- 管理后台 -->
+            <div class="system-card system-admin">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-xl font-bold text-purple-600 flex items-center">
+                        <span class="mr-2">💼</span> 管理后台
+                    </h3>
+                    <span id="admin-status" class="status-badge status-pending">待设置</span>
+                </div>
+                <div class="space-y-2 text-sm">
+                    <div class="flex justify-between">
+                        <span class="text-gray-600">角色：</span>
+                        <span id="admin-role" class="font-medium">-</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-gray-600">账号：</span>
+                        <span id="admin-account" class="font-medium">-</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-gray-600">订单：</span>
+                        <span id="admin-orders-count" class="font-medium text-purple-600">0 条</span>
+                    </div>
+                </div>
+                <div class="mt-4 space-y-2">
+                    <button onclick="openSystem('admin')" class="w-full btn-secondary text-sm">
+                        💼 打开管理后台
+                    </button>
+                    <button onclick="simulateAdminLogin()" class="w-full btn-secondary text-sm bg-purple-50 text-purple-700">
+                        🔐 登录管理员账号
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 操作日志 -->
+        <div class="bg-white rounded-2xl shadow-lg p-8">
+            <h2 class="text-2xl font-bold mb-4 flex items-center">
+                <span class="mr-3">📊</span> 操作日志
+                <span id="logCount" class="ml-auto text-sm font-normal text-gray-500">0 条</span>
+            </h2>
+            <div id="logContainer" class="bg-gray-900 text-green-400 p-6 rounded-xl font-mono text-sm max-h-96 overflow-y-auto">
+                <div class="log-entry mb-3 pb-3 border-b border-gray-700">
+                    <div class="text-gray-500 text-xs">等待操作...</div>
+                    <div class="text-gray-400">系统已就绪，请配置订单信息并点击"模拟完整下单流程"</div>
+                </div>
+            </div>
+            <div class="mt-4 flex gap-3">
+                <button onclick="clearAll()" class="btn-secondary">
+                    🗑️ 清除所有
+                </button>
+                <button onclick="exportLogs()" class="btn-secondary">
+                    📥 导出日志
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 日志记录
+        function addLog(message, type = 'info') {
+            const container = document.getElementById('logContainer');
+            const timestamp = new Date().toLocaleTimeString('zh-CN', { hour12: false });
+            const colors = {
+                info: 'text-blue-400',
+                success: 'text-green-400',
+                error: 'text-red-400',
+                warning: 'text-yellow-400'
+            };
+            
+            const entry = document.createElement('div');
+            entry.className = 'log-entry mb-3 pb-3 border-b border-gray-700';
+            entry.innerHTML = `
+                <div class="text-gray-500 text-xs">[${timestamp}]</div>
+                <div class="${colors[type] || 'text-gray-300'}">${message}</div>
+            `;
+            
+            container.appendChild(entry);
+            container.scrollTop = container.scrollHeight;
+            
+            const count = container.children.length;
+            document.getElementById('logCount').textContent = `${count} 条`;
+        }
+
+        // 更新门店信息
+        function updateStoreInfo() {
+            const storeSelect = document.getElementById('targetStore');
+            const storeInfo = document.getElementById('storeInfo');
+            const accounts = {
+                'ST001': { name: '朝阳区干洗店', account: 'chaoyang001', password: 'store123' },
+                'ST002': { name: '海淀区干洗店', account: 'haidian001', password: 'store123' },
+                'ST003': { name: '丰台区干洗店', account: 'fengtai001', password: 'store123' }
+            };
+            const store = accounts[storeSelect.value];
+            storeInfo.innerHTML = `<strong>门店账号：</strong>${store.account} / 密码: ${store.password}`;
+        }
+
+        // 计算服务费用
+        function calculateTotal() {
+            const checkboxes = document.querySelectorAll('.service-checkbox:checked');
+            let total = 0;
+            checkboxes.forEach(cb => {
+                total += parseInt(cb.dataset.price);
+            });
+            document.getElementById('serviceTotal').textContent = `¥${total}`;
+            return total;
+        }
+
+        // 监听服务选择变化
+        document.querySelectorAll('.service-checkbox').forEach(cb => {
+            cb.addEventListener('change', calculateTotal);
+        });
+
+        // 模拟完整下单流程
+        async function simulateFullFlow() {
+            addLog('🚀 开始模拟完整下单流程...', 'info');
+            
+            // 1. 收集数据
+            const userName = document.getElementById('userName').value;
+            const userPhone = document.getElementById('userPhone').value;
+            const storeId = document.getElementById('targetStore').value;
+            const storeName = document.getElementById('targetStore').selectedOptions[0].text.split(')')[0].substring(2);
+            const deliveryMethod = document.querySelector('input[name="delivery"]:checked').value;
+            const services = [];
+            let total = 0;
+            
+            document.querySelectorAll('.service-checkbox:checked').forEach(cb => {
+                services.push({ name: cb.value, price: parseInt(cb.dataset.price) });
+                total += parseInt(cb.dataset.price);
+            });
+            
+            if (services.length === 0) {
+                addLog('❌ 请至少选择一项服务', 'error');
+                return;
+            }
+
+            // 生成订单号
+            const orderNo = 'ORD' + new Date().getFullYear() + 
+                           String(new Date().getMonth() + 1).padStart(2, '0') + 
+                           String(new Date().getDate()).padStart(2, '0') + 
+                           String(Date.now()).slice(-6);
+
+            addLog(`📦 订单号: ${orderNo}`, 'info');
+            addLog(`👤 用户: ${userName} (${userPhone})`, 'info');
+            addLog(`🏪 门店: ${storeName} (${storeId})`, 'info');
+            addLog(`🧺 服务: ${services.map(s => s.name).join(', ')}`, 'info');
+            addLog(`💰 金额: ¥${total} + ¥${deliveryMethod === 'courier' ? 10 : 0}配送费`, 'info');
+
+            // 2. C端下单
+            await simulateCOrder(orderNo, userName, userPhone, storeId, storeName, services, total, deliveryMethod);
+            
+            // 3. 门店端订单
+            await simulateStoreOrder(orderNo, storeId, services, total);
+            
+            // 4. 管理后台订单
+            await simulateAdminOrder(orderNo, userName, userPhone, storeId, storeName, services, total);
+            
+            // 5. 更新界面状态
+            updateStatusCards();
+            
+            addLog('✅ 完整下单流程模拟完成！', 'success');
+            addLog('💡 请在各系统中查看订单数据', 'info');
+        }
+
+        // C端下单
+        async function simulateCOrder(orderNo, userName, userPhone, storeId, storeName, services, total, deliveryMethod) {
+            addLog('📱 步骤1：C端小程序下单...', 'info');
+            
+            // 设置C端用户登录
+            const cUser = {
+                token: 'c_token_' + Date.now(),
+                userId: 'c_user_001',
+                name: userName,
+                phone: userPhone,
+                avatar: null
+            };
+            localStorage.setItem('userToken', JSON.stringify(cUser));
+            addLog('✅ C端用户登录令牌已设置', 'success');
+            
+            // 创建订单
+            const order = {
+                orderId: orderNo,
+                services: services,
+                store: { id: storeId, name: storeName },
+                deliveryMethod: deliveryMethod,
+                status: 'pending',
+                paymentStatus: 'unpaid',
+                total: total + (deliveryMethod === 'courier' ? 10 : 0),
+                createdAt: new Date().toISOString(),
+                contact: {
+                    name: userName,
+                    phone: userPhone,
+                    address: deliveryMethod === 'courier' ? '北京市海淀区中关村大街1号' : null
+                }
+            };
+            
+            const cOrders = JSON.parse(localStorage.getItem('orders') || '[]');
+            cOrders.unshift(order);
+            localStorage.setItem('orders', JSON.stringify(cOrders));
+            addLog(`✅ C端订单已创建: ${cOrders.length} 条订单`, 'success');
+        }
+
+        // 门店端订单
+        async function simulateStoreOrder(orderNo, storeId, services, total) {
+            addLog('🏪 步骤2：门店端接收订单...', 'info');
+            
+            // 设置门店登录
+            const storeAccounts = {
+                'ST001': '朝阳区干洗店',
+                'ST002': '海淀区干洗店',
+                'ST003': '丰台区干洗店'
+            };
+            
+            const storeUser = {
+                token: 'store_token_' + Date.now(),
+                storeId: storeId,
+                storeName: storeAccounts[storeId],
+                role: 'store_manager',
+                username: storeId === 'ST001' ? 'chaoyang001' : 
+                         storeId === 'ST002' ? 'haidian001' : 'fengtai001'
+            };
+            localStorage.setItem('storeUser', JSON.stringify(storeUser));
+            addLog(`✅ 门店登录令牌已设置: ${storeAccounts[storeId]}`, 'success');
+            
+            // 创建门店订单（注意：只有属于该门店的订单才显示）
+            const storeOrder = {
+                orderId: orderNo,
+                storeId: storeId,
+                items: services.map(s => ({ name: s.name, price: s.price, quantity: 1 })),
+                status: 'pending',
+                total: total,
+                createdAt: new Date().toISOString(),
+                customerName: 'C端用户',
+                customerPhone: '138****8001'
+            };
+            
+            const mOrders = JSON.parse(localStorage.getItem('store_orders') || '[]');
+            // 只添加属于当前门店的订单
+            const existingStoreOrder = mOrders.find(o => o.orderId === orderNo && o.storeId === storeId);
+            if (!existingStoreOrder) {
+                mOrders.unshift(storeOrder);
+            }
+            localStorage.setItem('store_orders', JSON.stringify(mOrders));
+            addLog(`✅ 门店端订单已创建: ${mOrders.length} 条订单`, 'success');
+        }
+
+        // 管理后台订单
+        async function simulateAdminOrder(orderNo, userName, userPhone, storeId, storeName, services, total) {
+            addLog('💼 步骤3：管理后台查看订单...', 'info');
+            
+            // 设置管理员登录
+            const adminUser = {
+                token: 'admin_token_' + Date.now(),
+                username: 'admin',
+                role: '总管理员',
+                name: '系统管理员'
+            };
+            localStorage.setItem('adminUser', JSON.stringify(adminUser));
+            localStorage.setItem('adminToken', adminUser.token);
+            addLog('✅ 管理后台登录令牌已设置', 'success');
+            
+            // 创建管理后台订单（所有订单）
+            const adminOrder = {
+                orderId: orderNo,
+                orderNo: orderNo,
+                userId: 'c_user_001',
+                storeId: storeId,
+                storeName: storeName,
+                items: services.map(s => ({ name: s.name, price: s.price, quantity: 1, subtotal: s.price })),
+                amounts: {
+                    subtotal: total,
+                    discount: 0,
+                    deliveryFee: 0,
+                    total: total
+                },
+                status: 'pending',
+                paymentStatus: 'unpaid',
+                createdAt: new Date().toISOString(),
+                customerName: userName,
+                customerPhone: userPhone
+            };
+            
+            const adminOrders = JSON.parse(localStorage.getItem('admin_orders') || '[]');
+            adminOrders.unshift(adminOrder);
+            localStorage.setItem('admin_orders', JSON.stringify(adminOrders));
+            addLog(`✅ 管理后台订单已创建: ${adminOrders.length} 条订单`, 'success');
+        }
+
+        // 更新状态卡片
+        function updateStatusCards() {
+            // C端
+            const cUser = JSON.parse(localStorage.getItem('userToken') || '{}');
+            const cOrders = JSON.parse(localStorage.getItem('orders') || '[]');
+            document.getElementById('c-user-name').textContent = cUser.name || '-';
+            document.getElementById('c-user-phone').textContent = cUser.phone || '-';
+            document.getElementById('c-orders-count').textContent = `${cOrders.length} 条`;
+            document.getElementById('c-status').className = 'status-badge status-active';
+            document.getElementById('c-status').textContent = '已设置';
+            
+            // 门店端
+            const mUser = JSON.parse(localStorage.getItem('storeUser') || '{}');
+            const mOrders = JSON.parse(localStorage.getItem('store_orders') || '[]');
+            document.getElementById('m-store-name').textContent = mUser.storeName || '-';
+            document.getElementById('m-store-id').textContent = mUser.storeId || '-';
+            document.getElementById('m-orders-count').textContent = `${mOrders.length} 条`;
+            document.getElementById('m-status').className = 'status-badge status-active';
+            document.getElementById('m-status').textContent = '已设置';
+            
+            // 管理后台
+            const adminUser = JSON.parse(localStorage.getItem('adminUser') || '{}');
+            const adminOrders = JSON.parse(localStorage.getItem('admin_orders') || '[]');
+            document.getElementById('admin-role').textContent = adminUser.role || '-';
+            document.getElementById('admin-account').textContent = adminUser.username || '-';
+            document.getElementById('admin-orders-count').textContent = `${adminOrders.length} 条`;
+            document.getElementById('admin-status').className = 'status-badge status-active';
+            document.getElementById('admin-status').textContent = '已设置';
+        }
+
+        // 打开系统
+        function openSystem(system) {
+            const urls = {
+                'c': 'c-orders.html',
+                'm': 'm-index.html',
+                'admin': 'admin.html'
+            };
+            window.open(urls[system], '_blank');
+            addLog(`📱 打开${system === 'c' ? 'C端' : system === 'm' ? '门店端' : '管理后台'}: ${urls[system]}`, 'info');
+        }
+
+        // 模拟门店登录
+        function simulateStoreLogin() {
+            const storeId = document.getElementById('targetStore').value;
+            const storeAccounts = {
+                'ST001': { storeName: '朝阳区干洗店', username: 'chaoyang001' },
+                'ST002': { storeName: '海淀区干洗店', username: 'haidian001' },
+                'ST003': { storeName: '丰台区干洗店', username: 'fengtai001' }
+            };
+            
+            const store = storeAccounts[storeId];
+            const storeUser = {
+                token: 'store_token_' + Date.now(),
+                storeId: storeId,
+                storeName: store.storeName,
+                role: 'store_manager',
+                username: store.username
+            };
+            
+            localStorage.setItem('storeUser', JSON.stringify(storeUser));
+            addLog(`🔐 门店账号已登录: ${store.storeName} (${store.username})`, 'success');
+            updateStatusCards();
+        }
+
+        // 模拟管理员登录
+        function simulateAdminLogin() {
+            const adminUser = {
+                token: 'admin_token_' + Date.now(),
+                username: 'admin',
+                role: '总管理员',
+                name: '系统管理员'
+            };
+            
+            localStorage.setItem('adminUser', JSON.stringify(adminUser));
+            localStorage.setItem('adminToken', adminUser.token);
+            addLog('🔐 管理员账号已登录: admin (总管理员)', 'success');
+            updateStatusCards();
+        }
+
+        // 清除所有
+        function clearAll() {
+            if (!confirm('确定要清除所有测试数据吗？')) return;
+            
+            localStorage.removeItem('userToken');
+            localStorage.removeItem('orders');
+            localStorage.removeItem('storeUser');
+            localStorage.removeItem('storeToken');
+            localStorage.removeItem('store_orders');
+            localStorage.removeItem('adminUser');
+            localStorage.removeItem('adminToken');
+            localStorage.removeItem('admin_orders');
+            
+            addLog('🗑️ 所有测试数据已清除', 'warning');
+            updateStatusCards();
+            
+            // 重置状态卡片
+            ['c', 'm', 'admin'].forEach(system => {
+                document.getElementById(`${system}-status`).className = 'status-badge status-pending';
+                document.getElementById(`${system}-status`).textContent = '待设置';
+            });
+            document.getElementById('c-user-name').textContent = '-';
+            document.getElementById('c-user-phone').textContent = '-';
+            document.getElementById('c-orders-count').textContent = '0 条';
+            document.getElementById('m-store-name').textContent = '-';
+            document.getElementById('m-store-id').textContent = '-';
+            document.getElementById('m-orders-count').textContent = '0 条';
+            document.getElementById('admin-role').textContent = '-';
+            document.getElementById('admin-account').textContent = '-';
+            document.getElementById('admin-orders-count').textContent = '0 条';
+        }
+
+        // 导出日志
+        function exportLogs() {
+            const logs = document.getElementById('logContainer').innerText;
+            const blob = new Blob([logs], { type: 'text/plain;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `order-test-logs-${new Date().toISOString().slice(0,10)}.txt`;
+            a.click();
+            URL.revokeObjectURL(url);
+            addLog('📥 日志已导出', 'success');
+        }
+
+        // 页面加载时初始化
+        document.addEventListener('DOMContentLoaded', () => {
+            calculateTotal();
+            updateStoreInfo();
+            addLog('🎉 生产环境模拟测试工具已就绪', 'success');
+        });
+    </script>
+</body>
+</html>

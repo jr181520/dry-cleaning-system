@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>修改订单 - 干洗服务</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#1e40af',
+                        secondary: '#3b82f6',
+                        success: '#10b981',
+                        warning: '#f59e0b',
+                        danger: '#ef4444'
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        * { -webkit-tap-highlight-color: transparent; }
+        .service-card {
+            border: 2px solid #e5e7eb;
+            border-radius: 16rpx;
+            padding: 20rpx;
+            transition: all 0.3s;
+            cursor: pointer;
+        }
+        .service-card.selected {
+            border-color: #1e40af;
+            background: #eff6ff;
+        }
+        .quantity-btn {
+            width: 40rpx;
+            height: 40rpx;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24rpx;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen pb-24">
+    <!-- 顶部导航 -->
+    <header class="bg-white sticky top-0 z-50">
+        <div class="flex items-center justify-between px-4 py-4 border-b border-gray-100">
+            <a href="javascript:history.back()" class="text-gray-700">
+                <i class="fa fa-arrow-left text-lg"></i>
+            </a>
+            <span class="text-lg font-semibold text-gray-800">修改订单</span>
+            <span class="w-8"></span>
+        </div>
+    </header>
+
+    <!-- 原订单信息 -->
+    <div class="bg-white mx-4 mt-4 rounded-2xl p-4">
+        <h3 class="text-base font-semibold text-gray-800 mb-3">原订单信息</h3>
+        <div class="text-sm text-gray-500 mb-2">订单编号：<span id="originalOrderNo" class="font-mono text-gray-800">-</span></div>
+        <div class="text-sm text-gray-500">原订单金额：<span class="text-red-500 font-semibold">¥<span id="originalAmount">0</span></span></div>
+    </div>
+
+    <!-- 服务选择 -->
+    <div class="bg-white mx-4 mt-4 rounded-2xl p-4">
+        <h3 class="text-base font-semibold text-gray-800 mb-4">修改服务项目</h3>
+        <div id="servicesList" class="space-y-3">
+            <!-- 动态加载 -->
+        </div>
+    </div>
+
+    <!-- 费用对比 -->
+    <div class="bg-white mx-4 mt-4 rounded-2xl p-4">
+        <h3 class="text-base font-semibold text-gray-800 mb-4">费用对比</h3>
+        <div class="space-y-3 text-sm">
+            <div class="flex justify-between">
+                <span class="text-gray-500">原订单金额</span>
+                <span class="text-gray-800">¥<span id="oldTotal">0</span></span>
+            </div>
+            <div class="flex justify-between">
+                <span class="text-gray-500">修改后金额</span>
+                <span class="text-gray-800">¥<span id="newTotal">0</span></span>
+            </div>
+            <div class="flex justify-between pt-3 border-t border-gray-100">
+                <span class="text-gray-800 font-semibold">差额</span>
+                <span id="diffAmount" class="font-semibold">¥0</span>
+            </div>
+        </div>
+        <div class="mt-3 p-3 bg-blue-50 rounded-xl text-sm text-blue-600" id="diffTip">
+            金额无变化
+        </div>
+    </div>
+
+    <!-- 底部操作栏 -->
+    <div class="fixed bottom-0 left-0 right-0 bg-white p-4 shadow-lg">
+        <div class="flex gap-3">
+            <button onclick="cancelModify()" class="flex-1 py-3 border border-gray-300 rounded-xl text-gray-600 font-medium">
+                取消修改
+            </button>
+            <button onclick="confirmModify()" class="flex-1 py-3 bg-primary text-white rounded-xl font-medium" id="confirmBtn">
+                确认修改
+            </button>
+        </div>
+    </div>
+
+    <script>
+        let originalOrder = null;
+        let orderId = null;
+        let selectedServices = [];
+
+        // 服务数据
+        const services = [
+            { id: 1, icon: '👔', name: '西装干洗', desc: '专业熨烫定型', price: 50 },
+            { id: 2, icon: '👕', name: '衬衫清洗', desc: '轻柔手洗护理', price: 30 },
+            { id: 3, icon: '🧥', name: '羽绒服清洗', desc: '杀菌除螨护理', price: 80 },
+            { id: 4, icon: '👟', name: '运动鞋清洗', desc: '深度清洁保养', price: 40 },
+            { id: 5, icon: '👞', name: '皮鞋护理', desc: '真皮保养上光', price: 45 },
+            { id: 6, icon: '👜', name: '皮包护理', desc: '奢侈品级养护', price: 100 },
+            { id: 7, icon: '🛏️', name: '床单被罩', desc: '高温杀菌洗涤', price: 60 },
+            { id: 8, icon: '🛋️', name: '沙发清洗', desc: '深度除螨清洁', price: 120 }
+        ];
+
+        // 页面初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            const urlParams = new URLSearchParams(window.location.search);
+            orderId = urlParams.get('orderId');
+            
+            // 从localStorage获取要修改的订单
+            const modifyingOrderStr = localStorage.getItem('modifyingOrder');
+            if (!modifyingOrderStr) {
+                alert('未找到要修改的订单');
+                window.location.href = 'c-orders.html';
+                return;
+            }
+            
+            originalOrder = JSON.parse(modifyingOrderStr);
+            
+            // 验证订单ID（支持多种ID格式）
+            const possibleIds = [
+                originalOrder.orderId,
+                originalOrder.id,
+                originalOrder._id,
+                originalOrder.orderNo
+            ].filter(Boolean); // 过滤掉undefined/null
+            
+            if (orderId && !possibleIds.includes(orderId)) {
+                alert('订单信息不匹配');
+                window.location.href = 'c-orders.html';
+                return;
+            }
+            
+            initPage();
+        });
+
+        // 初始化页面
+        function initPage() {
+            // 显示原订单信息
+            document.getElementById('originalOrderNo').textContent = originalOrder.orderId || originalOrder.orderNo || '-';
+            const originalTotal = originalOrder.fees?.total || originalOrder.total || 0;
+            document.getElementById('originalAmount').textContent = originalTotal;
+            document.getElementById('oldTotal').textContent = originalTotal;
+            
+            // 获取原订单的服务项目
+            const originalItems = originalOrder.items || originalOrder.services || [];
+            
+            // 初始化选择状态
+            selectedServices = services.map(s => {
+                const originalItem = originalItems.find(item => 
+                    item.name === s.name || item.serviceName === s.name
+                );
+                return {
+                    ...s,
+                    selected: !!originalItem,
+                    quantity: originalItem ? (originalItem.quantity || 1) : 1
+                };
+            });
+            
+            renderServices();
+            updateDiff();
+        }
+
+        // 渲染服务列表
+        function renderServices() {
+            const container = document.getElementById('servicesList');
+            container.innerHTML = selectedServices.map((service, index) => `
+                <div class="service-card ${service.selected ? 'selected' : ''}" onclick="toggleService(${index})">
+                    <div class="flex items-center gap-3">
+                        <span class="text-3xl">${service.icon}</span>
+                        <div class="flex-1">
+                            <div class="font-semibold text-gray-800">${service.name}</div>
+                            <div class="text-xs text-gray-500">${service.desc}</div>
+                        </div>
+                        <div class="text-right">
+                            <div class="text-red-500 font-semibold">¥${service.price}</div>
+                            ${service.selected ? `
+                                <div class="flex items-center gap-2 mt-2">
+                                    <button class="quantity-btn bg-gray-200" onclick="event.stopPropagation(); changeQuantity(${index}, -1)">-</button>
+                                    <span class="text-sm font-medium w-6 text-center">${service.quantity}</span>
+                                    <button class="quantity-btn bg-gray-200" onclick="event.stopPropagation(); changeQuantity(${index}, 1)">+</button>
+                                </div>
+                            ` : ''}
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // 切换服务选择
+        function toggleService(index) {
+            selectedServices[index].selected = !selectedServices[index].selected;
+            if (selectedServices[index].selected && selectedServices[index].quantity === 0) {
+                selectedServices[index].quantity = 1;
+            }
+            renderServices();
+            updateDiff();
+        }
+
+        // 修改数量
+        function changeQuantity(index, delta) {
+            const newQuantity = selectedServices[index].quantity + delta;
+            if (newQuantity >= 1 && newQuantity <= 10) {
+                selectedServices[index].quantity = newQuantity;
+                renderServices();
+                updateDiff();
+            }
+        }
+
+        // 更新费用对比
+        function updateDiff() {
+            const newTotal = selectedServices
+                .filter(s => s.selected)
+                .reduce((sum, s) => sum + s.price * s.quantity, 0);
+            
+            const originalTotal = parseFloat(document.getElementById('oldTotal').textContent);
+            const diff = newTotal - originalTotal;
+            
+            document.getElementById('newTotal').textContent = newTotal;
+            
+            const diffEl = document.getElementById('diffAmount');
+            const tipEl = document.getElementById('diffTip');
+            
+            if (diff === 0) {
+                diffEl.textContent = '¥0';
+                diffEl.className = 'font-semibold text-gray-600';
+                tipEl.textContent = '金额无变化';
+                tipEl.className = 'mt-3 p-3 bg-gray-50 rounded-xl text-sm text-gray-600';
+            } else if (diff > 0) {
+                diffEl.textContent = `+¥${diff}`;
+                diffEl.className = 'font-semibold text-red-500';
+                tipEl.textContent = `需补差价 ¥${diff}，支付后订单生效`;
+                tipEl.className = 'mt-3 p-3 bg-red-50 rounded-xl text-sm text-red-600';
+            } else {
+                diffEl.textContent = `-¥${Math.abs(diff)}`;
+                diffEl.className = 'font-semibold text-green-500';
+                tipEl.textContent = `将退款 ¥${Math.abs(diff)}，1-3个工作日到账`;
+                tipEl.className = 'mt-3 p-3 bg-green-50 rounded-xl text-sm text-green-600';
+            }
+            
+            // 更新按钮文字
+            const confirmBtn = document.getElementById('confirmBtn');
+            if (diff > 0) {
+                confirmBtn.textContent = `支付差价 ¥${diff}`;
+            } else if (diff < 0) {
+                confirmBtn.textContent = '确认修改并退款';
+            } else {
+                confirmBtn.textContent = '确认修改';
+            }
+        }
+
+        // 取消修改
+        function cancelModify() {
+            if (confirm('确定要取消修改吗？')) {
+                localStorage.removeItem('modifyingOrder');
+                window.location.href = 'c-orders.html';
+            }
+        }
+
+        // 确认修改
+        async function confirmModify() {
+            const selectedItems = selectedServices.filter(s => s.selected);
+            
+            if (selectedItems.length === 0) {
+                alert('请至少选择一项服务');
+                return;
+            }
+            
+            const newTotal = selectedItems.reduce((sum, s) => sum + s.price * s.quantity, 0);
+            const originalTotal = originalOrder.fees?.total || originalOrder.total || 0;
+            const diff = newTotal - originalTotal;
+            
+            const confirmMsg = diff > 0 
+                ? `确认修改并支付差价 ¥${diff} 吗？`
+                : diff < 0 
+                    ? `确认修改吗？退款 ¥${Math.abs(diff)} 将在1-3个工作日到账`
+                    : '确认修改订单吗？';
+            
+            if (!confirm(confirmMsg)) return;
+            
+            // 构建修改后的订单数据
+            const modifiedOrder = {
+                ...originalOrder,
+                items: selectedItems.map(s => ({
+                    name: s.name,
+                    serviceName: s.name,
+                    price: s.price,
+                    quantity: s.quantity,
+                    status: 'pending'
+                })),
+                services: selectedItems.map(s => ({
+                    id: s.id,
+                    name: s.name,
+                    icon: s.icon,
+                    price: s.price,
+                    desc: s.desc
+                })),
+                fees: {
+                    ...originalOrder.fees,
+                    serviceFee: newTotal,
+                    total: newTotal + (originalOrder.fees?.deliveryFee || 0)
+                },
+                // 修改订单后，将订单状态重置为paid，以便M端可以进行入库操作
+                status: 'paid',
+                modifiedAt: new Date().toISOString(),
+                modifyDiff: diff,
+                modifyType: diff > 0 ? 'supplement' : diff < 0 ? 'refund' : 'no_change'
+            };
+            
+            try {
+                // 调用后端API
+                const response = await fetch(`http://localhost:3000/api/cleaning/orders/${orderId}/modify`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        items: modifiedOrder.items,
+                        newTotal: modifiedOrder.fees.total,
+                        diff: diff,
+                        modifyTime: new Date().toISOString()
+                    })
+                });
+                const result = await response.json();
+                if (result.success) {
+                    console.log('订单修改已同步到后端');
+                }
+            } catch (error) {
+                console.warn('API调用失败，本地处理:', error);
+            }
+            
+            // 更新本地订单（支持多种ID格式匹配）
+            const orders = JSON.parse(localStorage.getItem('orders') || '[]');
+            const idx = orders.findIndex(o => 
+                o.orderId === orderId || 
+                o.id === orderId || 
+                o._id === orderId || 
+                o.orderNo === orderId
+            );
+            if (idx > -1) {
+                orders[idx] = modifiedOrder;
+                localStorage.setItem('orders', JSON.stringify(orders));
+            } else {
+                // 如果本地没有，添加修改后的订单
+                orders.push(modifiedOrder);
+                localStorage.setItem('orders', JSON.stringify(orders));
+            }
+            localStorage.setItem('currentOrder', JSON.stringify(modifiedOrder));
+            localStorage.removeItem('modifyingOrder');
+            
+            // 同步到门店订单（让M端能看到更新）
+            syncOrderToStore(modifiedOrder);
+            
+            // 如果需要补差价，跳转到支付页面
+            if (diff > 0) {
+                alert('订单已修改，请支付差价');
+                window.location.href = 'c-payment.html?modify=true&diff=' + diff;
+            } else {
+                alert(diff < 0 ? '订单已修改，退款将在1-3个工作日到账' : '订单修改成功');
+                window.location.href = 'c-order-detail.html?id=' + encodeURIComponent(orderId);
+            }
+        }
+
+        // 同步订单到门店订单列表（让M端能看到C端订单变化）
+        function syncOrderToStore(order) {
+            try {
+                const storeOrders = JSON.parse(localStorage.getItem('store_orders') || '[]');
+                const orderStoreId = order.storeId || (order.store ? order.store.id : null);
+                
+                if (!orderStoreId) {
+                    console.warn('订单没有门店ID，无法同步到门店');
+                    return;
+                }
+                
+                // 查找是否已存在（支持多种ID匹配）
+                const existingIndex = storeOrders.findIndex(o => 
+                    o.orderId === order.orderId || 
+                    o.id === order.orderId ||
+                    o._id === order.orderId ||
+                    o.orderNo === order.orderId ||
+                    o.orderNo === order.orderNo
+                );
+                
+                // 保留原有的orderNo，不要覆盖
+                const storeOrder = {
+                    ...order,
+                    orderNo: order.orderNo || order.orderId,  // 保留原有orderNo
+                    _id: order._id || order.id || order.orderId,
+                    storeId: orderStoreId,
+                    updatedAt: new Date().toISOString()
+                };
+                
+                if (existingIndex > -1) {
+                    // 更新现有订单 - 保留原有的关键字段，但使用新订单的状态和items（因为是修改后的）
+                    const existingOrder = storeOrders[existingIndex];
+                    storeOrders[existingIndex] = { 
+                        ...existingOrder, 
+                        ...storeOrder,
+                        orderId: existingOrder.orderId || order.orderId,  // 保留原有orderId
+                        orderNo: existingOrder.orderNo || order.orderNo || order.orderId,  // 保留原有orderNo
+                        // 重要：使用新订单的状态（修改后应为paid）和items
+                        status: order.status,
+                        items: order.items,
+                        services: order.services,
+                        fees: order.fees,
+                        modifiedAt: order.modifiedAt
+                    };
+                    console.log('[同步] 更新门店订单:', order.orderId, '索引:', existingIndex, '新状态:', order.status);
+                } else {
+                    // 添加新订单
+                    storeOrders.push(storeOrder);
+                    console.log('[同步] 添加新订单到门店:', order.orderId);
+                }
+                
+                localStorage.setItem('store_orders', JSON.stringify(storeOrders));
+            } catch (error) {
+                console.error('[同步] 同步订单到门店失败:', error);
+            }
+        }
+    </script>
+</body>
+</html>

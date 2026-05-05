@@ -1,0 +1,81 @@
+<view class="container">
+  <!-- 订单状态Tab -->
+  <view class="order-tabs">
+    <view class="tab-item {{currentTab === 'all' ? 'active' : ''}}" bindtap="onSwitchTab" data-tab="all">
+      <text>全部</text>
+    </view>
+    <view class="tab-item {{currentTab === 'pending' ? 'active' : ''}}" bindtap="onSwitchTab" data-tab="pending">
+      <text>待处理</text>
+    </view>
+    <view class="tab-item {{currentTab === 'processing' ? 'active' : ''}}" bindtap="onSwitchTab" data-tab="processing">
+      <text>处理中</text>
+    </view>
+    <view class="tab-item {{currentTab === 'ready' ? 'active' : ''}}" bindtap="onSwitchTab" data-tab="ready">
+      <text>待取件</text>
+    </view>
+    <view class="tab-item {{currentTab === 'completed' ? 'active' : ''}}" bindtap="onSwitchTab" data-tab="completed">
+      <text>已完成</text>
+    </view>
+  </view>
+
+  <!-- 订单列表 -->
+  <view class="order-list" wx:if="{{orders.length > 0}}">
+    <view class="order-card" wx:for="{{orders}}" wx:key="id" bindtap="onViewOrder" data-id="{{item.id}}">
+      <view class="order-header">
+        <view class="order-store">
+          <text class="store-name">{{item.storeName}}</text>
+          <text class="iconfont icon-arrow-right"></text>
+        </view>
+        <view class="order-status tag-{{item.status}}">
+          <text>{{item.statusText}}</text>
+        </view>
+      </view>
+
+      <view class="order-content">
+        <view class="order-items">
+          <view class="item-info" wx:for="{{item.items}}" wx:for-item="orderItem" wx:key="id">
+            <text class="item-name">{{orderItem.name}}</text>
+            <text class="item-qty">x{{orderItem.quantity}}</text>
+          </view>
+        </view>
+        <view class="order-summary">
+          <text class="total-count">共{{item.totalCount}}件</text>
+          <text class="total-price">¥{{item.totalPrice}}</text>
+        </view>
+      </view>
+
+      <view class="order-footer">
+        <view class="order-time">
+          <text class="iconfont icon-time"></text>
+          <text>{{item.createdAt}}</text>
+        </view>
+        <view class="order-actions">
+          <button class="action-btn primary" wx:if="{{item.status === 'ready'}}" catchtap="onPickup" data-id="{{item.id}}">
+            立即取件
+          </button>
+          <button class="action-btn" wx:if="{{item.status === 'completed'}}" catchtap="onRate" data-id="{{item.id}}">
+            评价
+          </button>
+          <button class="action-btn" catchtap="onViewDetail" data-id="{{item.id}}">
+            查看详情
+          </button>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 空状态 -->
+  <view class="empty-state" wx:else>
+    <view class="empty-icon">
+      <text class="iconfont icon-orders"></text>
+    </view>
+    <text class="empty-text">暂无订单</text>
+    <button class="btn btn-primary" bindtap="onCreateOrder">立即下单</button>
+  </view>
+
+  <!-- 加载更多 -->
+  <view class="load-more" wx:if="{{orders.length > 0 && hasMore}}">
+    <text wx:if="{{loading}}">加载中...</text>
+    <text wx:else bindtap="onLoadMore">加载更多</text>
+  </view>
+</view>

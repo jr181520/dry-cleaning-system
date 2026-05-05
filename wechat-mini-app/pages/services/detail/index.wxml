@@ -1,0 +1,79 @@
+<view class="container">
+  <!-- 服务信息 -->
+  <view class="service-header">
+    <view class="service-icon">{{service.icon}}</view>
+    <text class="service-name">{{service.name}}</text>
+    <text class="service-price">¥{{service.price}}</text>
+    <text class="service-desc">{{service.desc}}</text>
+  </view>
+
+  <!-- 服务说明 -->
+  <view class="section">
+    <view class="section-header">
+      <text class="section-title">服务说明</text>
+    </view>
+    <view class="section-content">
+      <text class="content-text">1. 专业干洗师傅手工清洗，确保衣物不受损伤</text>
+      <text class="content-text">2. 使用环保干洗溶剂，安全无刺激</text>
+      <text class="content-text">3. 熨烫平整，包装精美</text>
+      <text class="content-text">4. 如有特殊污渍，请提前告知</text>
+    </view>
+  </view>
+
+  <!-- 服务流程 -->
+  <view class="section">
+    <view class="section-header">
+      <text class="section-title">服务流程</text>
+    </view>
+    <view class="process-steps">
+      <view class="step-item">
+        <view class="step-number">1</view>
+        <view class="step-info">
+          <text class="step-title">下单预约</text>
+          <text class="step-desc">选择服务项目和取送方式</text>
+        </view>
+      </view>
+      <view class="step-line"></view>
+      <view class="step-item">
+        <view class="step-number">2</view>
+        <view class="step-info">
+          <text class="step-title">上门取件/到店送洗</text>
+          <text class="step-desc">根据选择的方式送交衣物</text>
+        </view>
+      </view>
+      <view class="step-line"></view>
+      <view class="step-item">
+        <view class="step-number">3</view>
+        <view class="step-info">
+          <text class="step-title">专业清洗</text>
+          <text class="step-desc">干洗店进行专业清洗处理</text>
+        </view>
+      </view>
+      <view class="step-line"></view>
+      <view class="step-item">
+        <view class="step-number">4</view>
+        <view class="step-info">
+          <text class="step-title">通知取件</text>
+          <text class="step-desc">清洗完成后通知您取件</text>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 注意事项 -->
+  <view class="section">
+    <view class="section-header">
+      <text class="section-title">注意事项</text>
+    </view>
+    <view class="section-content">
+      <text class="content-text">1. 请在取件时仔细检查衣物</text>
+      <text class="content-text">2. 如有问题请在24小时内联系客服</text>
+      <text class="content-text">3. 珍贵衣物建议购买保价服务</text>
+    </view>
+  </view>
+
+  <!-- 立即预约按钮 -->
+  <view class="submit-section">
+    <button class="submit-btn" bindtap="onBookService">立即预约</button>
+  </view>
+</view>

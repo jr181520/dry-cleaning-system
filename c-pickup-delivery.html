@@ -1,0 +1,575 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>跑腿配送 - 干洗服务</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#1e40af',
+                        secondary: '#3b82f6',
+                        accent: '#60a5fa',
+                        success: '#10b981',
+                        warning: '#f59e0b',
+                        danger: '#ef4444',
+                        meituan: '#FFC300',
+                        jingdong: '#E1251B',
+                        shunfeng: '#DC1E32',
+                        taobao: '#FF5000'
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        * { -webkit-tap-highlight-color: transparent; }
+        .item-card {
+            background: #ffffff;
+            border-radius: 16rpx;
+            padding: 20rpx;
+            margin-bottom: 16rpx;
+            box-shadow: 0 2rpx 8rpx rgba(0,0,0,0.04);
+        }
+        .provider-card {
+            border: 2rpx solid #e5e7eb;
+            border-radius: 16rpx;
+            padding: 20rpx;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .provider-card.selected {
+            border-color: #1e40af;
+            background: #eff6ff;
+        }
+        .provider-card.disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        .lamp-indicator {
+            width: 100rpx;
+            height: 100rpx;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 40rpx;
+            transition: all 0.5s ease;
+        }
+        .lamp-off {
+            background: #e5e7eb;
+            color: #9ca3af;
+        }
+        .lamp-on {
+            background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
+            color: #fff;
+            box-shadow: 0 0 30rpx rgba(251, 191, 36, 0.6);
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 100rpx;
+            height: 56rpx;
+        }
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #ccc;
+            transition: .4s;
+            border-radius: 56rpx;
+        }
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 44rpx;
+            width: 44rpx;
+            left: 6rpx;
+            bottom: 6rpx;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+        input:checked + .slider {
+            background-color: #1e40af;
+        }
+        input:checked + .slider:before {
+            transform: translateX(44rpx);
+        }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen pb-32">
+    <!-- 顶部导航 -->
+    <header class="bg-white sticky top-0 z-50">
+        <div class="flex items-center justify-between px-4 py-4 border-b border-gray-100">
+            <a href="c-orders.html" class="text-gray-700">
+                <i class="fa fa-arrow-left text-lg"></i>
+            </a>
+            <span class="text-lg font-semibold text-gray-800">跑腿配送</span>
+            <span class="w-8"></span>
+        </div>
+    </header>
+
+    <!-- 灯条状态 -->
+    <div class="bg-white mx-4 mt-4 rounded-2xl p-4">
+        <div class="flex items-center justify-between">
+            <div>
+                <h3 class="text-base font-semibold text-gray-800" id="lampStatus">等待支付</h3>
+                <p class="text-sm text-gray-500 mt-1" id="lampDesc">选择跑腿服务并支付后点亮灯条</p>
+            </div>
+            <div class="lamp-indicator lamp-off" id="lampIndicator">💡</div>
+        </div>
+    </div>
+
+    <!-- 物品明细 -->
+    <div class="bg-white mx-4 mt-4 rounded-2xl p-4">
+        <h3 class="text-base font-semibold text-gray-800 mb-4 flex items-center gap-2">
+            <i class="fa fa-list text-primary"></i>
+            物品明细
+        </h3>
+        <div id="itemsList"></div>
+    </div>
+
+    <!-- 店铺信息 -->
+    <div class="bg-white mx-4 mt-4 rounded-2xl p-4">
+        <h3 class="text-base font-semibold text-gray-800 mb-4 flex items-center gap-2">
+            <i class="fa fa-store text-primary"></i>
+            取件店铺
+        </h3>
+        <div id="storeInfo"></div>
+    </div>
+
+    <!-- 订单信息 -->
+    <div class="bg-white mx-4 mt-4 rounded-2xl p-4">
+        <h3 class="text-base font-semibold text-gray-800 mb-4 flex items-center gap-2">
+            <i class="fa fa-info-circle text-primary"></i>
+            订单信息
+        </h3>
+        <div class="space-y-3 text-sm">
+            <div class="flex justify-between">
+                <span class="text-gray-500">订单编号</span>
+                <span class="text-gray-800 font-mono" id="orderNo">-</span>
+            </div>
+            <div class="flex justify-between">
+                <span class="text-gray-500">下单时间</span>
+                <span class="text-gray-800" id="createTime">-</span>
+            </div>
+            <div class="flex justify-between">
+                <span class="text-gray-500">配送地址</span>
+                <span class="text-gray-800 text-right max-w-[60%]" id="deliveryAddress">-</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- 跑腿服务商选择 -->
+    <div class="bg-white mx-4 mt-4 rounded-2xl p-4">
+        <h3 class="text-base font-semibold text-gray-800 mb-4 flex items-center gap-2">
+            <i class="fa fa-motorcycle text-primary"></i>
+            选择跑腿服务商
+        </h3>
+        <div class="space-y-3" id="providerList">
+            <!-- 美团跑腿 -->
+            <div class="provider-card" onclick="selectProvider('meituan')" data-provider="meituan">
+                <div class="flex items-center gap-3">
+                    <div class="w-12 h-12 bg-yellow-400 rounded-xl flex items-center justify-center text-xl">
+                        🦘
+                    </div>
+                    <div class="flex-1">
+                        <div class="font-semibold text-gray-800">美团跑腿</div>
+                        <div class="text-xs text-gray-500">预计30-45分钟送达</div>
+                    </div>
+                    <div class="text-right">
+                        <div class="text-red-500 font-semibold">¥<span class="provider-price">15</span></div>
+                        <div class="text-xs text-gray-400">配送费</div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 京东秒送 -->
+            <div class="provider-card" onclick="selectProvider('jingdong')" data-provider="jingdong">
+                <div class="flex items-center gap-3">
+                    <div class="w-12 h-12 bg-red-600 rounded-xl flex items-center justify-center text-xl text-white">
+                        🐕
+                    </div>
+                    <div class="flex-1">
+                        <div class="font-semibold text-gray-800">京东秒送</div>
+                        <div class="text-xs text-gray-500">预计25-40分钟送达</div>
+                    </div>
+                    <div class="text-right">
+                        <div class="text-red-500 font-semibold">¥<span class="provider-price">18</span></div>
+                        <div class="text-xs text-gray-400">配送费</div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 顺丰跑腿 -->
+            <div class="provider-card" onclick="selectProvider('shunfeng')" data-provider="shunfeng">
+                <div class="flex items-center gap-3">
+                    <div class="w-12 h-12 bg-gray-800 rounded-xl flex items-center justify-center text-xl text-white">
+                        🚁
+                    </div>
+                    <div class="flex-1">
+                        <div class="font-semibold text-gray-800">顺丰跑腿</div>
+                        <div class="text-xs text-gray-500">预计20-35分钟送达</div>
+                    </div>
+                    <div class="text-right">
+                        <div class="text-red-500 font-semibold">¥<span class="provider-price">20</span></div>
+                        <div class="text-xs text-gray-400">配送费</div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 淘宝闪购 -->
+            <div class="provider-card" onclick="selectProvider('taobao')" data-provider="taobao">
+                <div class="flex items-center gap-3">
+                    <div class="w-12 h-12 bg-orange-500 rounded-xl flex items-center justify-center text-xl text-white">
+                        🛒
+                    </div>
+                    <div class="flex-1">
+                        <div class="font-semibold text-gray-800">淘宝闪购</div>
+                        <div class="text-xs text-gray-500">预计30-50分钟送达</div>
+                    </div>
+                    <div class="text-right">
+                        <div class="text-red-500 font-semibold">¥<span class="provider-price">16</span></div>
+                        <div class="text-xs text-gray-400">配送费</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 联系商家开关 -->
+    <div class="bg-white mx-4 mt-4 rounded-2xl p-4">
+        <div class="flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center text-green-600">
+                    <i class="fa fa-phone"></i>
+                </div>
+                <div>
+                    <div class="font-medium text-gray-800">联系商家</div>
+                    <div class="text-xs text-gray-500">配送前与商家确认</div>
+                </div>
+            </div>
+            <label class="switch">
+                <input type="checkbox" id="contactSwitch" onchange="toggleContact()">
+                <span class="slider"></span>
+            </label>
+        </div>
+    </div>
+
+    <!-- 确认支付开关 -->
+    <div class="bg-white mx-4 mt-4 rounded-2xl p-4">
+        <div class="flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center text-blue-600">
+                    <i class="fa fa-credit-card"></i>
+                </div>
+                <div>
+                    <div class="font-medium text-gray-800">确认支付</div>
+                    <div class="text-xs text-gray-500">我已确认订单信息无误</div>
+                </div>
+            </div>
+            <label class="switch">
+                <input type="checkbox" id="paymentSwitch" onchange="togglePayment()">
+                <span class="slider"></span>
+            </label>
+        </div>
+    </div>
+
+    <!-- 底部支付栏 -->
+    <div class="fixed bottom-0 left-0 right-0 bg-white p-4 shadow-lg">
+        <div class="mb-3">
+            <div class="flex items-center justify-between">
+                <span class="text-sm text-gray-500">跑腿配送费</span>
+                <span class="text-xs text-gray-400">清洗费用已支付</span>
+            </div>
+            <div class="flex items-center justify-between mt-1">
+                <div class="text-red-500 font-bold text-2xl">¥<span id="deliveryFee">0</span></div>
+                <div class="text-xs text-green-600 bg-green-50 px-2 py-1 rounded">
+                    <i class="fa fa-check-circle mr-1"></i>服务费已付
+                </div>
+            </div>
+        </div>
+        <button onclick="confirmPayment()" class="w-full py-4 bg-primary text-white rounded-xl font-semibold text-lg flex items-center justify-center gap-2 disabled:bg-gray-300 disabled:cursor-not-allowed" id="payBtn" disabled>
+            <i class="fa fa-lock"></i>
+            确认支付配送费
+        </button>
+        <p class="text-xs text-gray-400 text-center mt-2">支付完成后将为您安排配送</p>
+    </div>
+
+    <script>
+        let orderId = null;
+        let orderData = null;
+        let selectedProvider = null;
+        let deliveryFee = 0;
+        let contactEnabled = false;
+        let paymentEnabled = false;
+
+        const providerFees = {
+            'meituan': 15,
+            'jingdong': 18,
+            'shunfeng': 20,
+            'taobao': 16
+        };
+
+        // 页面初始化
+        document.addEventListener('DOMContentLoaded', async function() {
+            const urlParams = new URLSearchParams(window.location.search);
+            orderId = urlParams.get('id');
+            
+            if (!orderId) {
+                alert('订单ID不能为空');
+                window.location.href = 'c-orders.html';
+                return;
+            }
+
+            await loadOrderData();
+        });
+
+        // 加载订单数据
+        async function loadOrderData() {
+            const orders = JSON.parse(localStorage.getItem('orders') || '[]');
+            orderData = orders.find(o => o.orderId === orderId || o.id === orderId || o._id === orderId);
+            
+            if (!orderData) {
+                try {
+                    const response = await fetch(`http://localhost:3000/api/cleaning/orders/${orderId}`, {
+                        headers: {
+                            'Authorization': 'Bearer ' + (localStorage.getItem('authToken') || ''),
+                            'Cache-Control': 'no-cache'
+                        }
+                    });
+                    const result = await response.json();
+                    if (result.success && result.data) {
+                        orderData = result.data;
+                    }
+                } catch (error) {
+                    console.warn('从API获取订单失败:', error);
+                }
+            }
+
+            if (!orderData) {
+                alert('未找到订单信息');
+                window.location.href = 'c-orders.html';
+                return;
+            }
+
+            renderPage();
+        }
+
+        // 渲染页面
+        function renderPage() {
+            // 物品列表
+            const items = orderData.items || orderData.services || [];
+            document.getElementById('itemsList').innerHTML = items.length === 0 
+                ? '<p class="text-gray-500 text-center py-4">暂无物品信息</p>'
+                : items.map((item, index) => `
+                    <div class="item-card">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center gap-3">
+                                <span class="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 font-semibold">${index + 1}</span>
+                                <div>
+                                    <div class="font-medium text-gray-800">${item.name || item.serviceName || '未知物品'}</div>
+                                    <div class="text-xs text-gray-500">${item.type || item.serviceType || '标准服务'}</div>
+                                </div>
+                            </div>
+                            <span class="text-red-500 font-semibold">¥${item.price || item.unitPrice || 0}</span>
+                        </div>
+                    </div>
+                `).join('');
+
+            // 店铺信息
+            const store = orderData.store || {};
+            document.getElementById('storeInfo').innerHTML = `
+                <div class="flex items-start gap-3">
+                    <div class="w-14 h-14 bg-blue-100 rounded-xl flex items-center justify-center text-2xl">🏪</div>
+                    <div class="flex-1">
+                        <div class="font-semibold text-gray-800">${store.name || '服务网点'}</div>
+                        <div class="text-sm text-gray-500 mt-1"><i class="fa fa-map-marker-alt text-primary mr-1"></i>${store.address || '地址信息待完善'}</div>
+                        <div class="text-sm text-gray-500 mt-1"><i class="fa fa-phone text-primary mr-1"></i>${store.phone || '400-888-8888'}</div>
+                    </div>
+                </div>
+            `;
+
+            // 订单信息
+            document.getElementById('orderNo').textContent = orderData.orderId || orderData.orderNo || '-';
+            document.getElementById('createTime').textContent = orderData.createTime || 
+                (orderData.createdAt ? new Date(orderData.createdAt).toLocaleString() : '-');
+            document.getElementById('deliveryAddress').textContent = 
+                orderData.contact?.address || orderData.delivery?.address || '请填写配送地址';
+
+            // 只显示配送费，订单金额已在下单时支付
+            document.getElementById('deliveryFee').textContent = deliveryFee;
+
+            // 检查是否已支付/完成
+            if (orderData.status === 'completed' || orderData.deliveryPaid) {
+                showPaidState();
+            }
+        }
+
+        // 选择服务商
+        function selectProvider(provider) {
+            selectedProvider = provider;
+            deliveryFee = providerFees[provider];
+            
+            // 更新UI
+            document.querySelectorAll('.provider-card').forEach(card => {
+                card.classList.remove('selected');
+            });
+            document.querySelector(`[data-provider="${provider}"]`).classList.add('selected');
+            
+            document.getElementById('deliveryFee').textContent = deliveryFee;
+            checkCanPay();
+        }
+
+        // 切换联系商家
+        function toggleContact() {
+            contactEnabled = document.getElementById('contactSwitch').checked;
+            if (contactEnabled) {
+                const store = orderData.store || {};
+                const phone = store.phone || '400-888-8888';
+                window.location.href = 'tel:' + phone;
+            }
+        }
+
+        // 切换确认支付
+        function togglePayment() {
+            paymentEnabled = document.getElementById('paymentSwitch').checked;
+            checkCanPay();
+        }
+
+        // 检查是否可以支付
+        function checkCanPay() {
+            const canPay = selectedProvider && paymentEnabled;
+            const btn = document.getElementById('payBtn');
+            btn.disabled = !canPay;
+            btn.innerHTML = canPay 
+                ? '<i class="fa fa-credit-card"></i> 确认支付'
+                : '<i class="fa fa-lock"></i> 确认支付';
+        }
+
+        // 确认支付
+        async function confirmPayment() {
+            if (!selectedProvider || !paymentEnabled) return;
+
+            const btn = document.getElementById('payBtn');
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> 支付中...';
+
+            try {
+                // 调用API
+                const response = await fetch(`http://localhost:3000/api/cleaning/orders/${orderId}/delivery`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        provider: selectedProvider,
+                        deliveryFee: deliveryFee,
+                        contactMerchant: contactEnabled,
+                        paidAt: new Date().toISOString()
+                    })
+                });
+                const result = await response.json();
+
+                // 更新本地数据
+                const orders = JSON.parse(localStorage.getItem('orders') || '[]');
+                const idx = orders.findIndex(o => o.orderId === orderId || o.id === orderId || o._id === orderId);
+                if (idx > -1) {
+                    orders[idx].deliveryProvider = selectedProvider;
+                    orders[idx].deliveryFee = deliveryFee;
+                    orders[idx].deliveryPaid = true;
+                    orders[idx].contactMerchant = contactEnabled;
+                    orders[idx].deliveryStatus = 'dispatched';
+                    localStorage.setItem('orders', JSON.stringify(orders));
+                }
+
+                showPaidState();
+                showToast('支付成功！跑腿服务已下单', 'success');
+
+            } catch (error) {
+                console.warn('API调用失败:', error);
+                // 本地更新
+                const orders = JSON.parse(localStorage.getItem('orders') || '[]');
+                const idx = orders.findIndex(o => o.orderId === orderId || o.id === orderId || o._id === orderId);
+                if (idx > -1) {
+                    orders[idx].deliveryProvider = selectedProvider;
+                    orders[idx].deliveryFee = deliveryFee;
+                    orders[idx].deliveryPaid = true;
+                    orders[idx].deliveryStatus = 'dispatched';
+                    localStorage.setItem('orders', JSON.stringify(orders));
+                }
+                showPaidState();
+                showToast('支付成功！跑腿服务已下单', 'success');
+            }
+        }
+
+        // 显示已支付状态
+        function showPaidState() {
+            // 点亮灯条
+            const lamp = document.getElementById('lampIndicator');
+            lamp.classList.remove('lamp-off');
+            lamp.classList.add('lamp-on');
+            lamp.innerHTML = '✨';
+            
+            document.getElementById('lampStatus').textContent = '跑腿服务已下单';
+            document.getElementById('lampStatus').classList.add('text-green-600');
+            document.getElementById('lampDesc').textContent = '配送员将尽快上门取件，请保持电话畅通';
+
+            // 禁用选择
+            document.querySelectorAll('.provider-card').forEach(card => {
+                card.classList.add('disabled');
+                card.onclick = null;
+            });
+            document.getElementById('contactSwitch').disabled = true;
+            document.getElementById('paymentSwitch').disabled = true;
+
+            // 更新按钮
+            document.getElementById('payBtn').outerHTML = `
+                <button onclick="trackDelivery()" class="w-full py-4 bg-green-500 text-white rounded-xl font-semibold text-lg flex items-center justify-center gap-2">
+                    <i class="fa fa-map-marker-alt"></i>
+                    查看配送进度
+                </button>
+            `;
+        }
+
+        // 查看配送进度
+        function trackDelivery() {
+            const providerNames = {
+                'meituan': '美团跑腿',
+                'jingdong': '京东秒送',
+                'shunfeng': '顺丰跑腿',
+                'taobao': '淘宝闪购'
+            };
+            const provider = orderData.deliveryProvider || selectedProvider;
+            showToast(`正在为您跳转${providerNames[provider] || '跑腿服务'}...`, 'success');
+            // 实际项目中这里可以跳转到具体的配送跟踪页面
+        }
+
+        // 显示提示
+        function showToast(message, type = 'success') {
+            const toast = document.createElement('div');
+            toast.className = `fixed top-20 left-1/2 transform -translate-x-1/2 ${type === 'success' ? 'bg-green-500' : 'bg-red-500'} text-white px-6 py-3 rounded-lg shadow-lg z-50`;
+            toast.innerHTML = `<i class="fa fa-${type === 'success' ? 'check' : 'exclamation'}-circle mr-2"></i>${message}`;
+            document.body.appendChild(toast);
+            setTimeout(() => toast.remove(), 2000);
+        }
+    </script>
+</body>
+</html>

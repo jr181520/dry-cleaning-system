@@ -1,0 +1,233 @@
+<view class="order-detail-page">
+  <!-- 顶部状态卡片 -->
+  <view class="status-card" style="background: {{statusConfig.gradient}}">
+    <!-- 返回首页按钮 -->
+    <view class="home-btn" bindtap="onGoHome">
+      <text class="iconfont icon-home"></text>
+    </view>
+    
+    <view class="status-icon-large">
+      <text class="iconfont icon-{{statusConfig.icon}}"></text>
+    </view>
+    <view class="status-text">{{statusConfig.text}}</view>
+    <view class="status-desc">{{order.statusDescription}}</view>
+    
+    <view class="live-indicator" wx:if="{{polling}}">
+      <view class="live-dot"></view>
+      <text>实时更新中</text>
+    </view>
+  </view>
+
+  <!-- 配送员信息 -->
+  <view class="driver-card" wx:if="{{order.delivery && (order.status === 'delivering' || order.status === 'delivering_back')}}">
+    <view class="driver-avatar">
+      <text class="iconfont icon-deliver"></text>
+    </view>
+    <view class="driver-info">
+      <view class="driver-name">{{order.delivery.driverName || '配送员'}}</view>
+      <view class="driver-status">{{order.status === 'delivering_back' ? '正在送回' : '正在配送中'}}</view>
+    </view>
+    <view class="driver-actions">
+      <button class="driver-btn call" bindtap="onCallDriver">
+        <text class="iconfont icon-phone"></text>
+      </button>
+    </view>
+  </view>
+
+  <!-- 进度条 -->
+  <view class="progress-section">
+    <view class="info-title">订单进度</view>
+    <view class="progress-steps">
+      <view class="progress-line"></view>
+      <view class="progress-line-fill" style="width: {{(currentStep / (steps.length - 1)) * 100}}%"></view>
+      
+      <view class="progress-step {{step.active ? 'active' : ''}} {{step.current ? 'current' : ''}}" 
+            wx:for="{{steps}}" 
+            wx:key="key">
+        <view class="step-icon">
+          <text class="iconfont icon-{{step.icon}}"></text>
+        </view>
+        <span class="step-label">{{step.text}}</span>
+      </view>
+    </view>
+  </view>
+
+  <!-- 取件码 -->
+  <view class="pickup-code-section" wx:if="{{order.pickupCode && order.status !== 'completed'}}">
+    <view class="pickup-code-label">取件码</view>
+    <view class="pickup-code-value">{{order.pickupCode}}</view>
+  </view>
+
+  <!-- 取件方式选择（待取件状态） -->
+  <view class="pickup-method-section" wx:if="{{showPickupMethod}}">
+    <view class="pickup-method-title">请选择取件方式</view>
+    
+    <!-- 到店自提 -->
+    <view class="pickup-method-option {{selectedPickupMethod === 'store_pickup' ? 'selected' : ''}}" 
+          data-method="store_pickup"
+          bindtap="onSelectPickupMethod">
+      <view class="pickup-method-icon" style="background: #e8f5e9; color: #4caf50;">🏪</view>
+      <view class="pickup-method-info">
+        <view class="pickup-method-name">到店自提</view>
+        <view class="pickup-method-desc">凭取件码到店取件，无需等待</view>
+      </view>
+      <view class="pickup-method-check">
+        <text class="iconfont icon-check" wx:if="{{selectedPickupMethod === 'store_pickup'}}"></text>
+      </view>
+    </view>
+    
+    <!-- 配送到家 -->
+    <view class="pickup-method-option {{selectedPickupMethod === 'home_delivery' ? 'selected' : ''}}" 
+          data-method="home_delivery"
+          bindtap="onSelectPickupMethod">
+      <view class="pickup-method-icon" style="background: #e3f2fd; color: #2196f3;">🚚</view>
+      <view class="pickup-method-info">
+        <view class="pickup-method-name">配送到家</view>
+        <view class="pickup-method-desc">骑手送件上门，方便快捷</view>
+      </view>
+      <view class="pickup-method-check">
+        <text class="iconfont icon-check" wx:if="{{selectedPickupMethod === 'home_delivery'}}"></text>
+      </view>
+    </view>
+    
+    <!-- 配送表单 -->
+    <view class="delivery-form {{selectedPickupMethod === 'home_delivery' ? 'show' : ''}}">
+      <view class="form-group">
+        <view class="form-label">配送地址</view>
+        <input class="form-input" 
+               type="text" 
+               placeholder="请输入详细配送地址"
+               value="{{deliveryForm.address}}"
+               data-field="address"
+               bindinput="onDeliveryFormInput"/>
+      </view>
+      <view class="form-group">
+        <view class="form-label">联系人</view>
+        <input class="form-input" 
+               type="text" 
+               placeholder="请输入联系人姓名"
+               value="{{deliveryForm.contactName}}"
+               data-field="contactName"
+               bindinput="onDeliveryFormInput"/>
+      </view>
+      <view class="form-group">
+        <view class="form-label">联系电话</view>
+        <input class="form-input" 
+               type="tel" 
+               placeholder="请输入联系电话"
+               value="{{deliveryForm.contactPhone}}"
+               data-field="contactPhone"
+               bindinput="onDeliveryFormInput"/>
+      </view>
+    </view>
+  </view>
+
+  <!-- 物品清单 -->
+  <view class="info-section">
+    <view class="info-title">物品清单</view>
+    <view class="item-list">
+      <view class="item-card" wx:for="{{order.items}}" wx:key="index">
+        <view class="item-icon">
+          <text class="iconfont icon-clothes"></text>
+        </view>
+        <view class="item-info">
+          <view class="item-name">{{item.name}}</view>
+          <view class="item-desc">状态: {{item.status}}</view>
+        </view>
+      </view>
+    </view>
+    <view class="info-row mt-3">
+      <span class="info-label">合计</span>
+      <span class="info-value" style="color:#ff5722;font-size:18px;">¥{{order.amounts.total || 0}}</span>
+    </view>
+  </view>
+
+  <!-- 门店信息 -->
+  <view class="info-section" wx:if="{{order.storeName}}">
+    <view class="info-title">服务网点</view>
+    <view class="info-row">
+      <span class="info-label">门店名称</span>
+      <span class="info-value">{{order.storeName}}</span>
+    </view>
+    <view class="info-row" wx:if="{{order.storeAddress}}">
+      <span class="info-label">门店地址</span>
+      <span class="info-value">{{order.storeAddress}}</span>
+    </view>
+    <view class="info-row" wx:if="{{order.storePhone}}">
+      <span class="info-label">联系电话</span>
+      <span class="info-value" style="color:#2196f3;" bindtap="onCallStore">{{order.storePhone}}</span>
+    </view>
+    <view class="store-actions" wx:if="{{order.status === 'ready'}}">
+      <button class="store-btn" bindtap="onNavigateToStore">
+        <text class="iconfont icon-location"></text>
+        导航到店
+      </button>
+      <button class="store-btn" bindtap="onCallStore">
+        <text class="iconfont icon-phone"></text>
+        联系门店
+      </button>
+    </view>
+  </view>
+
+  <!-- 订单信息 -->
+  <view class="info-section">
+    <view class="info-title">订单信息</view>
+    <view class="info-row">
+      <span class="info-label">订单编号</span>
+      <span class="info-value" bindtap="copyOrderNo">{{order.orderNo || order.orderId}}</span>
+    </view>
+    <view class="info-row">
+      <span class="info-label">下单时间</span>
+      <span class="info-value">{{formatTime(order.createdAt)}}</span>
+    </view>
+  </view>
+
+  <!-- 动态时间线 -->
+  <view class="info-section" wx:if="{{order.latestHistory}}">
+    <view class="info-title">订单动态</view>
+    <view class="timeline">
+      <view class="timeline-item active">
+        <view class="timeline-dot">
+          <text class="iconfont icon-check"></text>
+        </view>
+        <view class="timeline-content">
+          <view class="timeline-title">{{order.latestHistory.note}}</view>
+          <view class="timeline-time">{{formatTime(order.latestHistory.time)}}</view>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 底部操作栏 -->
+  <view class="bottom-bar">
+    <button class="btn-action btn-outline" bindtap="onCallStore" wx:if="{{order.storePhone}}">
+      联系门店
+    </button>
+    
+    <!-- 待取件状态的主操作按钮 -->
+    <button class="btn-action btn-success" 
+            bindtap="onHandleMainAction" 
+            wx:if="{{order.status === 'ready'}}">
+      {{selectedPickupMethod === 'home_delivery' ? '确认配送' : '确认取件'}}
+    </button>
+    
+    <!-- 其他状态的主操作按钮 -->
+    <button class="btn-action btn-success" 
+            bindtap="onPay" 
+            wx:elif="{{order.status === 'pending'}}">
+      去支付
+    </button>
+    
+    <button class="btn-action btn-outline" 
+            bindtap="onRemind" 
+            wx:elif="{{order.status === 'processing' || order.status === 'received'}}">
+      催单
+    </button>
+    
+    <button class="btn-action btn-primary" 
+            bindtap="onRate" 
+            wx:elif="{{order.status === 'completed'}}">
+      去评价
+    </button>
+  </view>
+</view>

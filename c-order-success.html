@@ -1,0 +1,652 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>下单成功 - 干洗服务</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome -->
+    <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#1e40af',
+                        secondary: '#3b82f6',
+                        accent: '#60a5fa',
+                        success: '#10b981',
+                        warning: '#f59e0b',
+                        danger: '#ef4444',
+                        dark: '#1e293b',
+                        light: '#f8fafc',
+                        info: '#3b82f6',
+                        purple: '#8b5cf6',
+                        pink: '#ec4899',
+                        teal: '#14b8a6',
+                        orange: '#f97316'
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        * {
+            -webkit-tap-highlight-color: transparent;
+        }
+        
+        /* 成功动画 */
+        @keyframes checkmark {
+            0% {
+                stroke-dashoffset: 100;
+            }
+            100% {
+                stroke-dashoffset: 0;
+            }
+        }
+        
+        @keyframes scale {
+            0% {
+                transform: scale(0);
+            }
+            50% {
+                transform: scale(1.2);
+            }
+            100% {
+                transform: scale(1);
+            }
+        }
+        
+        .success-icon {
+            animation: scale 0.5s ease-out forwards;
+        }
+        
+        .checkmark-path {
+            stroke-dasharray: 100;
+            stroke-dashoffset: 100;
+            animation: checkmark 0.6s ease-out 0.3s forwards;
+        }
+        
+        /* 订单卡片 */
+        .order-card {
+            background: #ffffff;
+            border-radius: 20rpx;
+            padding: 24rpx;
+            box-shadow: 0 4rpx 16rpx rgba(0, 0, 0, 0.06);
+        }
+        
+        /* 服务标签 */
+        .service-tag {
+            display: inline-flex;
+            align-items: center;
+            gap: 8rpx;
+            background: #eff6ff;
+            padding: 12rpx 20rpx;
+            border-radius: 16rpx;
+        }
+        
+        /* 按钮样式 */
+        .btn-primary {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            padding: 28rpx 48rpx;
+            border-radius: 28rpx;
+            box-shadow: 0 4rpx 16rpx rgba(16, 185, 129, 0.3);
+            transition: all 0.3s;
+        }
+        
+        .btn-primary:active {
+            transform: scale(0.98);
+        }
+        
+        .btn-secondary {
+            background: #f9fafb;
+            padding: 28rpx 48rpx;
+            border-radius: 28rpx;
+            border: 2rpx solid #e5e7eb;
+            transition: all 0.3s;
+        }
+        
+        .btn-secondary:active {
+            background: #f3f4f6;
+        }
+        
+        /* 底部安全区 */
+        .bottom-bar {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: #ffffff;
+            padding: 24rpx;
+            padding-bottom: calc(24rpx + env(safe-area-inset-bottom));
+            box-shadow: 0 -4rpx 20rpx rgba(0, 0, 0, 0.1);
+            z-index: 100;
+        }
+        
+        /* 进度条 */
+        .progress-bar {
+            background: linear-gradient(90deg, #10b981 0%, #059669 100%);
+            height: 8rpx;
+            border-radius: 4rpx;
+            transition: width 0.5s ease;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen pb-36">
+    <!-- 成功头部 -->
+    <div class="bg-gradient px-4 pt-8 pb-20 text-center">
+        <!-- 成功图标 -->
+        <div class="success-icon mx-auto w-32 h-32 bg-white rounded-full flex items-center justify-center shadow-lg mb-6">
+            <svg class="w-16 h-16 text-green-500" viewBox="0 0 52 52">
+                <circle class="checkmark-circle" cx="26" cy="26" r="25" fill="none" stroke="#10b981" stroke-width="2"/>
+                <path class="checkmark-check" fill="none" stroke="#10b981" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" d="M14 27l7 7 16-16"/>
+            </svg>
+        </div>
+        
+        <h1 class="text-white text-2xl font-bold mb-2">下单成功!</h1>
+        <p class="text-white/80 text-sm">您的订单已提交，请等待门店确认</p>
+    </div>
+
+    <!-- 主内容区 -->
+    <main class="px-4 -mt-12">
+        <!-- 订单信息卡片 -->
+        <div class="order-card mb-4">
+            <div class="flex items-center justify-between mb-4 pb-4 border-b border-gray-100">
+                <span class="font-bold text-gray-800">订单编号</span>
+                <span id="order-id" class="text-blue-600 font-bold font-mono">-</span>
+            </div>
+            
+            <div class="space-y-3 text-sm">
+                <div class="flex justify-between">
+                    <span class="text-gray-500">下单时间</span>
+                    <span id="create-time" class="text-gray-800">-</span>
+                </div>
+                <div class="flex justify-between">
+                    <span class="text-gray-500">支付方式</span>
+                    <span id="payment-method" class="text-gray-800">-</span>
+                </div>
+                <div class="flex justify-between">
+                    <span class="text-gray-500">支付金额</span>
+                    <span id="pay-amount" class="text-red-500 font-bold">¥0</span>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 服务详情 -->
+        <div class="order-card mb-4">
+            <h3 class="font-bold text-gray-800 mb-3">服务详情</h3>
+            <div id="services-list" class="flex flex-wrap gap-2 mb-4">
+                <!-- 服务标签将通过JavaScript加载 -->
+            </div>
+            <div class="flex items-center gap-2 pt-4 border-t border-gray-100">
+                <span class="text-2xl">🏪</span>
+                <div class="flex-1">
+                    <span id="store-name" class="font-semibold text-gray-800">-</span>
+                    <span id="store-address" class="text-xs text-gray-500 block">-</span>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 取件信息 -->
+        <div class="order-card mb-4">
+            <h3 class="font-bold text-gray-800 mb-3">取件信息</h3>
+            <div class="space-y-3 text-sm">
+                <div class="flex items-center gap-2">
+                    <span class="text-gray-500">取件方式</span>
+                    <span id="delivery-method" class="ml-auto text-gray-800">-</span>
+                </div>
+                <div id="pickup-time-row" class="flex items-center gap-2">
+                    <span class="text-gray-500">预约时间</span>
+                    <span id="pickup-time" class="ml-auto text-gray-800">-</span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <span class="text-gray-500">联系人</span>
+                    <span id="contact-name" class="ml-auto text-gray-800">-</span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <span class="text-gray-500">联系电话</span>
+                    <span id="contact-phone" class="ml-auto text-gray-800">-</span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <span class="text-gray-500">取件地址</span>
+                    <span id="pickup-address" class="ml-auto text-gray-800 text-right max-w-40">-</span>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 订单状态进度 -->
+        <div class="order-card mb-4">
+            <h3 class="font-bold text-gray-800 mb-4">订单状态</h3>
+            
+            <!-- 进度条 -->
+            <div class="mb-4">
+                <div class="h-2 bg-gray-200 rounded-full overflow-hidden">
+                    <div id="progress-bar" class="progress-bar" style="width: 25%"></div>
+                </div>
+            </div>
+            
+            <!-- 状态节点 -->
+            <div class="flex justify-between relative">
+                <div class="flex flex-col items-center">
+                    <div class="w-8 h-8 rounded-full bg-green-500 text-white flex items-center justify-center text-sm mb-1">
+                        ✓
+                    </div>
+                    <span class="text-xs text-green-600 font-medium">已下单</span>
+                </div>
+                <div class="flex flex-col items-center">
+                    <div id="status-2" class="w-8 h-8 rounded-full bg-gray-200 text-gray-400 flex items-center justify-center text-sm mb-1">
+                        2
+                    </div>
+                    <span id="label-2" class="text-xs text-gray-400">待确认</span>
+                </div>
+                <div class="flex flex-col items-center">
+                    <div id="status-3" class="w-8 h-8 rounded-full bg-gray-200 text-gray-400 flex items-center justify-center text-sm mb-1">
+                        3
+                    </div>
+                    <span id="label-3" class="text-xs text-gray-400">清洗中</span>
+                </div>
+                <div class="flex flex-col items-center">
+                    <div id="status-4" class="w-8 h-8 rounded-full bg-gray-200 text-gray-400 flex items-center justify-center text-sm mb-1">
+                        4
+                    </div>
+                    <span id="label-4" class="text-xs text-gray-400">待取件</span>
+                </div>
+                <div class="flex flex-col items-center">
+                    <div id="status-5" class="w-8 h-8 rounded-full bg-gray-200 text-gray-400 flex items-center justify-center text-sm mb-1">
+                        5
+                    </div>
+                    <span id="label-5" class="text-xs text-gray-400">已完成</span>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 配送跟踪模块（仅跑腿订单显示） -->
+        <div id="delivery-tracker" class="order-card mb-4 hidden">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="font-bold text-gray-800">🏃 配送跟踪</h3>
+                <span id="delivery-status-badge" class="px-3 py-1 bg-blue-100 text-blue-600 text-xs font-semibold rounded-full">取件中</span>
+            </div>
+            
+            <!-- 配送员信息 -->
+            <div id="courier-info" class="flex items-center gap-4 p-4 bg-gradient-to-r from-blue-50 to-blue-100 rounded-xl mb-4">
+                <div class="w-16 h-16 bg-white rounded-full flex items-center justify-center shadow-sm">
+                    <span class="text-3xl">🧑‍✈️</span>
+                </div>
+                <div class="flex-1">
+                    <div class="flex items-center gap-2 mb-1">
+                        <span id="courier-name" class="font-bold text-gray-800">配送员</span>
+                        <span class="text-xs text-gray-500">正在取件</span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <span id="courier-distance" class="text-sm text-blue-600 font-semibold">距您约1.5km</span>
+                        <span class="text-xs text-gray-400">|</span>
+                        <span id="courier-eta" class="text-sm text-gray-600">预计15分钟后到达</span>
+                    </div>
+                </div>
+                <div class="flex flex-col gap-2">
+                    <button onclick="callCourier()" class="w-12 h-12 bg-green-500 rounded-full flex items-center justify-center shadow-sm active:scale-95 transition-transform">
+                        <span class="text-white text-xl">📞</span>
+                    </button>
+                    <button onclick="chatWithCourier()" class="w-12 h-12 bg-blue-500 rounded-full flex items-center justify-center shadow-sm active:scale-95 transition-transform">
+                        <span class="text-white text-xl">💬</span>
+                    </button>
+                </div>
+            </div>
+            
+            <!-- 配送进度 -->
+            <div class="mb-4">
+                <div class="flex justify-between text-xs text-gray-500 mb-2">
+                    <span id="delivery-start">已取件</span>
+                    <span id="delivery-end">送至门店</span>
+                </div>
+                <div class="relative">
+                    <div class="h-2 bg-gray-200 rounded-full overflow-hidden">
+                        <div id="delivery-progress-bar" class="h-full bg-gradient-to-r from-blue-500 to-blue-600 transition-all duration-500" style="width: 0%"></div>
+                    </div>
+                    <div class="absolute top-0 left-0 w-full h-2 flex justify-between items-center">
+                        <div id="delivery-dot-1" class="w-4 h-4 bg-green-500 rounded-full border-2 border-white -mt-1 shadow"></div>
+                        <div id="delivery-dot-2" class="w-4 h-4 bg-gray-300 rounded-full border-2 border-white -mt-1 shadow"></div>
+                        <div id="delivery-dot-3" class="w-4 h-4 bg-gray-300 rounded-full border-2 border-white -mt-1 shadow"></div>
+                    </div>
+                </div>
+                <div class="flex justify-between text-xs mt-2">
+                    <div id="delivery-status-1" class="text-green-600 font-medium">✓ 已取件</div>
+                    <div id="delivery-status-2" class="text-gray-400">配送中</div>
+                    <div id="delivery-status-3" class="text-gray-400">已送达</div>
+                </div>
+            </div>
+            
+            <!-- 配送信息 -->
+            <div class="space-y-3 text-sm">
+                <div class="flex items-start gap-3 p-3 bg-gray-50 rounded-lg">
+                    <span class="text-lg">📍</span>
+                    <div class="flex-1">
+                        <div class="flex justify-between mb-1">
+                            <span class="text-gray-500">取件地址</span>
+                            <span id="pickup-loc" class="text-gray-700 font-medium">-</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-gray-500">送达地址</span>
+                            <span id="dropoff-loc" class="text-gray-700 font-medium">-</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
+                    <span class="text-lg">🛡️</span>
+                    <div class="flex-1">
+                        <span class="text-gray-500">配送保障</span>
+                        <span class="ml-2 text-green-600 font-medium">全程监控 · 丢失赔付</span>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 实时刷新按钮 -->
+            <button onclick="refreshDeliveryStatus()" class="w-full mt-4 py-3 bg-blue-50 text-blue-600 font-semibold rounded-xl flex items-center justify-center gap-2 active:bg-blue-100 transition-colors">
+                <span class="text-lg">🔄</span>
+                <span>刷新配送状态</span>
+            </button>
+        </div>
+        
+        <!-- 温馨提示 -->
+        <div class="bg-blue-50 rounded-2xl p-4 mb-4">
+            <h4 class="font-semibold text-blue-800 mb-2 flex items-center gap-2">
+                <span class="text-xl">💡</span>
+                温馨提示
+            </h4>
+            <ul class="text-sm text-blue-700 space-y-1">
+                <li>• 订单确认后，我们会通知您取件时间</li>
+                <li>• 如需修改订单，请联系客服</li>
+                <li>• 衣物清洗完成后，我们会第一时间通知您</li>
+            </ul>
+        </div>
+    </main>
+
+    <!-- 底部按钮 -->
+    <div class="bottom-bar">
+        <div class="flex gap-4">
+            <div class="btn-secondary flex-1 cursor-pointer text-center" onclick="goHome()">
+                <span class="text-gray-700 font-semibold">返回首页</span>
+            </div>
+            <div class="btn-primary flex-1 cursor-pointer text-center" onclick="viewOrder()">
+                <span class="text-white font-semibold">查看订单</span>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 订单数据
+        let order = null;
+
+        // 页面初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            // 检查登录状态
+            if (!localStorage.getItem('userToken')) {
+                window.location.href = 'c-login.html';
+                return;
+            }
+            
+            loadOrder();
+        });
+
+        // 加载订单数据
+        function loadOrder() {
+            const orderData = localStorage.getItem('currentOrder');
+            if (!orderData) {
+                alert('订单信息不存在');
+                window.location.href = 'c-index.html';
+                return;
+            }
+            
+            order = JSON.parse(orderData);
+            
+            // 订单信息
+            document.getElementById('order-id').textContent = order.orderId;
+            document.getElementById('create-time').textContent = order.createTime;
+            document.getElementById('pay-amount').textContent = `¥${order.fees.total}`;
+            
+            // 支付方式
+            const paymentMethods = {
+                'wechat': '微信支付',
+                'balance': '账户余额',
+                'alipay': '支付宝',
+                'unionpay': '银行卡'
+            };
+            document.getElementById('payment-method').textContent = paymentMethods[order.paymentMethod] || '-';
+            
+            // 服务列表
+            const servicesList = document.getElementById('services-list');
+            servicesList.innerHTML = order.services.map(service => `
+                <span class="service-tag">
+                    <span>${service.icon}</span>
+                    <span class="text-sm text-blue-600 font-medium">${service.name}</span>
+                    <span class="text-xs text-gray-400">¥${service.price}</span>
+                </span>
+            `).join('');
+            
+            // 门店信息
+            document.getElementById('store-name').textContent = order.store ? order.store.name : '系统自动分配';
+            document.getElementById('store-address').textContent = order.store ? order.store.address : '-';
+            
+            // 取件信息
+            document.getElementById('delivery-method').textContent = order.deliveryMethod === 'pickup' ? '自送到店' : '跑腿上门取件';
+            document.getElementById('pickup-time').textContent = order.time ? `${order.time.text} ${order.time.subText}` : '-';
+            document.getElementById('contact-name').textContent = order.contact ? order.contact.name : '-';
+            document.getElementById('contact-phone').textContent = order.contact ? order.contact.phone : '-';
+            document.getElementById('pickup-address').textContent = order.contact ? order.contact.address : '-';
+            
+            // 如果是跑腿订单，显示配送跟踪模块
+            if (order.deliveryMethod === 'courier') {
+                initDeliveryTracker();
+            }
+        }
+        
+        // 初始化配送跟踪模块
+        function initDeliveryTracker() {
+            const tracker = document.getElementById('delivery-tracker');
+            tracker.classList.remove('hidden');
+            
+            // 模拟配送员信息
+            const courierInfo = order.courier || {
+                name: '张师傅',
+                phone: '138****1234',
+                distance: '1.5km',
+                eta: '15分钟',
+                status: 'picking', // picking: 取件中, delivering: 配送中, delivered: 已送达
+                progress: 0
+            };
+            
+            // 更新配送员信息
+            document.getElementById('courier-name').textContent = courierInfo.name;
+            document.getElementById('courier-distance').textContent = `距您约${courierInfo.distance}`;
+            document.getElementById('courier-eta').textContent = `预计${courierInfo.eta}后到达`;
+            
+            // 更新地址信息
+            document.getElementById('pickup-loc').textContent = order.contact ? order.contact.address : '-';
+            document.getElementById('dropoff-loc').textContent = order.store ? order.store.address : '-';
+            
+            // 存储配送信息用于后续更新
+            window.deliveryInfo = courierInfo;
+            
+            // 更新配送状态
+            updateDeliveryStatus(courierInfo.status, courierInfo.progress);
+            
+            // 通知商家骑手已分配
+            notifyStoreCourierAssigned(order.orderId, courierInfo);
+            
+            // 启动实时更新
+            startDeliveryUpdates();
+        }
+        
+        // ================================================
+        // 通知商家骑手已分配
+        // ================================================
+        function notifyStoreCourierAssigned(orderId, courierInfo) {
+            console.log('[C端] 骑手已分配，通知商家:', orderId, courierInfo);
+            
+            const notification = {
+                type: 'courier_assigned',
+                orderId: orderId,
+                courierName: courierInfo.name,
+                courierPhone: courierInfo.phone,
+                timestamp: new Date().toISOString()
+            };
+            
+            // 保存到localStorage供M端监听
+            localStorage.setItem('courier_assigned_' + orderId, JSON.stringify(notification));
+            localStorage.setItem('last_courier_assigned', orderId);
+            
+            // 触发storage事件通知M端
+            window.dispatchEvent(new StorageEvent('storage', {
+                key: 'courier_assigned_' + orderId,
+                newValue: JSON.stringify(notification)
+            }));
+        }
+        
+        // ================================================
+        // 更新配送状态并同步到商家
+        // ================================================
+        function updateDeliveryStatusAndNotify(status, progress) {
+            updateDeliveryStatus(status, progress);
+            
+            // 通知商家配送状态变更
+            const notification = {
+                type: 'delivery_status_update',
+                orderId: order.orderId,
+                deliveryStatus: status,
+                progress: progress,
+                timestamp: new Date().toISOString()
+            };
+            
+            localStorage.setItem('delivery_status_' + order.orderId, JSON.stringify(notification));
+            
+            window.dispatchEvent(new StorageEvent('storage', {
+                key: 'delivery_status_' + order.orderId,
+                newValue: JSON.stringify(notification)
+            }));
+        }
+        
+        // 更新配送状态
+        function updateDeliveryStatus(status, progress) {
+            const progressBar = document.getElementById('delivery-progress-bar');
+            const statusBadge = document.getElementById('delivery-status-badge');
+            const dot1 = document.getElementById('delivery-dot-1');
+            const dot2 = document.getElementById('delivery-dot-2');
+            const dot3 = document.getElementById('delivery-dot-3');
+            const status2 = document.getElementById('delivery-status-2');
+            const status3 = document.getElementById('delivery-status-3');
+            
+            // 更新进度条
+            progressBar.style.width = `${progress}%`;
+            
+            // 更新状态点和文字
+            if (status === 'picking') {
+                statusBadge.textContent = '取件中';
+                statusBadge.className = 'px-3 py-1 bg-blue-100 text-blue-600 text-xs font-semibold rounded-full';
+                dot1.className = 'w-4 h-4 bg-green-500 rounded-full border-2 border-white -mt-1 shadow';
+                dot2.className = 'w-4 h-4 bg-blue-500 rounded-full border-2 border-white -mt-1 shadow animate-pulse';
+                status2.className = 'text-blue-600 font-medium';
+                status2.textContent = '● 取件中';
+            } else if (status === 'delivering') {
+                statusBadge.textContent = '配送中';
+                statusBadge.className = 'px-3 py-1 bg-amber-100 text-amber-600 text-xs font-semibold rounded-full';
+                dot1.className = 'w-4 h-4 bg-green-500 rounded-full border-2 border-white -mt-1 shadow';
+                dot2.className = 'w-4 h-4 bg-green-500 rounded-full border-2 border-white -mt-1 shadow';
+                dot3.className = 'w-4 h-4 bg-blue-500 rounded-full border-2 border-white -mt-1 shadow animate-pulse';
+                status2.className = 'text-green-600 font-medium';
+                status2.textContent = '✓ 已取件';
+                status3.className = 'text-blue-600 font-medium';
+                status3.textContent = '● 配送中';
+            } else if (status === 'delivered') {
+                statusBadge.textContent = '已送达';
+                statusBadge.className = 'px-3 py-1 bg-green-100 text-green-600 text-xs font-semibold rounded-full';
+                dot1.className = 'w-4 h-4 bg-green-500 rounded-full border-2 border-white -mt-1 shadow';
+                dot2.className = 'w-4 h-4 bg-green-500 rounded-full border-2 border-white -mt-1 shadow';
+                dot3.className = 'w-4 h-4 bg-green-500 rounded-full border-2 border-white -mt-1 shadow';
+                status2.className = 'text-green-600 font-medium';
+                status2.textContent = '✓ 已取件';
+                status3.className = 'text-green-600 font-medium';
+                status3.textContent = '✓ 已送达';
+            }
+            
+            // 更新配送信息
+            if (window.deliveryInfo) {
+                window.deliveryInfo.status = status;
+                window.deliveryInfo.progress = progress;
+            }
+        }
+        
+        // 刷新配送状态
+        function refreshDeliveryStatus() {
+            // 模拟实时更新配送状态
+            const btn = event.target.closest('button');
+            btn.disabled = true;
+            btn.innerHTML = '<span class="text-lg">⏳</span><span>刷新中...</span>';
+            
+            setTimeout(() => {
+                // 模拟配送进度
+                if (window.deliveryInfo) {
+                    if (window.deliveryInfo.status === 'picking') {
+                        window.deliveryInfo.progress = 10;
+                        updateDeliveryStatus('delivering', 50);
+                    } else if (window.deliveryInfo.status === 'delivering') {
+                        window.deliveryInfo.progress = 90;
+                        updateDeliveryStatus('delivered', 100);
+                    }
+                }
+                
+                btn.disabled = false;
+                btn.innerHTML = '<span class="text-lg">🔄</span><span>刷新配送状态</span>';
+            }, 1500);
+        }
+        
+        // 启动实时更新
+        function startDeliveryUpdates() {
+            // 每30秒自动更新一次
+            window.deliveryUpdateTimer = setInterval(() => {
+                if (window.deliveryInfo && window.deliveryInfo.status !== 'delivered') {
+                    // 模拟距离减少
+                    const currentDist = parseFloat(window.deliveryInfo.distance);
+                    if (currentDist > 0.1) {
+                        window.deliveryInfo.distance = (currentDist - 0.2).toFixed(1) + 'km';
+                        document.getElementById('courier-distance').textContent = `距您约${window.deliveryInfo.distance}`;
+                        
+                        // 更新ETA
+                        const eta = Math.max(1, Math.round(currentDist * 10));
+                        window.deliveryInfo.eta = `${eta}分钟`;
+                        document.getElementById('courier-eta').textContent = `预计${eta}分钟后到达`;
+                    }
+                }
+            }, 30000);
+        }
+        
+        // 拨打电话
+        function callCourier() {
+            const phone = window.deliveryInfo?.phone || '13812345678';
+            window.location.href = `tel:${phone}`;
+        }
+        
+        // 联系骑手
+        function chatWithCourier() {
+            alert('骑手电话：' + (window.deliveryInfo?.phone || '138****1234'));
+        }
+
+        // 返回首页
+        function goHome() {
+            localStorage.removeItem('currentOrder');
+            window.location.href = 'c-index.html';
+        }
+
+        // 查看订单
+        function viewOrder() {
+            if (order && order.orderId) {
+                window.location.href = 'c-order-detail.html?id=' + encodeURIComponent(order.orderId);
+            } else {
+                window.location.href = 'c-order-detail.html';
+            }
+        }
+    </script>
+</body>
+</html>

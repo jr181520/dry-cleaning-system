@@ -1,0 +1,221 @@
+<view class="login-container">
+  <!-- Logo和标题区域 -->
+  <view class="header-section">
+    <view class="logo-wrapper">
+      <image class="logo" src="/assets/images/logo.png" mode="aspectFit" wx:if="{{false}}"></image>
+      <view class="logo-placeholder">
+        <text class="logo-icon">👔</text>
+      </view>
+    </view>
+    <text class="app-title">干洗店</text>
+    <text class="app-slogan">专业干洗，服务到家</text>
+  </view>
+
+  <!-- 登录方式切换 -->
+  <view class="login-method-tabs" wx:if="{{isLogin}}">
+    <view 
+      class="tab-item {{loginMethod === 'wechat' ? 'active' : ''}}" 
+      bindtap="onToggleLoginMethod" 
+      data-method="wechat"
+    >
+      <text class="tab-icon">💬</text>
+      <text class="tab-text">微信登录</text>
+    </view>
+    <view 
+      class="tab-item {{loginMethod === 'phone' ? 'active' : ''}}" 
+      bindtap="onToggleLoginMethod" 
+      data-method="phone"
+    >
+      <text class="tab-icon">📱</text>
+      <text class="tab-text">手机登录</text>
+    </view>
+  </view>
+
+  <!-- 微信一键登录区域 -->
+  <view class="wechat-login-section" wx:if="{{isLogin && loginMethod === 'wechat'}}">
+    <!-- 用户协议勾选框 -->
+    <view class="wechat-agreement">
+      <checkbox-group bindchange="onAgreeChange">
+        <label class="wechat-agreement-label">
+          <checkbox 
+            value="agree" 
+            color="#10b981" 
+            checked="{{isAgree}}"
+            class="wechat-checkbox"
+          />
+          <view class="agreement-content">
+            <text class="agreement-prefix">我已阅读并同意</text>
+            <text class="link-text" bindtap="onViewAgreement">《用户服务协议》</text>
+            <text class="agreement-connector">和</text>
+            <text class="link-text" bindtap="onViewPrivacy">《隐私政策》</text>
+          </view>
+        </label>
+      </checkbox-group>
+    </view>
+    
+    <button 
+      class="wechat-login-btn {{loading ? 'loading' : ''}} {{!isAgree ? 'disabled' : ''}}" 
+      bindtap="onWechatLogin"
+      disabled="{{loading || !isAgree}}"
+      hover-class="none"
+    >
+      <text class="btn-icon">💬</text>
+      <text class="btn-text">{{loading ? '登录中...' : '微信一键登录'}}</text>
+    </button>
+    
+    <view class="login-tips">
+      <text class="tip-text">登录即表示您同意我们的</text>
+      <text class="link-text" bindtap="onViewAgreement">服务条款</text>
+      <text class="tip-text">和</text>
+      <text class="link-text" bindtap="onViewPrivacy">隐私政策</text>
+    </view>
+  </view>
+
+  <!-- 手机号登录表单 -->
+  <view class="login-form {{loginMethod === 'phone' || !isLogin ? 'show' : ''}}" wx:if="{{!isLogin || loginMethod === 'phone'}}">
+    <!-- 手机号 -->
+    <view class="form-item">
+      <view class="form-label">
+        <text class="label-icon">📱</text>
+        <text class="label-text">手机号</text>
+      </view>
+      <input 
+        class="form-input" 
+        type="number" 
+        maxlength="11" 
+        placeholder="请输入手机号"
+        value="{{phone}}"
+        bindinput="onPhoneInput"
+        disabled="{{loading}}"
+      />
+    </view>
+
+    <!-- 验证码 -->
+    <view class="form-item">
+      <view class="form-label">
+        <text class="label-icon">🔐</text>
+        <text class="label-text">验证码</text>
+      </view>
+      <view class="input-with-btn">
+        <input 
+          class="form-input" 
+          type="number" 
+          maxlength="6" 
+          placeholder="请输入验证码"
+          value="{{code}}"
+          bindinput="onCodeInput"
+          disabled="{{loading}}"
+        />
+        <button 
+          class="send-code-btn {{countdown > 0 ? 'disabled' : ''}}" 
+          bindtap="onSendCode"
+          disabled="{{countdown > 0 || loading}}"
+        >
+          {{countdown > 0 ? countdown + 's' : '获取验证码'}}
+        </button>
+      </view>
+    </view>
+
+    <!-- 密码（注册模式或手机号+密码登录） -->
+    <view class="form-item" wx:if="{{!isLogin || (isLogin && !code)}}">
+      <view class="form-label">
+        <text class="label-icon">🔒</text>
+        <text class="label-text">密码</text>
+      </view>
+      <view class="input-with-icon">
+        <input 
+          class="form-input" 
+          type="{{showPassword ? 'text' : 'password'}}" 
+          placeholder="{{isLogin ? '请输入密码' : '请设置密码（至少6位）'}}"
+          value="{{password}}"
+          bindinput="onPasswordInput"
+          disabled="{{loading}}"
+        />
+        <view class="toggle-password" bindtap="onTogglePassword">
+          <text class="icon">{{showPassword ? '👁️' : '👁️‍🗨️'}}</text>
+        </view>
+      </view>
+    </view>
+
+    <!-- 确认密码（仅注册模式） -->
+    <view class="form-item" wx:if="{{!isLogin}}">
+      <view class="form-label">
+        <text class="label-icon">🔒</text>
+        <text class="label-text">确认密码</text>
+      </view>
+      <view class="input-with-icon">
+        <input 
+          class="form-input" 
+          type="{{showConfirmPassword ? 'text' : 'password'}}" 
+          placeholder="请再次输入密码"
+          value="{{confirmPassword}}"
+          bindinput="onConfirmPasswordInput"
+          disabled="{{loading}}"
+        />
+        <view class="toggle-password" bindtap="onToggleConfirmPassword">
+          <text class="icon">{{showConfirmPassword ? '👁️' : '👁️‍🗨️'}}</text>
+        </view>
+      </view>
+    </view>
+
+    <!-- 昵称（仅注册模式） -->
+    <view class="form-item" wx:if="{{!isLogin}}">
+      <view class="form-label">
+        <text class="label-icon">👤</text>
+        <text class="label-text">昵称</text>
+      </view>
+      <input 
+        class="form-input" 
+        type="text" 
+        maxlength="20" 
+        placeholder="请输入昵称（选填）"
+        value="{{nickname}}"
+        bindinput="onNicknameInput"
+        disabled="{{loading}}"
+      />
+    </view>
+
+    <!-- 用户协议 -->
+    <view class="agreement-section">
+      <checkbox-group bindchange="onAgreeChange">
+        <label class="agreement-label">
+          <checkbox value="agree" color="#1e40af" checked="{{isAgree}}" />
+          <text class="agreement-text">我已阅读并同意</text>
+        </label>
+      </checkbox-group>
+      <text class="link-text" bindtap="onViewAgreement">《用户服务协议》</text>
+      <text class="agreement-text">和</text>
+      <text class="link-text" bindtap="onViewPrivacy">《隐私政策》</text>
+    </view>
+
+    <!-- 提交按钮 -->
+    <button 
+      class="submit-btn {{loading ? 'loading' : ''}}" 
+      bindtap="{{isLogin ? 'onPhoneLogin' : 'onPhoneLogin'}}"
+      disabled="{{loading || !isAgree}}"
+    >
+      <text class="btn-text">{{loading ? '处理中...' : (isLogin ? '登录' : '注册')}}</text>
+    </button>
+  </view>
+
+  <!-- 底部导航 -->
+  <view class="bottom-section">
+    <!-- 登录/注册切换 -->
+    <view class="toggle-mode" wx:if="{{isLogin && loginMethod === 'phone'}}">
+      <text class="toggle-text">还没有账号？</text>
+      <text class="toggle-btn" bindtap="onToggleMode">立即注册</text>
+    </view>
+    
+    <view class="toggle-mode" wx:if="{{!isLogin}}">
+      <text class="toggle-text">已有账号？</text>
+      <text class="toggle-btn" bindtap="onToggleMode">立即登录</text>
+    </view>
+
+    <!-- 游客入口 -->
+    <view class="guest-access">
+      <text class="guest-text" bindtap="onGuestAccess">游客体验</text>
+      <text class="guest-split">|</text>
+      <text class="guest-text">了解更多</text>
+    </view>
+  </view>
+</view>

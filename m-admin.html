@@ -1,0 +1,1596 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>干洗店总后台管理系统 - 手机终端</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome -->
+    <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.8/dist/chart.umd.min.js"></script>
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#1e40af',
+                        secondary: '#3b82f6',
+                        accent: '#60a5fa',
+                        success: '#10b981',
+                        warning: '#f59e0b',
+                        danger: '#ef4444',
+                        dark: '#1e293b',
+                        light: '#f8fafc',
+                        info: '#3b82f6',
+                        purple: '#8b5cf6',
+                        pink: '#ec4899',
+                        teal: '#14b8a6',
+                        orange: '#f97316'
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', 'sans-serif'],
+                        mono: ['Fira Code', 'monospace']
+                    },
+                    animation: {
+                        'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                        'blink': 'blink 1s step-end infinite',
+                        'float': 'float 3s ease-in-out infinite',
+                        'slide-up': 'slideUp 0.5s ease-out forwards',
+                        'slide-down': 'slideDown 0.5s ease-out forwards',
+                        'fade-in': 'fadeIn 0.5s ease-out forwards',
+                        'zoom-in': 'zoomIn 0.3s ease-out forwards',
+                        'bounce-slow': 'bounce 2s infinite',
+                        'shake': 'shake 0.5s ease-in-out forwards'
+                    },
+                    keyframes: {
+                        blink: {
+                            '0%, 100%': { opacity: '1' },
+                            '50%': { opacity: '0' },
+                        },
+                        float: {
+                            '0%, 100%': { transform: 'translateY(0)' },
+                            '50%': { transform: 'translateY(-10px)' },
+                        },
+                        slideUp: {
+                            '0%': { transform: 'translateY(20px)', opacity: '0' },
+                            '100%': { transform: 'translateY(0)', opacity: '1' },
+                        },
+                        slideDown: {
+                            '0%': { transform: 'translateY(-20px)', opacity: '0' },
+                            '100%': { transform: 'translateY(0)', opacity: '1' },
+                        },
+                        fadeIn: {
+                            '0%': { opacity: '0' },
+                            '100%': { opacity: '1' },
+                        },
+                        zoomIn: {
+                            '0%': { transform: 'scale(0.95)', opacity: '0' },
+                            '100%': { transform: 'scale(1)', opacity: '1' },
+                        },
+                        shake: {
+                            '0%, 100%': { transform: 'translateX(0)' },
+                            '25%': { transform: 'translateX(-5px)' },
+                            '75%': { transform: 'translateX(5px)' },
+                        }
+                    },
+                    boxShadow: {
+                        'card': '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+                        'card-hover': '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
+                        'btn': '0 2px 4px rgba(0, 0, 0, 0.1)',
+                        'btn-hover': '0 4px 8px rgba(0, 0, 0, 0.15)',
+                        'input': '0 1px 3px rgba(0, 0, 0, 0.12)',
+                        'input-focus': '0 0 0 3px rgba(59, 130, 246, 0.1)'
+                    }
+                }
+            }
+        }
+    </script>
+    <style type="text/tailwindcss">
+        @layer utilities {
+            .glass {
+                background: rgba(255, 255, 255, 0.7);
+                backdrop-filter: blur(10px);
+                border: 1px solid rgba(255, 255, 255, 0.1);
+            }
+            .glass-dark {
+                background: rgba(30, 41, 59, 0.7);
+                backdrop-filter: blur(10px);
+                border: 1px solid rgba(255, 255, 255, 0.1);
+            }
+            .text-shadow {
+                text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            }
+            .text-shadow-lg {
+                text-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+            }
+            .scrollbar-thin {
+                scrollbar-width: thin;
+            }
+            .scrollbar-thin::-webkit-scrollbar {
+                width: 6px;
+            }
+            .scrollbar-thin::-webkit-scrollbar-track {
+                background: #f1f1f1;
+            }
+            .scrollbar-thin::-webkit-scrollbar-thumb {
+                background: #888;
+                border-radius: 3px;
+            }
+            .scrollbar-thin::-webkit-scrollbar-thumb:hover {
+                background: #555;
+            }
+            .transition-transform {
+                transition-property: transform;
+                transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+                transition-duration: 150ms;
+            }
+            .hover-scale:hover {
+                transform: scale(1.02);
+            }
+            .light-bar-normal {
+                background-color: #e2e8f0;
+                transition: all 0.3s ease;
+            }
+            .light-bar-active {
+                background-color: #3b82f6;
+                transition: all 0.3s ease;
+            }
+            .light-bar-pulse {
+                animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+            }
+        }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <!-- 顶部导航栏 -->
+    <header class="fixed top-0 left-0 right-0 bg-white shadow-md z-40">
+        <div class="flex items-center justify-between p-4">
+            <div class="flex items-center space-x-2">
+                <button id="menu-btn" class="p-2 rounded-lg hover:bg-gray-100 transition-all duration-300 ease-in-out">
+                    <i class="fa fa-bars text-gray-700"></i>
+                </button>
+                <h1 class="text-lg font-semibold text-gray-800">总后台管理</h1>
+            </div>
+            <div class="flex items-center space-x-3">
+                <div class="relative">
+                    <button id="notification-btn" class="p-2 rounded-lg hover:bg-gray-100 transition-all duration-300 ease-in-out">
+                        <i class="fa fa-bell text-gray-700"></i>
+                        <span class="absolute top-0 right-0 w-2 h-2 bg-red-500 rounded-full animate-pulse"></span>
+                    </button>
+                </div>
+                <div class="flex items-center space-x-2">
+                    <div class="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-white" id="user-avatar">
+                        <i class="fa fa-user"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- 侧边栏 -->
+    <div id="sidebar" class="fixed top-0 left-0 bottom-0 w-64 bg-white shadow-lg z-50 transform -translate-x-full transition-transform duration-300 ease-in-out">
+        <div class="p-4 border-b border-gray-200">
+            <div class="flex items-center space-x-3">
+                <div class="w-10 h-10 rounded-full bg-primary flex items-center justify-center text-white">
+                    <i class="fa fa-tint"></i>
+                </div>
+                <div>
+                    <h2 class="font-semibold text-gray-800">总后台管理系统</h2>
+                    <p class="text-sm text-gray-500" id="user-role">管理员</p>
+                </div>
+            </div>
+        </div>
+        <nav class="p-4">
+            <ul class="space-y-2" id="nav-menu">
+                <!-- 导航菜单项将通过JavaScript动态添加 -->
+            </ul>
+        </nav>
+    </div>
+
+    <!-- 侧边栏遮罩层 -->
+    <div id="sidebar-overlay" class="fixed inset-0 bg-black bg-opacity-50 z-40 hidden"></div>
+
+    <!-- 主内容区 -->
+    <main class="pt-16 pb-20">
+        <!-- 总仪表盘 -->
+        <div id="dashboard-content" class="content-section p-4">
+            <div class="mb-6">
+                <h2 class="text-xl font-bold text-gray-800">总仪表盘</h2>
+                <p class="text-gray-600">欢迎回来，今天是 <span id="current-date"></span></p>
+            </div>
+
+            <!-- 实时数据 -->
+            <div class="bg-gradient-to-r from-primary to-secondary rounded-xl p-4 mb-6 text-white">
+                <div class="text-sm opacity-90 mb-1">实时数据</div>
+                <div class="flex justify-between items-center">
+                    <div>
+                        <div class="text-2xl font-bold">¥128,500</div>
+                        <div class="text-sm opacity-80">今日总收入</div>
+                    </div>
+                    <div>
+                        <div class="text-2xl font-bold">27</div>
+                        <div class="text-sm opacity-80">门店数量</div>
+                    </div>
+                    <div>
+                        <div class="text-2xl font-bold">12</div>
+                        <div class="text-sm opacity-80">用户数量</div>
+                    </div>
+                    <div>
+                        <div class="text-2xl font-bold">35</div>
+                        <div class="text-sm opacity-80">今日订单</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 统计卡片 -->
+            <div class="grid grid-cols-2 gap-4 mb-6">
+                <div class="bg-white rounded-xl shadow-card p-4 border border-gray-200 hover:shadow-card-hover transition-all duration-300 ease-in-out hover-scale">
+                    <div class="flex items-center justify-between mb-2">
+                        <h3 class="text-sm font-medium text-gray-600">总订单数</h3>
+                        <i class="fa fa-shopping-cart text-primary"></i>
+                    </div>
+                    <p class="text-2xl font-bold text-gray-800">1,280</p>
+                    <p class="text-xs text-green-500 mt-1">
+                        <i class="fa fa-arrow-up"></i> 12% 较上月
+                    </p>
+                </div>
+                <div class="bg-white rounded-xl shadow-card p-4 border border-gray-200 hover:shadow-card-hover transition-all duration-300 ease-in-out hover-scale">
+                    <div class="flex items-center justify-between mb-2">
+                        <h3 class="text-sm font-medium text-gray-600">总会员数</h3>
+                        <i class="fa fa-user-circle text-purple"></i>
+                    </div>
+                    <p class="text-2xl font-bold text-gray-800">856</p>
+                    <p class="text-xs text-green-500 mt-1">
+                        <i class="fa fa-arrow-up"></i> 8% 较上月
+                    </p>
+                </div>
+                <div class="bg-white rounded-xl shadow-card p-4 border border-gray-200 hover:shadow-card-hover transition-all duration-300 ease-in-out hover-scale">
+                    <div class="flex items-center justify-between mb-2">
+                        <h3 class="text-sm font-medium text-gray-600">今日储值</h3>
+                        <i class="fa fa-credit-card text-success"></i>
+                    </div>
+                    <p class="text-2xl font-bold text-gray-800">¥2,350</p>
+                    <p class="text-xs text-green-500 mt-1">
+                        <i class="fa fa-arrow-up"></i> 15% 较昨日
+                    </p>
+                </div>
+                <div class="bg-white rounded-xl shadow-card p-4 border border-gray-200 hover:shadow-card-hover transition-all duration-300 ease-in-out hover-scale">
+                    <div class="flex items-center justify-between mb-2">
+                        <h3 class="text-sm font-medium text-gray-600">待处理订单</h3>
+                        <i class="fa fa-clock-o text-warning"></i>
+                    </div>
+                    <p class="text-2xl font-bold text-gray-800">8</p>
+                    <p class="text-xs text-red-500 mt-1">
+                        <i class="fa fa-arrow-up"></i> 5% 较昨日
+                    </p>
+                </div>
+            </div>
+
+            <!-- 快速操作 -->
+            <div class="bg-white rounded-xl shadow-card p-4 border border-gray-200 mb-6">
+                <h3 class="text-lg font-semibold text-gray-800 mb-4">快速操作</h3>
+                <div class="grid grid-cols-4 gap-3">
+                    <button class="flex flex-col items-center p-3 rounded-lg hover:bg-gray-50 transition-all duration-300 ease-in-out">
+                        <div class="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center text-primary mb-2">
+                            <i class="fa fa-plus"></i>
+                        </div>
+                        <span class="text-xs text-gray-700">新增门店</span>
+                    </button>
+                    <button class="flex flex-col items-center p-3 rounded-lg hover:bg-gray-50 transition-all duration-300 ease-in-out">
+                        <div class="w-12 h-12 rounded-full bg-green-100 flex items-center justify-center text-success mb-2">
+                            <i class="fa fa-user-plus"></i>
+                        </div>
+                        <span class="text-xs text-gray-700">新增用户</span>
+                    </button>
+                    <button class="flex flex-col items-center p-3 rounded-lg hover:bg-gray-50 transition-all duration-300 ease-in-out">
+                        <div class="w-12 h-12 rounded-full bg-yellow-100 flex items-center justify-center text-warning mb-2">
+                            <i class="fa fa-bar-chart"></i>
+                        </div>
+                        <span class="text-xs text-gray-700">查看统计</span>
+                    </button>
+                    <button class="flex flex-col items-center p-3 rounded-lg hover:bg-gray-50 transition-all duration-300 ease-in-out">
+                        <div class="w-12 h-12 rounded-full bg-purple-100 flex items-center justify-center text-purple mb-2">
+                            <i class="fa fa-envelope"></i>
+                        </div>
+                        <span class="text-xs text-gray-700">发送消息</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- 最近订单 -->
+            <div class="bg-white rounded-xl shadow-card p-4 border border-gray-200 mb-6">
+                <h3 class="text-lg font-semibold text-gray-800 mb-4">最近订单</h3>
+                <div class="space-y-3">
+                    <div class="p-3 border border-gray-200 rounded-lg hover:bg-gray-50 transition-all duration-300 ease-in-out">
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="text-sm font-medium text-gray-800">#ORD-2025-0721-001</span>
+                            <span class="px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs font-medium">已完成</span>
+                        </div>
+                        <div class="flex items-center justify-between text-sm text-gray-600">
+                            <span>张三 - 广州天河店</span>
+                            <span>¥320</span>
+                        </div>
+                    </div>
+                    <div class="p-3 border border-gray-200 rounded-lg hover:bg-gray-50 transition-all duration-300 ease-in-out">
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="text-sm font-medium text-gray-800">#ORD-2025-0721-002</span>
+                            <span class="px-2 py-1 bg-yellow-100 text-yellow-800 rounded-full text-xs font-medium">处理中</span>
+                        </div>
+                        <div class="flex items-center justify-between text-sm text-gray-600">
+                            <span>李四 - 上海外滩店</span>
+                            <span>¥520</span>
+                        </div>
+                    </div>
+                    <div class="p-3 border border-gray-200 rounded-lg hover:bg-gray-50 transition-all duration-300 ease-in-out">
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="text-sm font-medium text-gray-800">#ORD-2025-0721-003</span>
+                            <span class="px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-xs font-medium">待处理</span>
+                        </div>
+                        <div class="flex items-center justify-between text-sm text-gray-600">
+                            <span>王五 - 北京王府井店</span>
+                            <span>¥260</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 区域汇总 -->
+        <div id="provincial-summary-content" class="content-section hidden p-4">
+            <div class="mb-6">
+                <h2 class="text-xl font-bold text-gray-800">区域汇总</h2>
+                <p class="text-gray-600">查看各区域业务数据</p>
+            </div>
+
+            <!-- 区域选择 -->
+            <div class="bg-white rounded-xl shadow-card p-4 border border-gray-200 mb-6">
+                <div class="flex flex-col space-y-3">
+                    <div class="relative">
+                        <select class="w-full border border-gray-300 rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all duration-300 ease-in-out">
+                            <option value="all">全部区域</option>
+                            <option value="guangdong">广东省</option>
+                            <option value="beijing">北京市</option>
+                            <option value="shanghai">上海市</option>
+                            <option value="jiangsu">江苏省</option>
+                            <option value="zhejiang">浙江省</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 区域数据 -->
+            <div class="bg-white rounded-xl shadow-card p-4 border border-gray-200 mb-6">
+                <h3 class="text-lg font-semibold text-gray-800 mb-4">区域数据</h3>
+                <div class="space-y-4">
+                    <div class="p-3 border border-gray-200 rounded-lg hover:bg-gray-50 transition-all duration-300 ease-in-out">
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="font-medium text-gray-800">广东省</span>
+                            <span class="text-sm text-gray-600">5家门店</span>
+                        </div>
+                        <div class="flex items-center justify-between text-sm">
+                            <span class="text-gray-600">订单数: 35</span>
+                            <span class="text-gray-600">收入: ¥12,850</span>
+                        </div>
+                        <button class="mt-3 text-primary hover:text-primary/80 text-sm font-medium transition-all duration-300 ease-in-out">
+                            查看详情
+                        </button>
+                    </div>
+                    <div class="p-3 border border-gray-200 rounded-lg hover:bg-gray-50 transition-all duration-300 ease-in-out">
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="font-medium text-gray-800">北京市</span>
+                            <span class="text-sm text-gray-600">3家门店</span>
+                        </div>
+                        <div class="flex items-center justify-between text-sm">
+                            <span class="text-gray-600">订单数: 22</span>
+                            <span class="text-gray-600">收入: ¥8,520</span>
+                        </div>
+                        <button class="mt-3 text-primary hover:text-primary/80 text-sm font-medium transition-all duration-300 ease-in-out">
+                            查看详情
+                        </button>
+                    </div>
+                    <div class="p-3 border border-gray-200 rounded-lg hover:bg-gray-50 transition-all duration-300 ease-in-out">
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="font-medium text-gray-800">上海市</span>
+                            <span class="text-sm text-gray-600">4家门店</span>
+                        </div>
+                        <div class="flex items-center justify-between text-sm">
+                            <span class="text-gray-600">订单数: 28</span>
+                            <span class="text-gray-600">收入: ¥10,680</span>
+                        </div>
+                        <button class="mt-3 text-primary hover:text-primary/80 text-sm font-medium transition-all duration-300 ease-in-out">
+                            查看详情
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 用户管理 -->
+        <div id="users-content" class="content-section hidden p-4">
+            <div class="mb-6">
+                <h2 class="text-xl font-bold text-gray-800">用户管理</h2>
+                <p class="text-gray-600">管理系统用户</p>
+            </div>
+
+            <!-- 搜索和筛选 -->
+            <div class="bg-white rounded-xl shadow-card p-4 border border-gray-200 mb-6">
+                <div class="flex flex-col space-y-3">
+                    <div class="relative">
+                        <input type="text" placeholder="搜索用户名、姓名..." class="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all duration-300 ease-in-out">
+                        <i class="fa fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
+                    </div>
+                    <div class="grid grid-cols-2 gap-3">
+                        <select class="w-full border border-gray-300 rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all duration-300 ease-in-out">
+                            <option value="">所有角色</option>
+                            <option value="总管理员">总管理员</option>
+                            <option value="区域管理员">区域管理员</option>
+                            <option value="门店管理员">门店管理员</option>
+                            <option value="财务管理员">财务管理员</option>
+                        </select>
+                        <select class="w-full border border-gray-300 rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all duration-300 ease-in-out">
+                            <option value="">所有状态</option>
+                            <option value="active">活跃</option>
+                            <option value="inactive">非活跃</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 用户列表 -->
+            <div class="bg-white rounded-xl shadow-card border border-gray-200">
+                <div class="overflow-x-auto">
+                    <table class="w-full">
+                        <thead>
+                            <tr class="bg-gray-50">
+                                <th class="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">用户名</th>
+                                <th class="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">姓名</th>
+                                <th class="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">角色</th>
+                                <th class="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">操作</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-200">
+                            <tr class="hover:bg-gray-50 transition-all duration-200 ease-in-out">
+                                <td class="py-3 px-4 text-sm text-gray-800">admin</td>
+                                <td class="py-3 px-4 text-sm text-gray-800">总管理员</td>
+                                <td class="py-3 px-4">
+                                    <span class="px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-xs font-medium">总管理员</span>
+                                </td>
+                                <td class="py-3 px-4">
+                                    <button class="text-primary hover:text-primary/80 text-sm font-medium transition-all duration-300 ease-in-out mr-2">编辑</button>
+                                    <button class="text-danger hover:text-danger/80 text-sm font-medium transition-all duration-300 ease-in-out">删除</button>
+                                </td>
+                            </tr>
+                            <tr class="hover:bg-gray-50 transition-all duration-200 ease-in-out">
+                                <td class="py-3 px-4 text-sm text-gray-800">region_admin</td>
+                                <td class="py-3 px-4 text-sm text-gray-800">区域管理员</td>
+                                <td class="py-3 px-4">
+                                    <span class="px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs font-medium">区域管理员</span>
+                                </td>
+                                <td class="py-3 px-4">
+                                    <button class="text-primary hover:text-primary/80 text-sm font-medium transition-all duration-300 ease-in-out mr-2">编辑</button>
+                                    <button class="text-danger hover:text-danger/80 text-sm font-medium transition-all duration-300 ease-in-out">删除</button>
+                                </td>
+                            </tr>
+                            <tr class="hover:bg-gray-50 transition-all duration-200 ease-in-out">
+                                <td class="py-3 px-4 text-sm text-gray-800">store_admin</td>
+                                <td class="py-3 px-4 text-sm text-gray-800">门店管理员</td>
+                                <td class="py-3 px-4">
+                                    <span class="px-2 py-1 bg-yellow-100 text-yellow-800 rounded-full text-xs font-medium">门店管理员</span>
+                                </td>
+                                <td class="py-3 px-4">
+                                    <button class="text-primary hover:text-primary/80 text-sm font-medium transition-all duration-300 ease-in-out mr-2">编辑</button>
+                                    <button class="text-danger hover:text-danger/80 text-sm font-medium transition-all duration-300 ease-in-out">删除</button>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- 门店管理 -->
+        <div id="stores-content" class="content-section hidden p-4">
+            <div class="mb-6">
+                <h2 class="text-xl font-bold text-gray-800">门店管理</h2>
+                <p class="text-gray-600">管理所有门店</p>
+            </div>
+
+            <!-- 搜索和筛选 -->
+            <div class="bg-white rounded-xl shadow-card p-4 border border-gray-200 mb-6">
+                <div class="flex flex-col space-y-3">
+                    <div class="relative">
+                        <input type="text" placeholder="搜索门店名称..." class="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all duration-300 ease-in-out">
+                        <i class="fa fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
+                    </div>
+                    <div class="grid grid-cols-2 gap-3">
+                        <select class="w-full border border-gray-300 rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all duration-300 ease-in-out">
+                            <option value="">所有区域</option>
+                            <option value="guangdong">广东省</option>
+                            <option value="beijing">北京市</option>
+                            <option value="shanghai">上海市</option>
+                            <option value="jiangsu">江苏省</option>
+                            <option value="zhejiang">浙江省</option>
+                        </select>
+                        <select class="w-full border border-gray-300 rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all duration-300 ease-in-out">
+                            <option value="">所有状态</option>
+                            <option value="active">活跃</option>
+                            <option value="inactive">非活跃</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 门店列表 -->
+            <div class="bg-white rounded-xl shadow-card border border-gray-200">
+                <div class="overflow-x-auto">
+                    <table class="w-full">
+                        <thead>
+                            <tr class="bg-gray-50">
+                                <th class="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">门店名称</th>
+                                <th class="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">区域</th>
+                                <th class="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">状态</th>
+                                <th class="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">操作</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-200">
+                            <tr class="hover:bg-gray-50 transition-all duration-200 ease-in-out">
+                                <td class="py-3 px-4 text-sm text-gray-800">广州天河店</td>
+                                <td class="py-3 px-4 text-sm text-gray-800">广东省</td>
+                                <td class="py-3 px-4">
+                                    <span class="px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs font-medium">活跃</span>
+                                </td>
+                                <td class="py-3 px-4">
+                                    <button class="text-primary hover:text-primary/80 text-sm font-medium transition-all duration-300 ease-in-out mr-2">编辑</button>
+                                    <button class="text-danger hover:text-danger/80 text-sm font-medium transition-all duration-300 ease-in-out">删除</button>
+                                </td>
+                            </tr>
+                            <tr class="hover:bg-gray-50 transition-all duration-200 ease-in-out">
+                                <td class="py-3 px-4 text-sm text-gray-800">上海外滩店</td>
+                                <td class="py-3 px-4 text-sm text-gray-800">上海市</td>
+                                <td class="py-3 px-4">
+                                    <span class="px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs font-medium">活跃</span>
+                                </td>
+                                <td class="py-3 px-4">
+                                    <button class="text-primary hover:text-primary/80 text-sm font-medium transition-all duration-300 ease-in-out mr-2">编辑</button>
+                                    <button class="text-danger hover:text-danger/80 text-sm font-medium transition-all duration-300 ease-in-out">删除</button>
+                                </td>
+                            </tr>
+                            <tr class="hover:bg-gray-50 transition-all duration-200 ease-in-out">
+                                <td class="py-3 px-4 text-sm text-gray-800">北京王府井店</td>
+                                <td class="py-3 px-4 text-sm text-gray-800">北京市</td>
+                                <td class="py-3 px-4">
+                                    <span class="px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs font-medium">活跃</span>
+                                </td>
+                                <td class="py-3 px-4">
+                                    <button class="text-primary hover:text-primary/80 text-sm font-medium transition-all duration-300 ease-in-out mr-2">编辑</button>
+                                    <button class="text-danger hover:text-danger/80 text-sm font-medium transition-all duration-300 ease-in-out">删除</button>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- 订单管理 -->
+        <div id="orders-content" class="content-section hidden p-4">
+            <div class="mb-6">
+                <h2 class="text-xl font-bold text-gray-800">订单管理</h2>
+                <p class="text-gray-600">管理所有订单</p>
+            </div>
+
+            <!-- 搜索和筛选 -->
+            <div class="bg-white rounded-xl shadow-card p-4 border border-gray-200 mb-6">
+                <div class="flex flex-col space-y-3">
+                    <div class="relative">
+                        <input type="text" placeholder="搜索订单号、客户姓名..." class="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all duration-300 ease-in-out">
+                        <i class="fa fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
+                    </div>
+                    <div class="grid grid-cols-2 gap-3">
+                        <select class="w-full border border-gray-300 rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all duration-300 ease-in-out">
+                            <option value="">所有状态</option>
+                            <option value="pending">待处理</option>
+                            <option value="processing">处理中</option>
+                            <option value="completed">已完成</option>
+                            <option value="picked">已取件</option>
+                        </select>
+                        <select class="w-full border border-gray-300 rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all duration-300 ease-in-out">
+                            <option value="">所有日期</option>
+                            <option value="today">今日</option>
+                            <option value="week">本周</option>
+                            <option value="month">本月</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 订单列表 -->
+            <div class="bg-white rounded-xl shadow-card border border-gray-200">
+                <div class="overflow-x-auto">
+                    <table class="w-full">
+                        <thead>
+                            <tr class="bg-gray-50">
+                                <th class="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">订单号</th>
+                                <th class="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">客户</th>
+                                <th class="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">金额</th>
+                                <th class="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">状态</th>
+                                <th class="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">操作</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-200">
+                            <tr class="hover:bg-gray-50 transition-all duration-200 ease-in-out">
+                                <td class="py-3 px-4 text-sm text-gray-800">#ORD-2025-0721-001</td>
+                                <td class="py-3 px-4 text-sm text-gray-800">张三</td>
+                                <td class="py-3 px-4 text-sm text-gray-800">¥320</td>
+                                <td class="py-3 px-4">
+                                    <span class="px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs font-medium">已完成</span>
+                                </td>
+                                <td class="py-3 px-4">
+                                    <button class="text-primary hover:text-primary/80 text-sm font-medium transition-all duration-300 ease-in-out">查看</button>
+                                </td>
+                            </tr>
+                            <tr class="hover:bg-gray-50 transition-all duration-200 ease-in-out">
+                                <td class="py-3 px-4 text-sm text-gray-800">#ORD-2025-0721-002</td>
+                                <td class="py-3 px-4 text-sm text-gray-800">李四</td>
+                                <td class="py-3 px-4 text-sm text-gray-800">¥520</td>
+                                <td class="py-3 px-4">
+                                    <span class="px-2 py-1 bg-yellow-100 text-yellow-800 rounded-full text-xs font-medium">处理中</span>
+                                </td>
+                                <td class="py-3 px-4">
+                                    <button class="text-primary hover:text-primary/80 text-sm font-medium transition-all duration-300 ease-in-out">查看</button>
+                                </td>
+                            </tr>
+                            <tr class="hover:bg-gray-50 transition-all duration-200 ease-in-out">
+                                <td class="py-3 px-4 text-sm text-gray-800">#ORD-2025-0721-003</td>
+                                <td class="py-3 px-4 text-sm text-gray-800">王五</td>
+                                <td class="py-3 px-4 text-sm text-gray-800">¥260</td>
+                                <td class="py-3 px-4">
+                                    <span class="px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-xs font-medium">待处理</span>
+                                </td>
+                                <td class="py-3 px-4">
+                                    <button class="text-primary hover:text-primary/80 text-sm font-medium transition-all duration-300 ease-in-out">查看</button>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- 会员管理 -->
+        <div id="members-content" class="content-section hidden p-4">
+            <div class="mb-6">
+                <h2 class="text-xl font-bold text-gray-800">会员管理</h2>
+                <p class="text-gray-600">管理所有会员</p>
+            </div>
+
+            <!-- 搜索 -->
+            <div class="bg-white rounded-xl shadow-card p-4 border border-gray-200 mb-6">
+                <div class="relative">
+                    <input type="text" placeholder="搜索会员姓名、电话..." class="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all duration-300 ease-in-out">
+                    <i class="fa fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
+                </div>
+            </div>
+
+            <!-- 会员列表 -->
+            <div class="bg-white rounded-xl shadow-card border border-gray-200">
+                <div class="overflow-x-auto">
+                    <table class="w-full">
+                        <thead>
+                            <tr class="bg-gray-50">
+                                <th class="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">姓名</th>
+                                <th class="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">电话</th>
+                                <th class="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">会员等级</th>
+                                <th class="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">储值余额</th>
+                                <th class="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">操作</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-200">
+                            <tr class="hover:bg-gray-50 transition-all duration-200 ease-in-out">
+                                <td class="py-3 px-4 text-sm text-gray-800">张三</td>
+                                <td class="py-3 px-4 text-sm text-gray-800">138****1234</td>
+                                <td class="py-3 px-4">
+                                    <span class="px-2 py-1 bg-yellow-100 text-yellow-800 rounded-full text-xs font-medium">银卡</span>
+                                </td>
+                                <td class="py-3 px-4 text-sm text-gray-800">¥1,280</td>
+                                <td class="py-3 px-4">
+                                    <button class="text-primary hover:text-primary/80 text-sm font-medium transition-all duration-300 ease-in-out">查看</button>
+                                </td>
+                            </tr>
+                            <tr class="hover:bg-gray-50 transition-all duration-200 ease-in-out">
+                                <td class="py-3 px-4 text-sm text-gray-800">李四</td>
+                                <td class="py-3 px-4 text-sm text-gray-800">139****5678</td>
+                                <td class="py-3 px-4">
+                                    <span class="px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs font-medium">金卡</span>
+                                </td>
+                                <td class="py-3 px-4 text-sm text-gray-800">¥3,560</td>
+                                <td class="py-3 px-4">
+                                    <button class="text-primary hover:text-primary/80 text-sm font-medium transition-all duration-300 ease-in-out">查看</button>
+                                </td>
+                            </tr>
+                            <tr class="hover:bg-gray-50 transition-all duration-200 ease-in-out">
+                                <td class="py-3 px-4 text-sm text-gray-800">王五</td>
+                                <td class="py-3 px-4 text-sm text-gray-800">137****9012</td>
+                                <td class="py-3 px-4">
+                                    <span class="px-2 py-1 bg-gray-100 text-gray-800 rounded-full text-xs font-medium">普通</span>
+                                </td>
+                                <td class="py-3 px-4 text-sm text-gray-800">¥0</td>
+                                <td class="py-3 px-4">
+                                    <button class="text-primary hover:text-primary/80 text-sm font-medium transition-all duration-300 ease-in-out">查看</button>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- 统计分析 -->
+        <div id="statistics-content" class="content-section hidden p-4">
+            <div class="mb-6">
+                <h2 class="text-xl font-bold text-gray-800">统计分析</h2>
+                <p class="text-gray-600">查看业务数据</p>
+            </div>
+
+            <!-- 收入趋势 -->
+            <div class="bg-white rounded-xl shadow-card p-4 border border-gray-200 mb-6">
+                <h3 class="text-lg font-semibold text-gray-800 mb-4">收入趋势</h3>
+                <div class="h-64">
+                    <canvas id="revenue-chart"></canvas>
+                </div>
+            </div>
+
+            <!-- 订单状态分布 -->
+            <div class="bg-white rounded-xl shadow-card p-4 border border-gray-200 mb-6">
+                <h3 class="text-lg font-semibold text-gray-800 mb-4">订单状态分布</h3>
+                <div class="h-64">
+                    <canvas id="order-status-chart"></canvas>
+                </div>
+            </div>
+
+            <!-- 区域收入分布 -->
+            <div class="bg-white rounded-xl shadow-card p-4 border border-gray-200 mb-6">
+                <h3 class="text-lg font-semibold text-gray-800 mb-4">区域收入分布</h3>
+                <div class="h-64">
+                    <canvas id="region-chart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- 消息中心 -->
+        <div id="messages-content" class="content-section hidden p-4">
+            <div class="mb-6">
+                <h2 class="text-xl font-bold text-gray-800">消息中心</h2>
+                <p class="text-gray-600">管理系统消息和内部沟通</p>
+            </div>
+
+            <div class="grid grid-cols-1 gap-6">
+                <!-- 消息列表 -->
+                <div class="bg-white rounded-xl shadow-card p-4 border border-gray-200">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="text-lg font-semibold text-gray-800">消息列表</h3>
+                        <button class="text-primary hover:text-primary/80 text-sm font-medium transition-all duration-300 ease-in-out">
+                            <i class="fa fa-refresh mr-1"></i> 刷新
+                        </button>
+                    </div>
+                    
+                    <div class="mb-4">
+                        <div class="relative">
+                            <input type="text" placeholder="搜索消息..." class="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all duration-300 ease-in-out">
+                            <i class="fa fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
+                        </div>
+                    </div>
+                    
+                    <div class="space-y-2 max-h-[400px] overflow-y-auto scrollbar-thin">
+                        <!-- 消息项 -->
+                        <div class="message-item p-3 rounded-lg bg-blue-50 cursor-pointer transition-all duration-300 ease-in-out hover:bg-blue-100">
+                            <div class="flex items-center justify-between mb-1">
+                                <span class="font-medium text-gray-800">旗舰店</span>
+                                <span class="text-xs text-gray-500">10:30</span>
+                            </div>
+                            <p class="text-sm text-gray-600 truncate">设备采购申请已提交，请审批</p>
+                        </div>
+                        
+                        <div class="message-item p-3 rounded-lg bg-white cursor-pointer border border-gray-200 transition-all duration-300 ease-in-out hover:bg-gray-50">
+                            <div class="flex items-center justify-between mb-1">
+                                <span class="font-medium text-gray-800">广州天河店</span>
+                                <span class="text-xs text-gray-500">09:15</span>
+                            </div>
+                            <p class="text-sm text-gray-600 truncate">本月业绩报表已提交</p>
+                        </div>
+                        
+                        <div class="message-item p-3 rounded-lg bg-white cursor-pointer border border-gray-200 transition-all duration-300 ease-in-out hover:bg-gray-50">
+                            <div class="flex items-center justify-between mb-1">
+                                <span class="font-medium text-gray-800">系统</span>
+                                <span class="text-xs text-gray-500">昨天</span>
+                            </div>
+                            <p class="text-sm text-gray-600 truncate">系统将于今晚进行维护，请提前做好准备</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 消息详情 -->
+                <div class="bg-white rounded-xl shadow-card p-4 border border-gray-200">
+                    <div class="flex items-center justify-between mb-6">
+                        <div class="flex items-center space-x-3">
+                            <div class="w-10 h-10 rounded-full bg-primary flex items-center justify-center text-white">
+                                旗
+                            </div>
+                            <div>
+                                <h3 class="font-semibold text-gray-800">旗舰店</h3>
+                                <p class="text-sm text-gray-500">设备采购申请</p>
+                            </div>
+                        </div>
+                        <div class="flex items-center space-x-2">
+                            <button class="p-2 rounded-lg hover:bg-gray-100 transition-all duration-300 ease-in-out">
+                                <i class="fa fa-reply text-gray-700"></i>
+                            </button>
+                            <button class="p-2 rounded-lg hover:bg-gray-100 transition-all duration-300 ease-in-out">
+                                <i class="fa fa-trash text-gray-700"></i>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="message-body mb-6 space-y-4">
+                        <div class="flex items-start space-x-3">
+                            <div class="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center flex-shrink-0">
+                                <span class="text-gray-500 text-sm">旗</span>
+                            </div>
+                            <div class="bg-gray-100 rounded-lg p-3 max-w-[80%]">
+                                <p class="text-gray-800">我们需要采购新的干洗设备，预算约5万元，请审批。</p>
+                                <p class="text-xs text-gray-500 mt-1">10:30</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- 智能回复建议 -->
+                    <div class="mb-4">
+                        <h4 class="text-sm font-medium text-gray-700 mb-2">智能回复</h4>
+                        <div class="flex flex-wrap gap-2">
+                            <button class="px-3 py-1 bg-gray-100 text-gray-700 rounded-full text-sm hover:bg-gray-200 transition-all duration-300 ease-in-out">
+                                收到，正在审批
+                            </button>
+                            <button class="px-3 py-1 bg-gray-100 text-gray-700 rounded-full text-sm hover:bg-gray-200 transition-all duration-300 ease-in-out">
+                                请提供详细的设备清单
+                            </button>
+                            <button class="px-3 py-1 bg-gray-100 text-gray-700 rounded-full text-sm hover:bg-gray-200 transition-all duration-300 ease-in-out">
+                                已批准，请尽快采购
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- 消息输入框 -->
+                    <div class="relative">
+                        <textarea placeholder="输入消息..." class="w-full pl-4 pr-12 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all duration-300 ease-in-out focus:shadow-lg resize-none" rows="3"></textarea>
+                        <button class="absolute bottom-3 right-3 bg-primary text-white p-2 rounded-full hover:bg-primary/90 transition-all duration-300 ease-in-out hover:scale-110">
+                            <i class="fa fa-paper-plane"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 系统设置 -->
+        <div id="settings-content" class="content-section hidden p-4">
+            <div class="mb-6">
+                <h2 class="text-xl font-bold text-gray-800">系统设置</h2>
+                <p class="text-gray-600">管理系统设置</p>
+            </div>
+
+            <div class="bg-white rounded-xl shadow-card p-4 border border-gray-200">
+                <h3 class="text-lg font-semibold text-gray-800 mb-4">基本设置</h3>
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">系统名称</label>
+                        <input type="text" value="干洗店总后台管理系统" class="w-full border border-gray-300 rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all duration-300 ease-in-out">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">联系电话</label>
+                        <input type="text" value="010-12345678" class="w-full border border-gray-300 rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all duration-300 ease-in-out">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">系统版本</label>
+                        <input type="text" value="v1.0.0" class="w-full border border-gray-300 rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all duration-300 ease-in-out" disabled>
+                    </div>
+                    <div class="pt-4">
+                        <button class="bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary/90 transition-all duration-300 ease-in-out shadow-btn hover:shadow-btn-hover">
+                            保存设置
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 客户管理 -->
+        <div id="customers-content" class="content-section hidden p-4">
+            <div class="mb-6">
+                <h2 class="text-xl font-bold text-gray-800">客户管理</h2>
+                <p class="text-gray-600">管理所有客户</p>
+            </div>
+
+            <!-- 搜索 -->
+            <div class="bg-white rounded-xl shadow-card p-4 border border-gray-200 mb-6">
+                <div class="relative">
+                    <input type="text" placeholder="搜索客户姓名、电话..." class="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all duration-300 ease-in-out">
+                    <i class="fa fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
+                </div>
+            </div>
+
+            <!-- 客户列表 -->
+            <div class="bg-white rounded-xl shadow-card border border-gray-200">
+                <div class="overflow-x-auto">
+                    <table class="w-full">
+                        <thead>
+                            <tr class="bg-gray-50">
+                                <th class="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">姓名</th>
+                                <th class="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">电话</th>
+                                <th class="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">会员等级</th>
+                                <th class="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">储值余额</th>
+                                <th class="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">操作</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-200">
+                            <tr class="hover:bg-gray-50 transition-all duration-200 ease-in-out">
+                                <td class="py-3 px-4 text-sm text-gray-800">张三</td>
+                                <td class="py-3 px-4 text-sm text-gray-800">138****1234</td>
+                                <td class="py-3 px-4">
+                                    <span class="px-2 py-1 bg-yellow-100 text-yellow-800 rounded-full text-xs font-medium">银卡</span>
+                                </td>
+                                <td class="py-3 px-4 text-sm text-gray-800">¥1,280</td>
+                                <td class="py-3 px-4">
+                                    <button class="text-primary hover:text-primary/80 text-sm font-medium transition-all duration-300 ease-in-out">查看</button>
+                                </td>
+                            </tr>
+                            <tr class="hover:bg-gray-50 transition-all duration-200 ease-in-out">
+                                <td class="py-3 px-4 text-sm text-gray-800">李四</td>
+                                <td class="py-3 px-4 text-sm text-gray-800">139****5678</td>
+                                <td class="py-3 px-4">
+                                    <span class="px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs font-medium">金卡</span>
+                                </td>
+                                <td class="py-3 px-4 text-sm text-gray-800">¥3,560</td>
+                                <td class="py-3 px-4">
+                                    <button class="text-primary hover:text-primary/80 text-sm font-medium transition-all duration-300 ease-in-out">查看</button>
+                                </td>
+                            </tr>
+                            <tr class="hover:bg-gray-50 transition-all duration-200 ease-in-out">
+                                <td class="py-3 px-4 text-sm text-gray-800">王五</td>
+                                <td class="py-3 px-4 text-sm text-gray-800">137****9012</td>
+                                <td class="py-3 px-4">
+                                    <span class="px-2 py-1 bg-gray-100 text-gray-800 rounded-full text-xs font-medium">普通</span>
+                                </td>
+                                <td class="py-3 px-4 text-sm text-gray-800">¥0</td>
+                                <td class="py-3 px-4">
+                                    <button class="text-primary hover:text-primary/80 text-sm font-medium transition-all duration-300 ease-in-out">查看</button>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- 物品管理 -->
+        <div id="items-content" class="content-section hidden p-4">
+            <div class="mb-6">
+                <h2 class="text-xl font-bold text-gray-800">物品管理</h2>
+                <p class="text-gray-600">管理所有物品</p>
+            </div>
+
+            <!-- 搜索和筛选 -->
+            <div class="bg-white rounded-xl shadow-card p-4 border border-gray-200 mb-6">
+                <div class="flex flex-col space-y-3">
+                    <div class="relative">
+                        <input type="text" placeholder="搜索物品名称..." class="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all duration-300 ease-in-out">
+                        <i class="fa fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
+                    </div>
+                    <div class="grid grid-cols-2 gap-3">
+                        <select class="w-full border border-gray-300 rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all duration-300 ease-in-out">
+                            <option value="">所有类型</option>
+                            <option value="clothing">服装</option>
+                            <option value="accessory">配饰</option>
+                            <option value="home">家居</option>
+                        </select>
+                        <select class="w-full border border-gray-300 rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all duration-300 ease-in-out">
+                            <option value="">所有状态</option>
+                            <option value="in-stock">在库</option>
+                            <option value="processing">处理中</option>
+                            <option value="completed">已完成</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 物品列表 -->
+            <div class="bg-white rounded-xl shadow-card border border-gray-200">
+                <div class="overflow-x-auto">
+                    <table class="w-full">
+                        <thead>
+                            <tr class="bg-gray-50">
+                                <th class="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">物品名称</th>
+                                <th class="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">类型</th>
+                                <th class="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">数量</th>
+                                <th class="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">状态</th>
+                                <th class="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">操作</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-200">
+                            <tr class="hover:bg-gray-50 transition-all duration-200 ease-in-out">
+                                <td class="py-3 px-4 text-sm text-gray-800">西装</td>
+                                <td class="py-3 px-4 text-sm text-gray-800">服装</td>
+                                <td class="py-3 px-4 text-sm text-gray-800">15</td>
+                                <td class="py-3 px-4">
+                                    <span class="px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-xs font-medium">在库</span>
+                                </td>
+                                <td class="py-3 px-4">
+                                    <button class="text-primary hover:text-primary/80 text-sm font-medium transition-all duration-300 ease-in-out">编辑</button>
+                                </td>
+                            </tr>
+                            <tr class="hover:bg-gray-50 transition-all duration-200 ease-in-out">
+                                <td class="py-3 px-4 text-sm text-gray-800">衬衫</td>
+                                <td class="py-3 px-4 text-sm text-gray-800">服装</td>
+                                <td class="py-3 px-4 text-sm text-gray-800">25</td>
+                                <td class="py-3 px-4">
+                                    <span class="px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-xs font-medium">在库</span>
+                                </td>
+                                <td class="py-3 px-4">
+                                    <button class="text-primary hover:text-primary/80 text-sm font-medium transition-all duration-300 ease-in-out">编辑</button>
+                                </td>
+                            </tr>
+                            <tr class="hover:bg-gray-50 transition-all duration-200 ease-in-out">
+                                <td class="py-3 px-4 text-sm text-gray-800">领带</td>
+                                <td class="py-3 px-4 text-sm text-gray-800">配饰</td>
+                                <td class="py-3 px-4 text-sm text-gray-800">8</td>
+                                <td class="py-3 px-4">
+                                    <span class="px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-xs font-medium">在库</span>
+                                </td>
+                                <td class="py-3 px-4">
+                                    <button class="text-primary hover:text-primary/80 text-sm font-medium transition-all duration-300 ease-in-out">编辑</button>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- 智能灯条系统 -->
+        <div id="light-system-content" class="content-section hidden p-4">
+            <div class="mb-6">
+                <h2 class="text-xl font-bold text-gray-800">智能灯条系统</h2>
+                <p class="text-gray-600">管理智能灯条状态</p>
+            </div>
+
+            <!-- 灯条状态 -->
+            <div class="bg-white rounded-xl shadow-card p-4 border border-gray-200 mb-6">
+                <h3 class="text-lg font-semibold text-gray-800 mb-4">灯条状态</h3>
+                <div class="space-y-4">
+                    <div class="p-3 border border-gray-200 rounded-lg hover:bg-gray-50 transition-all duration-300 ease-in-out">
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="font-medium text-gray-800">灯条 1</span>
+                            <span class="px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs font-medium">正常</span>
+                        </div>
+                        <div class="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
+                            <div class="h-full bg-green-500 rounded-full"></div>
+                        </div>
+                    </div>
+                    <div class="p-3 border border-gray-200 rounded-lg hover:bg-gray-50 transition-all duration-300 ease-in-out">
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="font-medium text-gray-800">灯条 2</span>
+                            <span class="px-2 py-1 bg-yellow-100 text-yellow-800 rounded-full text-xs font-medium">警告</span>
+                        </div>
+                        <div class="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
+                            <div class="h-full bg-yellow-500 rounded-full w-1/2"></div>
+                        </div>
+                    </div>
+                    <div class="p-3 border border-gray-200 rounded-lg hover:bg-gray-50 transition-all duration-300 ease-in-out">
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="font-medium text-gray-800">灯条 3</span>
+                            <span class="px-2 py-1 bg-red-100 text-red-800 rounded-full text-xs font-medium">故障</span>
+                        </div>
+                        <div class="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
+                            <div class="h-full bg-red-500 rounded-full w-1/4"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 数据备份 -->
+        <div id="backup-content" class="content-section hidden p-4">
+            <div class="mb-6">
+                <h2 class="text-xl font-bold text-gray-800">数据备份</h2>
+                <p class="text-gray-600">管理系统数据备份</p>
+            </div>
+
+            <!-- 备份管理 -->
+            <div class="bg-white rounded-xl shadow-card p-4 border border-gray-200 mb-6">
+                <h3 class="text-lg font-semibold text-gray-800 mb-4">备份管理</h3>
+                <div class="space-y-4">
+                    <div class="p-3 border border-gray-200 rounded-lg hover:bg-gray-50 transition-all duration-300 ease-in-out">
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="font-medium text-gray-800">自动备份</span>
+                            <label class="relative inline-flex items-center cursor-pointer">
+                                <input type="checkbox" value="" class="sr-only peer" checked>
+                                <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+                            </label>
+                        </div>
+                        <p class="text-sm text-gray-600">每日凌晨自动备份数据</p>
+                    </div>
+                    <div class="p-3 border border-gray-200 rounded-lg hover:bg-gray-50 transition-all duration-300 ease-in-out">
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="font-medium text-gray-800">手动备份</span>
+                            <button class="bg-primary text-white px-3 py-1 rounded-lg hover:bg-primary/90 transition-all duration-300 ease-in-out text-sm">
+                                立即备份
+                            </button>
+                        </div>
+                        <p class="text-sm text-gray-600">手动创建数据备份</p>
+                    </div>
+                    <div class="p-3 border border-gray-200 rounded-lg hover:bg-gray-50 transition-all duration-300 ease-in-out">
+                        <h4 class="font-medium text-gray-800 mb-2">备份历史</h4>
+                        <div class="space-y-2">
+                            <div class="flex items-center justify-between text-sm">
+                                <span class="text-gray-600">2025-07-21 00:00:00</span>
+                                <button class="text-primary hover:text-primary/80 text-sm font-medium transition-all duration-300 ease-in-out">
+                                    下载
+                                </button>
+                            </div>
+                            <div class="flex items-center justify-between text-sm">
+                                <span class="text-gray-600">2025-07-20 00:00:00</span>
+                                <button class="text-primary hover:text-primary/80 text-sm font-medium transition-all duration-300 ease-in-out">
+                                    下载
+                                </button>
+                            </div>
+                            <div class="flex items-center justify-between text-sm">
+                                <span class="text-gray-600">2025-07-19 00:00:00</span>
+                                <button class="text-primary hover:text-primary/80 text-sm font-medium transition-all duration-300 ease-in-out">
+                                    下载
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- 底部导航栏 -->
+    <nav class="fixed bottom-0 left-0 right-0 bg-white shadow-md z-40">
+        <div class="flex items-center justify-around p-2">
+            <a href="#dashboard" class="nav-link flex flex-col items-center p-2 rounded-lg text-primary">
+                <i class="fa fa-dashboard text-lg"></i>
+                <span class="text-xs mt-1">仪表盘</span>
+            </a>
+            <a href="#orders" class="nav-link flex flex-col items-center p-2 rounded-lg text-gray-600 hover:text-primary transition-all duration-300 ease-in-out">
+                <i class="fa fa-shopping-cart text-lg"></i>
+                <span class="text-xs mt-1">订单</span>
+            </a>
+            <a href="#members" class="nav-link flex flex-col items-center p-2 rounded-lg text-gray-600 hover:text-primary transition-all duration-300 ease-in-out">
+                <i class="fa fa-user-circle text-lg"></i>
+                <span class="text-xs mt-1">会员</span>
+            </a>
+            <a href="#messages" class="nav-link flex flex-col items-center p-2 rounded-lg text-gray-600 hover:text-primary transition-all duration-300 ease-in-out">
+                <i class="fa fa-envelope text-lg"></i>
+                <span class="text-xs mt-1">消息</span>
+            </a>
+            <a href="#settings" class="nav-link flex flex-col items-center p-2 rounded-lg text-gray-600 hover:text-primary transition-all duration-300 ease-in-out">
+                <i class="fa fa-cog text-lg"></i>
+                <span class="text-xs mt-1">设置</span>
+            </a>
+        </div>
+    </nav>
+
+    <!-- 通知下拉菜单 -->
+    <div id="notification-dropdown" class="fixed top-16 right-4 w-80 bg-white rounded-lg shadow-lg border border-gray-200 z-50 hidden">
+        <div class="p-4 border-b border-gray-200">
+            <h3 class="font-medium text-gray-800">消息通知</h3>
+        </div>
+        <div class="max-h-96 overflow-y-auto" id="notification-list">
+            <!-- 通知项将通过JavaScript动态添加 -->
+        </div>
+        <div class="p-3 border-t border-gray-200">
+            <a href="#messages" class="text-primary hover:text-primary/80 text-sm font-medium transition-all duration-300 ease-in-out hover:underline">查看全部消息</a>
+        </div>
+    </div>
+
+    <script>
+        // 检查登录状态
+        function checkLogin() {
+            const user = localStorage.getItem('adminUser');
+            if (!user) {
+                window.location.href = 'admin-login.html';
+                return null;
+            }
+            return JSON.parse(user);
+        }
+
+        // 权限配置
+        const permissions = {
+            '总管理员': {
+                navigation: ['dashboard', 'provincial-summary', 'users', 'stores', 'members', 'statistics', 'messages', 'settings'],
+                canViewAllData: true,
+                canManageUsers: true,
+                canManageStores: true,
+                canManageMembers: true,
+                canViewStatistics: true,
+                canSendMessages: true,
+                canChangeSettings: true
+            },
+            '区域管理员': {
+                navigation: ['dashboard', 'provincial-summary', 'stores', 'members', 'statistics', 'messages'],
+                canViewAllData: false,
+                canManageUsers: false,
+                canManageStores: true,
+                canManageMembers: true,
+                canViewStatistics: true,
+                canSendMessages: true,
+                canChangeSettings: false
+            },
+            '门店管理员': {
+                navigation: ['dashboard', 'orders', 'customers', 'members', 'items', 'light-system', 'statistics', 'messages', 'settings', 'backup'],
+                canViewAllData: false,
+                canManageUsers: false,
+                canManageStores: false,
+                canManageMembers: true,
+                canViewStatistics: true,
+                canSendMessages: true,
+                canChangeSettings: true
+            },
+            '财务管理员': {
+                navigation: ['dashboard', 'statistics', 'messages'],
+                canViewAllData: false,
+                canManageUsers: false,
+                canManageStores: false,
+                canManageMembers: false,
+                canViewStatistics: true,
+                canSendMessages: true,
+                canChangeSettings: false
+            }
+        };
+
+        // 页面加载完成后执行
+        document.addEventListener('DOMContentLoaded', function() {
+            // 检查登录状态
+            const currentUser = checkLogin();
+            if (!currentUser) return;
+
+            // 显示当前日期
+            const currentDate = new Date();
+            const options = { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' };
+            document.getElementById('current-date').textContent = currentDate.toLocaleDateString('zh-CN', options);
+
+            // 更新用户信息
+            document.getElementById('user-role').textContent = currentUser.role;
+            document.getElementById('user-avatar').innerHTML = `<span>${currentUser.name.charAt(0)}</span>`;
+
+            // 初始化导航菜单
+            initNavigationMenu(currentUser);
+
+            // 导航链接
+            const navLinks = document.querySelectorAll('.nav-link');
+            const contentSections = document.querySelectorAll('.content-section');
+
+            // 侧边栏菜单按钮
+            const menuBtn = document.getElementById('menu-btn');
+            const sidebar = document.getElementById('sidebar');
+            const sidebarOverlay = document.getElementById('sidebar-overlay');
+
+            // 通知按钮
+            const notificationBtn = document.getElementById('notification-btn');
+            const notificationDropdown = document.getElementById('notification-dropdown');
+
+            // 初始化导航菜单
+            function initNavigationMenu(user) {
+                const navMenu = document.getElementById('nav-menu');
+                const allowedNav = permissions[user.role].navigation;
+
+                // 导航菜单配置
+                const navItems = [
+                    { id: 'dashboard', icon: 'fa-dashboard', text: '总仪表盘' },
+                    { id: 'provincial-summary', icon: 'fa-map', text: '区域汇总' },
+                    { id: 'users', icon: 'fa-users', text: '用户管理' },
+                    { id: 'stores', icon: 'fa-shopping-bag', text: '门店管理' },
+                    { id: 'orders', icon: 'fa-shopping-cart', text: '订单管理' },
+                    { id: 'customers', icon: 'fa-users', text: '客户管理' },
+                    { id: 'items', icon: 'fa-tshirt', text: '物品管理' },
+                    { id: 'members', icon: 'fa-user-circle', text: '会员管理' },
+                    { id: 'light-system', icon: 'fa-lightbulb-o', text: '智能灯条系统' },
+                    { id: 'statistics', icon: 'fa-bar-chart', text: '统计分析' },
+                    { id: 'messages', icon: 'fa-envelope', text: '消息中心' },
+                    { id: 'settings', icon: 'fa-cog', text: '系统设置' },
+                    { id: 'backup', icon: 'fa-database', text: '数据备份' }
+                ];
+
+                // 清空导航菜单
+                navMenu.innerHTML = '';
+
+                // 添加导航菜单项
+                navItems.forEach(item => {
+                    if (allowedNav.includes(item.id)) {
+                        const li = document.createElement('li');
+                        li.innerHTML = `
+                            <a href="#${item.id}" class="nav-link flex items-center space-x-3 p-3 rounded-lg text-gray-700 hover:bg-blue-50 hover:text-primary transition-all duration-300 ease-in-out">
+                                <i class="fa ${item.icon} w-5 text-center"></i>
+                                <span>${item.text}</span>
+                            </a>
+                        `;
+                        navMenu.appendChild(li);
+                    }
+                });
+                
+                // 添加账号切换和退出登录区域
+                const accountSection = document.createElement('div');
+                accountSection.className = 'pt-4 mt-4 border-t border-gray-200 space-y-2';
+                accountSection.innerHTML = `
+                    <a href="#switch-account" onclick="switchAccount()" class="nav-link flex items-center space-x-3 p-3 rounded-lg text-gray-700 hover:bg-blue-50 hover:text-primary transition-all duration-300 ease-in-out">
+                        <i class="fa fa-exchange w-5 text-center"></i>
+                        <span>切换账号</span>
+                    </a>
+                    <a href="#logout" class="nav-link flex items-center space-x-3 p-3 rounded-lg text-gray-700 hover:bg-red-50 hover:text-danger transition-all duration-300 ease-in-out">
+                        <i class="fa fa-sign-out w-5 text-center"></i>
+                        <span>退出登录</span>
+                    </a>
+                `;
+                navMenu.appendChild(accountSection);
+            }
+
+            // 切换内容区域
+            function switchSection(target) {
+                // 处理退出登录
+                if (target === 'logout') {
+                    if (confirm('确定要退出登录吗？')) {
+                        localStorage.removeItem('adminUser');
+                        window.location.href = 'admin-login.html';
+                    }
+                    return;
+                }
+                
+                // 处理切换账号
+                if (target === 'switch-account') {
+                    switchAccount();
+                    return;
+                }
+
+                contentSections.forEach(section => {
+                    section.classList.add('hidden');
+                });
+
+                const targetSection = document.getElementById(`${target}-content`);
+                if (targetSection) {
+                    targetSection.classList.remove('hidden');
+                }
+
+                // 更新导航链接状态
+                navLinks.forEach(link => {
+                    link.classList.remove('text-primary');
+                    link.classList.add('text-gray-600');
+                });
+
+                document.querySelectorAll(`.nav-link[href="#${target}"]`).forEach(link => {
+                    link.classList.remove('text-gray-600');
+                    link.classList.add('text-primary');
+                });
+
+                // 关闭侧边栏
+                sidebar.classList.add('-translate-x-full');
+                sidebarOverlay.classList.add('hidden');
+
+                // 关闭通知下拉菜单
+                notificationDropdown.classList.add('hidden');
+            }
+            
+            // 切换账号功能
+            window.switchAccount = function() {
+                // 创建一个简单的账号选择列表
+                const accounts = [
+                    { username: 'admin', role: '总管理员', name: '总管理员' },
+                    { username: 'regional', role: '区域管理员', name: '区域管理员' },
+                    { username: 'store', role: '门店管理员', name: '门店管理员' },
+                    { username: 'finance', role: '财务管理员', name: '财务管理员' }
+                ];
+                
+                const currentUser = JSON.parse(localStorage.getItem('adminUser') || '{}');
+                
+                // 构建账号列表HTML
+                let accountListHTML = '<div style="padding: 20px;">';
+                accountListHTML += '<h3 style="font-size: 18px; font-weight: bold; margin-bottom: 20px; text-align: center;">切换账号</h3>';
+                
+                accounts.forEach(account => {
+                    const isCurrent = currentUser.username === account.username;
+                    const buttonStyle = isCurrent ? 
+                        'background-color: #3b82f6; color: white; border: 2px solid #1e40af;' : 
+                        'background-color: white; color: #374151; border: 1px solid #d1d5db;';
+                    
+                    accountListHTML += `
+                        <button onclick="selectAccount('${account.username}', '${account.role}', '${account.name}')" 
+                                style="display: block; width: 100%; padding: 15px; margin-bottom: 10px; border-radius: 8px; ${buttonStyle}; cursor: pointer; text-align: left;">
+                            <div style="font-weight: 600;">${account.name}</div>
+                            <div style="font-size: 12px; opacity: 0.8;">${account.role}</div>
+                            ${isCurrent ? '<div style="font-size: 11px; margin-top: 5px;">当前账号 ✓</div>' : ''}
+                        </button>
+                    `;
+                });
+                
+                accountListHTML += `
+                    <button onclick="closeAccountModal()" style="display: block; width: 100%; padding: 12px; margin-top: 10px; background-color: #f3f4f6; color: #6b7280; border: none; border-radius: 8px; cursor: pointer;">
+                        取消
+                    </button>
+                `;
+                accountListHTML += '</div>';
+                
+                // 创建模态框
+                let modal = document.getElementById('account-switch-modal');
+                if (!modal) {
+                    modal = document.createElement('div');
+                    modal.id = 'account-switch-modal';
+                    modal.style.cssText = 'position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); z-index: 9999; display: flex; align-items: center; justify-content: center; padding: 20px;';
+                    modal.onclick = function(e) { if (e.target === modal) closeAccountModal(); };
+                    document.body.appendChild(modal);
+                }
+                
+                const modalContent = document.createElement('div');
+                modalContent.style.cssText = 'background: white; border-radius: 12px; max-width: 400px; width: 100%; max-height: 80vh; overflow-y: auto; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);';
+                modalContent.innerHTML = accountListHTML;
+                modal.innerHTML = '';
+                modal.appendChild(modalContent);
+                modal.classList.remove('hidden');
+                
+                // 关闭侧边栏
+                sidebar.classList.add('-translate-x-full');
+                sidebarOverlay.classList.add('hidden');
+            };
+            
+            // 选择账号
+            window.selectAccount = function(username, role, name) {
+                const user = {
+                    id: username === 'admin' ? 1 : username === 'regional' ? 2 : username === 'store' ? 3 : 4,
+                    username: username,
+                    name: name,
+                    role: role,
+                    email: username + '@example.com',
+                    status: '活跃'
+                };
+                
+                localStorage.setItem('adminUser', JSON.stringify(user));
+                closeAccountModal();
+                
+                // 重新加载页面以应用新账号权限
+                alert(`已切换到账号：${name}（${role}）`);
+                location.reload();
+            };
+            
+            // 关闭账号切换模态框
+            window.closeAccountModal = function() {
+                const modal = document.getElementById('account-switch-modal');
+                if (modal) {
+                    modal.classList.add('hidden');
+                }
+            };
+            
+            // 绑定事件
+            function bindEvents() {
+                // 导航链接点击事件
+                navLinks.forEach(link => {
+                    link.addEventListener('click', (e) => {
+                        e.preventDefault();
+                        const target = link.getAttribute('href').substring(1);
+                        switchSection(target);
+                    });
+                });
+
+                // 侧边栏菜单按钮
+                menuBtn.addEventListener('click', () => {
+                    sidebar.classList.toggle('-translate-x-full');
+                    sidebarOverlay.classList.toggle('hidden');
+                });
+
+                // 点击遮罩层关闭侧边栏
+                sidebarOverlay.addEventListener('click', () => {
+                    sidebar.classList.add('-translate-x-full');
+                    sidebarOverlay.classList.add('hidden');
+                });
+
+                // 通知按钮
+                notificationBtn.addEventListener('click', () => {
+                    notificationDropdown.classList.toggle('hidden');
+                });
+
+                // 点击其他地方关闭通知下拉菜单
+                document.addEventListener('click', (e) => {
+                    if (!notificationBtn.contains(e.target) && !notificationDropdown.contains(e.target)) {
+                        notificationDropdown.classList.add('hidden');
+                    }
+                });
+            }
+
+            // 绑定事件
+            bindEvents();
+
+            // 初始化图表
+            initCharts();
+        });
+
+        // 初始化图表
+        function initCharts() {
+            // 收入趋势图表
+            const revenueChart = document.getElementById('revenue-chart');
+            if (revenueChart) {
+                new Chart(revenueChart, {
+                    type: 'line',
+                    data: {
+                        labels: ['1月', '2月', '3月', '4月', '5月', '6月', '7月'],
+                        datasets: [{
+                            label: '收入',
+                            data: [128500, 135600, 142800, 138500, 145200, 152600, 158900],
+                            borderColor: '#3b82f6',
+                            backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                            tension: 0.4,
+                            fill: true
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                display: false
+                            }
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: true
+                            }
+                        }
+                    }
+                });
+            }
+
+            // 订单状态分布图表
+            const orderStatusChart = document.getElementById('order-status-chart');
+            if (orderStatusChart) {
+                new Chart(orderStatusChart, {
+                    type: 'doughnut',
+                    data: {
+                        labels: ['待处理', '处理中', '已完成', '已取件'],
+                        datasets: [{
+                            data: [8, 15, 35, 22],
+                            backgroundColor: ['#3b82f6', '#f59e0b', '#10b981', '#8b5cf6']
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false
+                    }
+                });
+            }
+
+            // 区域收入分布图表
+            const regionChart = document.getElementById('region-chart');
+            if (regionChart) {
+                new Chart(regionChart, {
+                    type: 'bar',
+                    data: {
+                        labels: ['广东省', '北京市', '上海市', '江苏省', '浙江省'],
+                        datasets: [{
+                            label: '收入',
+                            data: [12850, 8520, 10680, 11360, 15700],
+                            backgroundColor: '#3b82f6'
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                            y: {
+                                beginAtZero: true
+                            }
+                        }
+                    }
+                });
+            }
+        }
+    </script>
+</body>
+</html>

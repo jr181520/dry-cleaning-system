@@ -1,0 +1,231 @@
+<view class="container">
+  <!-- 页面头部 -->
+  <view class="page-header">
+    <view class="header-content">
+      <text class="page-title">配送方式</text>
+      <text class="page-subtitle">选择合适的取件方式</text>
+    </view>
+  </view>
+
+  <!-- 已选摘要 -->
+  <view class="order-summary">
+    <view class="summary-header">
+      <text class="summary-icon">📦</text>
+      <text class="summary-title">订单摘要</text>
+    </view>
+    <view class="summary-content">
+      <view class="summary-row">
+        <text class="row-label">门店</text>
+        <text class="row-value {{!selectedStore ? 'auto-assigned' : ''}}">
+          {{selectedStore ? selectedStore.name : '系统自动分配'}}
+        </text>
+      </view>
+      <view class="summary-row">
+        <text class="row-label">服务</text>
+        <text class="row-value">{{selectedServices.length}}项</text>
+      </view>
+      <view class="summary-row" wx:if="{{selectedStore}}">
+        <text class="row-label">地址</text>
+        <text class="row-value address">{{selectedStore.address}}</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 配送方式选择 -->
+  <view class="section">
+    <view class="section-header">
+      <text class="section-title">选择取送方式</text>
+    </view>
+    <view class="delivery-methods">
+      <view 
+        class="method-card {{selectedDeliveryMethod === item.id ? 'selected' : ''}}"
+        wx:for="{{deliveryMethods}}"
+        wx:key="id"
+        bindtap="onSelectDeliveryMethod"
+        data-id="{{item.id}}"
+      >
+        <view class="method-radio">
+          <view class="radio-outer">
+            <view class="radio-inner" wx:if="{{selectedDeliveryMethod === item.id}}"></view>
+          </view>
+        </view>
+        <view class="method-icon">{{item.icon}}</view>
+        <view class="method-info">
+          <text class="method-name">{{item.name}}</text>
+          <text class="method-desc">{{item.desc}}</text>
+          <text class="method-discount" wx:if="{{item.discountText}}">{{item.discountText}}</text>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 配送服务商（仅跑腿方式显示） -->
+  <view class="section" wx:if="{{selectedDeliveryMethod === 'courier'}}">
+    <view class="section-header">
+      <text class="section-title">选择跑腿服务商</text>
+      <text class="section-subtitle">平台聚合多家配送服务</text>
+    </view>
+    <view class="providers-list">
+      <view 
+        class="provider-card {{selectedProvider.id === item.id ? 'selected' : ''}}"
+        wx:for="{{deliveryProviders}}"
+        wx:key="id"
+        bindtap="onSelectProvider"
+        data-id="{{item.id}}"
+      >
+        <view class="provider-header">
+          <text class="provider-icon">{{item.icon}}</text>
+          <view class="provider-info">
+            <text class="provider-name">{{item.name}}</text>
+            <view class="provider-rating">
+              <text class="rating-star">⭐</text>
+              <text class="rating-value">{{item.rating}}</text>
+              <text class="rating-text">评分</text>
+            </view>
+          </view>
+          <view class="provider-select">
+            <view class="select-radio">
+              <view class="radio-outer small">
+                <view class="radio-inner" wx:if="{{selectedProvider.id === item.id}}"></view>
+              </view>
+            </view>
+          </view>
+        </view>
+        
+        <view class="provider-details">
+          <view class="detail-row">
+            <text class="detail-icon">⏱️</text>
+            <text class="detail-text">预计{{item.estimatedTime}}</text>
+          </view>
+          <view class="detail-row">
+            <text class="detail-icon">💰</text>
+            <text class="detail-text">配送费 ¥{{item.fee}}</text>
+            <text class="detail-actual" wx:if="{{item.hasDiscount}}">→ ¥{{item.actualFee}}</text>
+          </view>
+        </view>
+        
+        <view class="provider-footer" wx:if="{{item.hasDiscount}}">
+          <view class="discount-badge">
+            <text class="badge-icon">🎉</text>
+            <text class="badge-text">{{item.discountInfo}}</text>
+          </view>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 取件信息（仅跑腿方式显示） -->
+  <view class="section" wx:if="{{selectedDeliveryMethod === 'courier'}}">
+    <view class="section-header">
+      <text class="section-title">取件信息</text>
+      <text class="section-subtitle" wx:if="{{contactName || userPhone || userAddress}}">已自动填充上次使用的信息</text>
+    </view>
+    <view class="info-form">
+      <view class="form-item">
+        <text class="form-label">联系人</text>
+        <input 
+          class="form-input" 
+          type="text" 
+          placeholder="请输入联系人姓名"
+          value="{{contactName}}"
+          bindinput="onContactNameInput"
+        />
+      </view>
+      <view class="form-item">
+        <text class="form-label">联系电话</text>
+        <input 
+          class="form-input" 
+          type="number" 
+          placeholder="请输入联系电话"
+          value="{{userPhone}}"
+          bindinput="onPhoneInput"
+        />
+      </view>
+      <view class="form-item">
+        <text class="form-label">取件地址</text>
+        <input 
+          class="form-input" 
+          type="text" 
+          placeholder="请输入详细地址"
+          value="{{userAddress}}"
+          bindinput="onAddressInput"
+        />
+      </view>
+    </view>
+  </view>
+
+  <!-- 预约时间选择 -->
+  <view class="section">
+    <view class="section-header">
+      <text class="section-title">选择预约时间</text>
+    </view>
+    <view class="time-grid">
+      <view 
+        class="time-item {{selectedTime === item.id ? 'selected' : ''}}"
+        wx:for="{{timeOptions}}"
+        wx:key="id"
+        bindtap="onSelectTime"
+        data-id="{{item.id}}"
+      >
+        <text class="time-text">{{item.text}}</text>
+        <view class="time-check" wx:if="{{selectedTime === item.id}}">
+          <text class="check-icon">✓</text>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 费用明细 -->
+  <view class="fee-section">
+    <view class="section-header">
+      <text class="section-title">费用明细</text>
+    </view>
+    <view class="fee-card">
+      <view class="fee-row">
+        <text class="fee-label">门店服务费</text>
+        <text class="fee-value">¥{{storeFee}}</text>
+      </view>
+      <view class="fee-row" wx:if="{{originalPrice > storeFee}}">
+        <text class="fee-label">原价</text>
+        <text class="fee-original">¥{{originalPrice}}</text>
+      </view>
+      <view class="fee-row discount" wx:if="{{discount > 0}}">
+        <text class="fee-label">自取折扣</text>
+        <text class="fee-discount">-¥{{discount}}</text>
+      </view>
+      <view class="fee-row" wx:if="{{deliveryFee > 0}}">
+        <text class="fee-label">配送费</text>
+        <text class="fee-value">¥{{deliveryFee}}</text>
+      </view>
+      <view class="fee-row discount-info" wx:if="{{selectedDeliveryMethod === 'courier' && selectedProvider.hasDiscount}}">
+        <text class="fee-label">配送优惠</text>
+        <text class="fee-discount">-¥{{selectedProvider.fee - selectedProvider.actualFee}}</text>
+      </view>
+      <view class="fee-divider"></view>
+      <view class="fee-row total">
+        <text class="fee-label">合计</text>
+        <text class="fee-total">¥{{totalAmount}}</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 确认按钮 -->
+  <view class="confirm-section">
+    <view class="confirm-content">
+      <view class="total-display">
+        <text class="total-label">应付金额</text>
+        <text class="total-amount">¥{{totalAmount}}</text>
+      </view>
+      <view 
+        class="confirm-btn"
+        bindtap="onConfirmOrder"
+      >
+        <text class="btn-text">确认下单</text>
+        <text class="btn-arrow">→</text>
+      </view>
+    </view>
+  </view>
+  
+  <!-- 底部安全区 -->
+  <view class="safe-area-bottom"></view>
+</view>

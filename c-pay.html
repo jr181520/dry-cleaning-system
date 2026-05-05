@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>订单支付 - 干洗服务</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+        .btn-wechat { background: linear-gradient(135deg, #07c160 0%, #06ad56 100%); }
+        .btn-alipay { background: linear-gradient(135deg, #1677ff 0%, #0958d9 100%); }
+        .btn-unionpay { background: linear-gradient(135deg, #722ed1 0%, #5319e7 100%); }
+        .btn:active { transform: scale(0.98); }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .fade-in { animation: fadeIn 0.3s ease-out; }
+        @keyframes pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.02); } }
+        .pulse { animation: pulse 1.5s infinite; }
+        .order-card { box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen">
+    <!-- 顶部导航 -->
+    <header class="bg-white shadow-sm sticky top-0 z-10">
+        <div class="max-w-lg mx-auto px-4 py-3 flex items-center justify-between">
+            <button onclick="goBack()" class="text-gray-600">
+                <i class="fa fa-arrow-left text-xl"></i>
+            </button>
+            <h1 class="text-lg font-semibold text-gray-800">订单支付</h1>
+            <div class="w-8"></div>
+        </div>
+    </header>
+
+    <!-- 加载状态 -->
+    <div id="loading" class="max-w-lg mx-auto px-4 py-20 text-center">
+        <div class="text-gray-500"><i class="fa fa-spinner fa-spin text-3xl"></i></div>
+        <p class="mt-4 text-gray-600">正在加载订单信息...</p>
+    </div>
+
+    <!-- 订单信息 -->
+    <div id="order-content" class="max-w-lg mx-auto px-4 py-6 hidden">
+        <!-- 订单详情卡片 -->
+        <div class="bg-white rounded-xl order-card p-5 mb-4 fade-in">
+            <div class="flex items-center mb-4">
+                <div class="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mr-3">
+                    <i class="fa fa-store text-blue-600 text-xl"></i>
+                </div>
+                <div>
+                    <div id="store-name" class="font-semibold text-gray-800">干洗店</div>
+                    <div id="store-address" class="text-sm text-gray-500">门店地址</div>
+                </div>
+            </div>
+            
+            <div class="border-t border-gray-100 pt-4">
+                <div class="text-center mb-4">
+                    <div class="text-sm text-gray-500 mb-1">待支付金额</div>
+                    <div id="amount" class="text-4xl font-bold text-red-600">¥0.00</div>
+                </div>
+                
+                <div class="space-y-2">
+                    <div class="flex justify-between text-sm">
+                        <span class="text-gray-500">订单号</span>
+                        <span id="order-id" class="text-gray-800 font-mono">-</span>
+                    </div>
+                    <div class="flex justify-between text-sm">
+                        <span class="text-gray-500">下单时间</span>
+                        <span id="order-time" class="text-gray-800">-</span>
+                    </div>
+                    <div class="flex justify-between text-sm">
+                        <span class="text-gray-500">取件方式</span>
+                        <span id="pickup-type" class="text-gray-800">到店自取</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 订单物品 -->
+        <div class="bg-white rounded-xl order-card p-5 mb-4 fade-in">
+            <div class="text-sm text-gray-500 mb-3">订单明细</div>
+            <div id="order-items" class="space-y-3">
+                <!-- 动态填充 -->
+            </div>
+        </div>
+
+        <!-- 支付方式 -->
+        <div class="bg-white rounded-xl order-card p-5 fade-in">
+            <div class="text-sm text-gray-500 mb-4">选择支付方式</div>
+            
+            <!-- 微信支付 -->
+            <button onclick="selectPayment('wechat')" id="btn-wechat" 
+                    class="btn btn-wechat w-full py-4 rounded-xl text-white font-semibold mb-3 flex items-center justify-center">
+                <i class="fa fa-weixin text-2xl mr-3"></i>
+                <span class="text-lg">微信支付</span>
+            </button>
+            
+            <!-- 支付宝 -->
+            <button onclick="selectPayment('alipay')" id="btn-alipay" 
+                    class="btn btn-alipay w-full py-4 rounded-xl text-white font-semibold mb-3 flex items-center justify-center">
+                <i class="fa fa-credit-card text-2xl mr-3"></i>
+                <span class="text-lg">支付宝</span>
+            </button>
+            
+            <!-- 银联云闪付 -->
+            <button onclick="selectPayment('unionpay')" id="btn-unionpay" 
+                    class="btn btn-unionpay w-full py-4 rounded-xl text-white font-semibold flex items-center justify-center">
+                <i class="fa fa-university text-2xl mr-3"></i>
+                <span class="text-lg">银联云闪付</span>
+            </button>
+        </div>
+
+        <!-- 安全提示 -->
+        <div class="text-center mt-6 text-xs text-gray-400">
+            <i class="fa fa-lock mr-1"></i> 支付安全由微信/支付宝/银联保障
+        </div>
+    </div>
+
+    <!-- 支付中弹窗 -->
+    <div id="paying-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+        <div class="bg-white rounded-2xl w-72 p-6 text-center">
+            <div class="text-5xl mb-4">⏳</div>
+            <div class="text-lg font-semibold text-gray-800 mb-2">支付处理中</div>
+            <div class="text-sm text-gray-500">请稍候，不要关闭页面</div>
+        </div>
+    </div>
+
+    <!-- 支付成功弹窗 -->
+    <div id="success-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+        <div class="bg-white rounded-2xl w-80 p-6 text-center">
+            <div class="text-6xl mb-4">✅</div>
+            <div class="text-xl font-semibold text-green-600 mb-2">支付成功</div>
+            <div class="text-sm text-gray-600 mb-4">感谢您的惠顾！</div>
+            <div id="success-order" class="text-xs text-gray-400 mb-4">订单号: -</div>
+            <button onclick="goToOrderDetail()" class="w-full py-3 bg-green-500 text-white rounded-xl font-semibold mb-2">
+                查看订单详情
+            </button>
+            <button onclick="goBack()" class="w-full py-3 bg-gray-200 text-gray-700 rounded-xl font-semibold">
+                返回首页
+            </button>
+        </div>
+    </div>
+
+    <!-- 错误提示 -->
+    <div id="error-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+        <div class="bg-white rounded-2xl w-72 p-6 text-center">
+            <div class="text-6xl mb-4">❌</div>
+            <div class="text-lg font-semibold text-red-600 mb-2">支付失败</div>
+            <div id="error-message" class="text-sm text-gray-600 mb-4">支付失败，请重试</div>
+            <button onclick="retryPayment()" class="w-full py-3 bg-blue-500 text-white rounded-xl font-semibold">
+                重新支付
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // 获取URL参数
+        const urlParams = new URLSearchParams(window.location.search);
+        const orderId = urlParams.get('order') || '';
+        const amount = parseFloat(urlParams.get('amount')) || 0;
+        const storeId = urlParams.get('store') || '';
+        const type = urlParams.get('type') || '';
+        
+        let selectedPayment = null;
+        let orderData = null;
+        
+        // 页面加载
+        document.addEventListener('DOMContentLoaded', function() {
+            // 延迟显示订单信息
+            setTimeout(() => {
+                if (!orderId) {
+                    document.getElementById('loading').innerHTML = `
+                        <div class="text-red-500"><i class="fa fa-exclamation-triangle text-3xl"></i></div>
+                        <p class="mt-4 text-gray-600">订单信息无效</p>
+                    `;
+                    return;
+                }
+                
+                // 尝试从localStorage获取订单信息
+                loadOrderData();
+            }, 300);
+        });
+        
+        // 加载订单数据
+        function loadOrderData() {
+            // 尝试从C端订单列表获取
+            try {
+                const orders = JSON.parse(localStorage.getItem('orders') || '[]');
+                orderData = orders.find(o => 
+                    o.orderId === orderId || 
+                    o.id === orderId || 
+                    o.orderNo === orderId
+                );
+                
+                // 如果没找到，尝试从门店订单获取
+                if (!orderData) {
+                    const storeOrders = JSON.parse(localStorage.getItem('store_orders') || '[]');
+                    orderData = storeOrders.find(o => 
+                        o.orderId === orderId || 
+                        o.id === orderId || 
+                        o.orderNo === orderId
+                    );
+                }
+            } catch (e) {
+                console.log('读取订单失败');
+            }
+            
+            // 如果有URL参数提供的金额，使用URL参数
+            if (amount > 0) {
+                if (!orderData) {
+                    orderData = {
+                        orderId: orderId,
+                        total: amount,
+                        items: []
+                    };
+                } else {
+                    orderData.total = amount;
+                }
+            }
+            
+            if (!orderData) {
+                // 使用URL参数创建基础订单数据
+                orderData = {
+                    orderId: orderId,
+                    total: amount,
+                    items: [{ name: '干洗服务', quantity: 1, price: amount }],
+                    createdAt: new Date().toISOString()
+                };
+            }
+            
+            displayOrder();
+        }
+        
+        // 显示订单信息
+        function displayOrder() {
+            document.getElementById('loading').classList.add('hidden');
+            document.getElementById('order-content').classList.remove('hidden');
+            
+            // 计算订单总金额（优先使用订单数据中的金额）
+            const orderTotal = orderData.total || orderData.amount || orderData.fees?.total || amount || 0;
+            
+            // 填充数据
+            document.getElementById('order-id').textContent = orderData.orderId || orderData.id || '-';
+            document.getElementById('amount').textContent = '¥' + orderTotal.toFixed(2);
+            document.getElementById('order-time').textContent = new Date(orderData.createdAt || Date.now()).toLocaleString('zh-CN');
+            document.getElementById('pickup-type').textContent = 
+                orderData.pickupType === 'delivery' ? '上门取送' : '到店自取';
+            
+            // 获取门店信息 - 优先使用订单中的门店信息
+            try {
+                const currentStore = JSON.parse(localStorage.getItem('currentStore') || '{}');
+                // 兼容多种字段名
+                const storeName = orderData.storeName || orderData.store?.name || currentStore.name || '系统分配门店';
+                const storeAddress = orderData.storeAddress || orderData.store?.address || currentStore.address || '门店地址';
+                
+                document.getElementById('store-name').textContent = storeName;
+                document.getElementById('store-address').textContent = storeAddress;
+                
+                console.log('[支付页面] 订单信息:', { 
+                    orderTotal, 
+                    orderTotal2: orderData.total, 
+                    amount: amount,
+                    storeName, 
+                    storeAddress,
+                    orderData
+                });
+            } catch (e) {
+                console.log('[支付页面] 获取门店信息失败:', e);
+            }
+            
+            // 填充订单物品
+            const itemsContainer = document.getElementById('order-items');
+            const items = orderData.items || orderData.services || [];
+            
+            if (items.length > 0) {
+                itemsContainer.innerHTML = items.map((item, idx) => `
+                    <div class="flex justify-between items-center py-2 ${idx < items.length - 1 ? 'border-b border-gray-100' : ''}">
+                        <div>
+                            <div class="text-gray-800">${item.name || '干洗服务'}</div>
+                            <div class="text-xs text-gray-400">x${item.quantity || 1}</div>
+                        </div>
+                        <div class="text-gray-800 font-medium">¥${((item.price || 0) * (item.quantity || 1)).toFixed(2)}</div>
+                    </div>
+                `).join('');
+            } else {
+                itemsContainer.innerHTML = `
+                    <div class="text-center text-gray-400 py-2">暂无明细</div>
+                `;
+            }
+        }
+        
+        // 选择支付方式
+        function selectPayment(method) {
+            selectedPayment = method;
+            
+            // 高亮选中按钮
+            ['wechat', 'alipay', 'unionpay'].forEach(m => {
+                const btn = document.getElementById('btn-' + m);
+                if (m === method) {
+                    btn.classList.add('pulse');
+                    btn.style.boxShadow = '0 4px 12px rgba(0,0,0,0.3)';
+                } else {
+                    btn.classList.remove('pulse');
+                    btn.style.boxShadow = 'none';
+                }
+            });
+            
+            // 延迟执行支付
+            setTimeout(() => {
+                processPayment(method);
+            }, 300);
+        }
+        
+        // 处理支付
+        function processPayment(method) {
+            document.getElementById('paying-modal').classList.remove('hidden');
+            
+            // 模拟支付处理
+            setTimeout(() => {
+                const success = Math.random() > 0.1; // 90%成功率
+                
+                document.getElementById('paying-modal').classList.add('hidden');
+                
+                if (success) {
+                    // 支付成功 - 更新C端和M端订单状态
+                    const paidAmount = orderData.total || amount;
+                    const paidAt = new Date().toISOString();
+                    
+                    // 更新C端订单
+                    try {
+                        const orders = JSON.parse(localStorage.getItem('orders') || '[]');
+                        const idx = orders.findIndex(o => 
+                            (o.orderId || o.id || o.orderNo) === (orderData.orderId || orderData.id || orderData.orderNo)
+                        );
+                        if (idx > -1) {
+                            orders[idx].status = 'paid';
+                            orders[idx].paymentStatus = 'paid';
+                            orders[idx].paidAmount = paidAmount;
+                            orders[idx].paidAt = paidAt;
+                            orders[idx].paymentMethod = method;
+                            localStorage.setItem('orders', JSON.stringify(orders));
+                        }
+                    } catch (e) {}
+                    
+                    // 更新M端订单
+                    try {
+                        const storeOrders = JSON.parse(localStorage.getItem('store_orders') || '[]');
+                        const idx = storeOrders.findIndex(o => 
+                            (o.orderId || o.id || o.orderNo) === (orderData.orderId || orderData.id || orderData.orderNo)
+                        );
+                        if (idx > -1) {
+                            storeOrders[idx].paymentStatus = 'paid';
+                            storeOrders[idx].status = 'paid';
+                            storeOrders[idx].paidAmount = paidAmount;
+                            storeOrders[idx].paidAt = paidAt;
+                            storeOrders[idx].paymentMethod = method;
+                            localStorage.setItem('store_orders', JSON.stringify(storeOrders));
+                        }
+                    } catch (e) {}
+                    
+                    // 保存支付记录
+                    try {
+                        const payments = JSON.parse(localStorage.getItem('c_payments') || '[]');
+                        payments.unshift({
+                            orderId: orderData.orderId || orderData.id,
+                            amount: paidAmount,
+                            method: method,
+                            paidAt: paidAt,
+                            status: 'paid'
+                        });
+                        localStorage.setItem('c_payments', JSON.stringify(payments));
+                    } catch (e) {}
+                    
+                    // 显示成功弹窗
+                    document.getElementById('success-order').textContent = '订单号: ' + (orderData.orderId || orderData.id);
+                    document.getElementById('success-modal').classList.remove('hidden');
+                    
+                } else {
+                    // 支付失败
+                    document.getElementById('error-message').textContent = '支付失败，请重试';
+                    document.getElementById('error-modal').classList.remove('hidden');
+                }
+            }, 1500);
+        }
+        
+        // 重试支付
+        function retryPayment() {
+            document.getElementById('error-modal').classList.add('hidden');
+            selectedPayment = null;
+            
+            ['wechat', 'alipay', 'unionpay'].forEach(m => {
+                const btn = document.getElementById('btn-' + m);
+                btn.classList.remove('pulse');
+                btn.style.boxShadow = 'none';
+            });
+        }
+        
+        // 查看订单详情
+        function goToOrderDetail() {
+            document.getElementById('success-modal').classList.add('hidden');
+            // 跳转到订单详情页（如果有的话）
+            window.location.href = 'c-order.html?order=' + (orderData.orderId || orderData.id);
+        }
+        
+        // 返回
+        function goBack() {
+            window.location.href = 'index.html';
+        }
+    </script>
+</body>
+</html>

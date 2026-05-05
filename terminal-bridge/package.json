@@ -1,0 +1,17 @@
+{
+  "name": "terminal-mqtt-wled-bridge",
+  "version": "1.0.0",
+  "description": "终端MQTT-WLED桥接服务 - 接收MQTT命令控制WLED灯条",
+  "main": "terminal-bridge.js",
+  "scripts": {
+    "start": "node terminal-bridge.js",
+    "start:dev": "set MQTT_ENV=dev&& node terminal-bridge.js",
+    "start:prod": "set MQTT_ENV=prod&& node terminal-bridge.js"
+  },
+  "keywords": ["mqtt", "wled", "light", "bridge"],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "mqtt": "^4.3.7"
+  }
+}
