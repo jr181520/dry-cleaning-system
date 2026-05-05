@@ -12,7 +12,7 @@ echo.
 
 cd /d "%~dp0"
 
-echo [1/3] 检查 Node.js 环境...
+echo [1/4] 检查 Node.js 环境...
 node --version >nul 2>&1
 if errorlevel 1 (
     echo ❌ Node.js 未安装，请先安装 Node.js
@@ -22,16 +22,21 @@ if errorlevel 1 (
 echo     ✅ Node.js 已安装
 
 echo.
-echo [2/3] 检查依赖...
+echo [2/4] 检查后端依赖...
+cd backend
 if not exist "node_modules" (
-    echo     📦 正在安装依赖...
+    echo     📦 正在安装后端依赖...
     call npm install
 ) else (
-    echo     ✅ 依赖已安装
+    echo     ✅ 后端依赖已安装
 )
 
 echo.
-echo [3/3] 启动后端服务（端口 3000）...
+echo [3/4] 返回项目目录...
+cd /d "%~dp0"
+
+echo.
+echo [4/4] 启动后端服务（端口 3000）...
 echo     📝 所有服务将合并运行：
 echo        - 后端API (订单、门店、商品)
 echo        - 支付系统 (微信、支付宝、银联)
