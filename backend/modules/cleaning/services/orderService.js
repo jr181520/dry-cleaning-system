@@ -241,10 +241,11 @@ class OrderService {
     ]);
 
     // 填充门店信息
-    const storeIds = [...new Set(list.map(o => o.storeId).filter(Boolean))];
-    const stores = await Store.find({ _id: { $in: storeIds } }).lean();
+    // 注意：订单的 storeId 实际上存储的是 storeNo（如 "ST001"），而不是 _id
+    const storeNos = [...new Set(list.map(o => o.storeId).filter(Boolean))];
+    const stores = await Store.find({ storeNo: { $in: storeNos } }).lean();
     const storeMap = {};
-    stores.forEach(s => { storeMap[s._id.toString()] = s; });
+    stores.forEach(s => { storeMap[s.storeNo] = s; });
 
     // 添加门店信息到每个订单
     const enrichedList = list.map(order => {
@@ -299,9 +300,10 @@ class OrderService {
     }
     
     // 填充门店信息
+    // 注意：订单的 storeId 实际上存储的是 storeNo（如 "ST001"），而不是 _id
     if (order.storeId) {
       try {
-        const store = await Store.findById(order.storeId).lean();
+        const store = await Store.findOne({ storeNo: order.storeId }).lean();
         if (store) {
           order.store = {
             id: store._id,
