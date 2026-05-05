@@ -453,6 +453,8 @@
                 localStorage.setItem('storeUser', JSON.stringify(staff));
                 localStorage.setItem('storeAccount', JSON.stringify({ type: 'phone', value: phone, name: staff.name }));
                 localStorage.setItem('isMockStoreUser', 'true');
+                // 清除访客模式标记，允许下次正常登录
+                localStorage.removeItem('guestModeHandled');
                 alert('模拟登录成功: ' + staff.name + '\n门店: ' + staff.storeName);
                 window.location.href = 'm-index.html';
             } else {

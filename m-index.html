@@ -1983,6 +1983,9 @@
             };
             localStorage.setItem('storeUser', JSON.stringify(storeUser));
             
+            // 清除访客模式标记，允许下次正常登录
+            localStorage.removeItem('guestModeHandled');
+            
             // 关闭模态框
             closeStoreAccountModal();
             
@@ -2709,25 +2712,38 @@
             // 检查登录状态 - 如果没有登录，跳转到登录页面
             const storeUser = localStorage.getItem('storeUser');
             const storeUserObj = JSON.parse(storeUser || '{}');
+            
+            // 检查是否是访客模式（已经取消过登录的用户）
+            const isGuestMode = localStorage.getItem('guestModeHandled') === 'true';
+            
             if (!storeUser || !storeUserObj.username) {
-                console.log('[初始化] 未检测到登录信息，跳转到登录页面');
-                if (confirm('检测到您尚未登录门店账号，是否前往登录？')) {
-                    window.location.href = 'm-login.html';
-                    return;
+                console.log('[初始化] 未检测到登录信息');
+                
+                // 如果已经是访客模式，不再弹出提示，直接使用默认门店
+                if (isGuestMode) {
+                    console.log('[初始化] 访客模式，直接使用默认门店信息');
                 } else {
-                    // 如果用户选择不登录，使用默认门店信息
-                    console.log('[初始化] 用户取消登录，使用默认门店信息');
-                    const defaultStore = {
-                        username: 'guest',
-                        storeId: 'ST002',
-                        storeName: '默认门店'
-                    };
-                    localStorage.setItem('storeUser', JSON.stringify(defaultStore));
-                    localStorage.setItem('currentStore', JSON.stringify({
-                        storeId: defaultStore.storeId,
-                        name: defaultStore.storeName,
-                        address: '门店地址'
-                    }));
+                    console.log('[初始化] 提示用户登录');
+                    if (confirm('检测到您尚未登录门店账号，是否前往登录？')) {
+                        window.location.href = 'm-login.html';
+                        return;
+                    } else {
+                        // 用户选择不登录，标记为访客模式，不再提示
+                        console.log('[初始化] 用户取消登录，使用默认门店信息');
+                        localStorage.setItem('guestModeHandled', 'true');
+                        
+                        const defaultStore = {
+                            username: 'guest',
+                            storeId: 'ST002',
+                            storeName: '默认门店'
+                        };
+                        localStorage.setItem('storeUser', JSON.stringify(defaultStore));
+                        localStorage.setItem('currentStore', JSON.stringify({
+                            storeId: defaultStore.storeId,
+                            name: defaultStore.storeName,
+                            address: '门店地址'
+                        }));
+                    }
                 }
             } else {
                 // 确保currentStore存在
