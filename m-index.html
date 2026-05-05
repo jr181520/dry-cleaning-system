@@ -1695,24 +1695,9 @@
         const API_BASE_URL = `http://localhost:${window.location.port || 3002}`;
         
         window.initDataSync = function() {
-            console.log('【同步管理器】初始化数据同步...');
-            console.log(`【同步管理器】使用API地址: ${API_BASE_URL}`);
-            
-            // 立即执行一次同步
-            performSync();
-            
-            // 设置定时同步
-            syncInterval = setInterval(() => {
-                performSync();
-            }, SYNC_INTERVAL);
-            
-            // 页面离开时停止同步
-            window.addEventListener('beforeunload', () => {
-                if (syncInterval) {
-                    clearInterval(syncInterval);
-                    syncInterval = null;
-                }
-            });
+            console.log('【同步管理器】M端已改用统一的OrderSyncManager，此函数已停用');
+            // 页面已配置使用统一的OrderSyncManager进行数据同步
+            // 启动逻辑已在DOMContentLoaded事件中通过OrderSyncManager.start()实现
         };
         
         async function performSync() {

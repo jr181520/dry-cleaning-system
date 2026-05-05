@@ -95,34 +95,73 @@ const OrderSyncManager = {
     // 从服务器获取订单
     async fetchServerOrders() {
         try {
-            // 尝试多个API端点
-            const endpoints = [
-                '/cleaning/orders',
-                '/admin/orders',
-                '/orders'
-            ];
+            // 确定使用哪个API端点和认证方式
+            let endpoint, authHeader;
             
-            for (const endpoint of endpoints) {
-                try {
-                    const response = await fetch(`${this.config.apiBaseUrl}${endpoint}`, {
-                        method: 'GET',
-                        headers: { 'Content-Type': 'application/json' },
-                        // 超时处理
-                        signal: AbortSignal.timeout(3000)
-                    });
-                    
-                    if (response.ok) {
-                        const result = await response.json();
-                        this.log(`从 ${endpoint} 获取到 ${result.data?.length || 0} 条订单`);
-                        return result.data || result;
-                    }
-                } catch (e) {
-                    // 继续尝试下一个端点
-                    continue;
-                }
+            if (window.location.pathname.includes('m-index')) {
+                // M端页面：获取门店订单
+                // 从localStorage获取当前门店ID
+                const currentStore = JSON.parse(localStorage.getItem('currentStore') || '{}');
+                const storeUser = JSON.parse(localStorage.getItem('storeUser') || '{}');
+                const myStoreId = currentStore.storeId || storeUser.storeId || 'ST002';
+                
+                // M端使用 /cleaning/orders?storeId=xxx 或获取所有订单后本地过滤
+                endpoint = '/cleaning/orders';
+                const storeToken = localStorage.getItem('storeToken') || localStorage.getItem('authToken');
+                authHeader = storeToken ? `Bearer ${storeToken}` : '';
+                
+                this.log(`M端同步，门店ID: ${myStoreId}`);
+            } else if (window.location.pathname.includes('admin')) {
+                // 管理员页面：获取所有订单
+                endpoint = '/cleaning/orders';
+                const adminToken = localStorage.getItem('adminToken') || localStorage.getItem('adminAuthToken');
+                authHeader = adminToken ? `Bearer ${adminToken}` : '';
+            } else {
+                // C端页面：获取用户订单
+                endpoint = '/cleaning/orders';
+                const userToken = localStorage.getItem('userToken') || localStorage.getItem('authToken');
+                authHeader = userToken ? `Bearer ${userToken}` : '';
             }
             
-            return null;
+            // 构建请求头
+            const headers = { 'Content-Type': 'application/json' };
+            if (authHeader) {
+                headers['Authorization'] = authHeader;
+            }
+            
+            this.log(`尝试从 ${endpoint} 获取订单...`);
+            
+            const response = await fetch(`${this.config.apiBaseUrl}${endpoint}`, {
+                method: 'GET',
+                headers: headers,
+                signal: AbortSignal.timeout(5000)
+            });
+            
+            if (response.ok) {
+                const result = await response.json();
+                let orders = result.data?.list || result.data || [];
+                
+                // M端需要过滤只显示本门店的订单
+                if (window.location.pathname.includes('m-index')) {
+                    const currentStore = JSON.parse(localStorage.getItem('currentStore') || '{}');
+                    const storeUser = JSON.parse(localStorage.getItem('storeUser') || '{}');
+                    const myStoreId = currentStore.storeId || storeUser.storeId || 'ST002';
+                    orders = orders.filter(o => 
+                        o.storeId === myStoreId || 
+                        o.store?.id === myStoreId
+                    );
+                    this.log(`过滤后本门店订单: ${orders.length} 条`);
+                }
+                
+                this.log(`从 ${endpoint} 获取到 ${orders.length} 条订单`);
+                return orders;
+            } else if (response.status === 401) {
+                this.log('认证失败（401），跳过此次同步', 'warn');
+                return null;
+            } else {
+                this.log(`API请求失败: ${response.status}`, 'warn');
+                return null;
+            }
         } catch (error) {
             this.log(`获取服务器订单失败: ${error.message}`, 'error');
             return null;
