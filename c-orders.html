@@ -548,7 +548,7 @@
                                     ${order.store?.specialty ? `<div class="text-xs text-blue-500">${order.store.specialty}</div>` : ''}
                                     ${order.store?.address ? `<div class="text-xs text-gray-400">📍 ${order.store.address}</div>` : ''}
                                     ${order.store?.location?.coordinates ? `
-                                        <button onclick="showStoreMap('${order.storeId}', '${order.store?.name || order.storeName}', '${order.store?.address || order.storeAddress}', ${Array.isArray(order.store.location.coordinates) ? order.store.location.coordinates[0] : order.store.location.coordinates.split(' ')[0]}, ${Array.isArray(order.store.location.coordinates) ? order.store.location.coordinates[1] : order.store.location.coordinates.split(' ')[1]})" 
+                                        <button onclick="event.stopPropagation(); showStoreMap('${order.storeId}', '${order.store?.name || order.storeName}', '${order.store?.address || order.storeAddress}', ${Array.isArray(order.store.location.coordinates) ? order.store.location.coordinates[0] : order.store.location.coordinates.split(' ')[0]}, ${Array.isArray(order.store.location.coordinates) ? order.store.location.coordinates[1] : order.store.location.coordinates.split(' ')[1]})" 
                                                 class="mt-1 px-2 py-1 bg-blue-500 text-white text-xs rounded hover:bg-blue-600">
                                             🗺️ 查看地图
                                         </button>
@@ -970,65 +970,96 @@
 
         // 删除订单记录
         async function deleteOrder(orderId) {
+            console.log('[删除] 开始删除订单:', orderId);
+            
+            // 尝试从多个存储位置获取订单
             const orders = JSON.parse(localStorage.getItem('orders') || '[]');
-            let order = orders.find(o => o.orderId === orderId);
+            const storeOrders = JSON.parse(localStorage.getItem('store_orders') || '[]');
+            
+            // 灵活匹配订单（支持orderId、orderNo、id等）
+            const findOrder = (orderList) => {
+                return orderList.find(o => 
+                    o.orderId === orderId || 
+                    o.orderNo === orderId ||
+                    o.id === orderId ||
+                    o._id === orderId
+                );
+            };
+            
+            let order = findOrder(orders) || findOrder(storeOrders);
             
             // 如果本地没有，尝试从API获取以验证订单状态
             if (!order) {
                 try {
                     const response = await fetch(`http://localhost:3000/api/cleaning/orders/${orderId}`, {
                         headers: {
-                            'Authorization': 'Bearer ' + (localStorage.getItem('authToken') || '')
+                            'Authorization': 'Bearer ' + (localStorage.getItem('userToken') || localStorage.getItem('authToken') || '')
                         }
                     });
                     const result = await response.json();
                     if (result.success && result.data) {
                         const serverOrder = result.data;
                         order = {
-                            orderId: serverOrder.orderNo,
+                            orderId: serverOrder.orderNo || serverOrder.orderId || orderId,
                             status: serverOrder.status
                         };
+                        console.log('[删除] 从API获取订单状态:', order.status);
                     }
                 } catch (error) {
-                    console.error('从API获取订单失败:', error);
+                    console.error('[删除] 从API获取订单失败:', error);
                 }
             }
             
             if (!order) {
-                showToast('订单不存在', 'error');
+                console.log('[删除] 订单不存在，强制从本地删除');
+                // 订单不存在时，强制从本地列表移除（用于清理脏数据）
+                const updatedOrders = orders.filter(o => 
+                    o.orderId !== orderId && o.orderNo !== orderId && o.id !== orderId && o._id !== orderId
+                );
+                const updatedStoreOrders = storeOrders.filter(o => 
+                    o.orderId !== orderId && o.orderNo !== orderId && o.id !== orderId && o._id !== orderId
+                );
+                localStorage.setItem('orders', JSON.stringify(updatedOrders));
+                localStorage.setItem('store_orders', JSON.stringify(updatedStoreOrders));
+                loadOrders();
+                showToast('订单记录已删除', 'success');
                 return;
             }
             
             // 正在处理中的订单不能删除
-            if (['pending', 'paid', 'confirmed', 'processing', 'cleaning', 'cleaned', 'ready', 'awaiting_store_confirm'].includes(order.status)) {
+            const activeStatuses = ['pending', 'paid', 'confirmed', 'processing', 'cleaning', 'cleaned', 'ready', 'awaiting_store_confirm', 'received', 'in_progress'];
+            if (activeStatuses.includes(order.status)) {
+                console.log('[删除] 订单状态不允许删除:', order.status);
                 showToast('正在处理中的订单无法删除，请等待处理完成', 'error');
                 return;
             }
             
             if (confirm('确定要删除该订单记录吗？\n此操作不可恢复。')) {
-                // 从C端订单列表中删除
-                const updatedOrders = orders.filter(o => o.orderId !== orderId);
-                localStorage.setItem('orders', JSON.stringify(updatedOrders));
-                
-                // 同时从门店订单列表中删除
-                const storeOrders = JSON.parse(localStorage.getItem('store_orders') || '[]');
-                const updatedStoreOrders = storeOrders.filter(o => 
-                    o.orderId !== orderId && o.orderNo !== orderId
+                // 从所有存储位置删除订单
+                const updatedOrders = orders.filter(o => 
+                    o.orderId !== orderId && o.orderNo !== orderId && o.id !== orderId && o._id !== orderId
                 );
+                const updatedStoreOrders = storeOrders.filter(o => 
+                    o.orderId !== orderId && o.orderNo !== orderId && o.id !== orderId && o._id !== orderId
+                );
+                localStorage.setItem('orders', JSON.stringify(updatedOrders));
                 localStorage.setItem('store_orders', JSON.stringify(updatedStoreOrders));
                 
                 // 将删除的订单ID记录到本地，避免API重新加载
                 let deletedOrderIds = JSON.parse(localStorage.getItem('deleted_order_ids') || '[]');
-                if (!deletedOrderIds.includes(orderId)) {
-                    deletedOrderIds.push(orderId);
-                    localStorage.setItem('deleted_order_ids', JSON.stringify(deletedOrderIds));
-                }
+                const idsToTrack = [orderId, order.orderId, order.orderNo].filter(Boolean);
+                idsToTrack.forEach(id => {
+                    if (!deletedOrderIds.includes(id)) {
+                        deletedOrderIds.push(id);
+                    }
+                });
+                localStorage.setItem('deleted_order_ids', JSON.stringify(deletedOrderIds));
                 
                 // 刷新订单列表
                 loadOrders();
                 showToast('订单记录已删除', 'success');
                 
-                console.log('[删除] 订单已删除:', orderId);
+                console.log('[删除] 订单已成功删除:', orderId);
             }
         }
 
