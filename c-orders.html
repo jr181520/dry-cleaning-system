@@ -324,6 +324,41 @@
                 loadOrders();
             });
             
+            // 监听订单更新事件（从详情页返回时）
+            window.addEventListener('orderUpdated', (e) => {
+                console.log('订单已更新，刷新列表...', e.detail);
+                loadOrders();
+            });
+            
+            // 监听页面返回（pageshow 事件在浏览器返回时触发）
+            window.addEventListener('pageshow', (e) => {
+                console.log('页面显示，强制刷新订单列表...');
+                loadOrders();
+                if (OrderSyncManager) {
+                    OrderSyncManager.sync();
+                }
+            });
+            
+            // 检查是否刚从详情页返回（通过 sessionStorage）
+            if (sessionStorage.getItem('fromOrderDetail') === 'true') {
+                console.log('刚从详情页返回，刷新订单列表...');
+                sessionStorage.removeItem('fromOrderDetail');
+                loadOrders();
+                if (OrderSyncManager) {
+                    OrderSyncManager.sync();
+                }
+            }
+            
+            // 检查是否刚从支付页返回（通过 sessionStorage）
+            if (sessionStorage.getItem('fromPaymentPage') === 'true') {
+                console.log('刚从支付页返回，刷新订单列表...');
+                sessionStorage.removeItem('fromPaymentPage');
+                loadOrders();
+                if (OrderSyncManager) {
+                    OrderSyncManager.sync();
+                }
+            }
+            
             // 使用事件委托绑定取件按钮事件
             const ordersList = document.getElementById('orders-list');
             if (ordersList) {
@@ -678,11 +713,26 @@
 
         // 支付订单
         function payOrder(orderId) {
+            console.log('[支付] 开始支付订单:', orderId);
             const orders = JSON.parse(localStorage.getItem('orders') || '[]');
-            const order = orders.find(o => o.orderId === orderId);
+            
+            // 灵活匹配订单ID
+            const matchOrder = (o) => {
+                return o.orderId === orderId || 
+                       o.orderNo === orderId || 
+                       o.id === orderId ||
+                       o._id === orderId;
+            };
+            
+            const order = orders.find(matchOrder);
+            console.log('[支付] 查找结果:', { orderId, found: !!order });
+            
             if (order) {
                 localStorage.setItem('currentOrder', JSON.stringify(order));
                 window.location.href = 'c-payment.html';
+            } else {
+                showToast('订单不存在，请刷新页面重试', 'error');
+                console.error('[支付] 未找到订单:', orderId);
             }
         }
 
@@ -712,15 +762,29 @@
                 });
                 const result = await response.json();
                 console.log('[取消] API响应:', result);
+                
+                if (result.success) {
+                    showToast('订单已取消', 'success');
+                } else {
+                    console.warn('[取消] API取消失败:', result.error);
+                }
             } catch (error) {
                 console.warn('[取消] API调用失败，使用本地处理:', error);
             }
             
-            // 更新本地状态
+            // 更新本地状态 - 增强ID匹配逻辑
             const orders = JSON.parse(localStorage.getItem('orders') || '[]');
-            const orderIndex = orders.findIndex(o => 
-                o.orderId === orderId || o.orderNo === orderId || o.id === orderId
-            );
+            
+            // 灵活匹配订单ID
+            const matchOrder = (o) => {
+                return o.orderId === orderId || 
+                       o.orderNo === orderId || 
+                       o.id === orderId ||
+                       o._id === orderId;
+            };
+            
+            const orderIndex = orders.findIndex(matchOrder);
+            console.log('[取消] 本地查找结果:', { orderId, orderIndex, total: orders.length });
             
             if (orderIndex > -1) {
                 orders[orderIndex].status = 'cancelled';
@@ -731,11 +795,32 @@
                 // 同步到门店订单（让M端能看到更新）
                 syncOrderToStore(orders[orderIndex]);
                 
+                // 刷新页面以显示最新状态
                 loadOrders();
-                showToast('订单已取消', 'success');
-                console.log('[取消] 订单已取消:', orderId);
+                console.log('[取消] 订单已取消并刷新:', orderId);
             } else {
-                showToast('订单不存在', 'error');
+                console.warn('[取消] 本地未找到订单，尝试从API同步...');
+                // 如果本地找不到，尝试强制同步后重试
+                if (typeof OrderSyncManager !== 'undefined') {
+                    await OrderSyncManager.sync();
+                    const updatedOrders = JSON.parse(localStorage.getItem('orders') || '[]');
+                    const retryIndex = updatedOrders.findIndex(matchOrder);
+                    
+                    if (retryIndex > -1) {
+                        updatedOrders[retryIndex].status = 'cancelled';
+                        updatedOrders[retryIndex].cancelledAt = new Date().toISOString();
+                        updatedOrders[retryIndex].updatedAt = new Date().toISOString();
+                        localStorage.setItem('orders', JSON.stringify(updatedOrders));
+                        loadOrders();
+                        showToast('订单已取消（已同步更新）', 'success');
+                        console.log('[取消] 同步后取消成功:', orderId);
+                    } else {
+                        showToast('订单不存在，请刷新页面重试', 'error');
+                        console.error('[取消] 同步后仍未找到订单:', orderId);
+                    }
+                } else {
+                    showToast('订单不存在，请刷新页面', 'error');
+                }
             }
         }
 
@@ -1238,6 +1323,24 @@
         // 显示门店地图
         let storeMap = null;
         function showStoreMap(storeId, storeName, address, lng, lat) {
+            console.log('[地图] 收到坐标:', { lng, lat, type: typeof lng, type2: typeof lat });
+            
+            // 验证坐标值
+            const lngNum = parseFloat(lng);
+            const latNum = parseFloat(lat);
+            
+            if (isNaN(lngNum) || isNaN(latNum)) {
+                alert('门店坐标无效，无法显示地图');
+                console.error('[地图] 坐标无效:', lng, lat);
+                return;
+            }
+            
+            // 中国坐标范围检查（约）
+            const isValidChinaCoords = latNum >= 15 && latNum <= 60 && lngNum >= 70 && lngNum <= 140;
+            if (!isValidChinaCoords) {
+                console.warn('[地图] 坐标可能不在中国范围内:', latNum, lngNum);
+            }
+            
             // 创建模态框
             const modal = document.createElement('div');
             modal.id = 'storeMapModal';
@@ -1259,7 +1362,7 @@
                     <div class="p-4 bg-gray-50 rounded-b-lg">
                         <p class="text-sm text-gray-600 text-center">
                             📍 地址: ${address}<br>
-                            🗺️ 坐标: ${lng}, ${lat}
+                            🗺️ 坐标: 纬度 ${latNum.toFixed(6)}, 经度 ${lngNum.toFixed(6)}
                         </p>
                     </div>
                 </div>
@@ -1267,21 +1370,28 @@
             
             document.body.appendChild(modal);
             
-            // 初始化地图
+            // 初始化地图（使用纬度,经度顺序）
             setTimeout(() => {
-                if (storeMap) {
-                    storeMap.remove();
+                try {
+                    if (storeMap) {
+                        storeMap.remove();
+                    }
+                    storeMap = L.map('storeMapContainer').setView([latNum, lngNum], 16);
+                    
+                    // 添加地图图层
+                    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+                    }).addTo(storeMap);
+                    
+                    // 添加标记
+                    const marker = L.marker([latNum, lngNum]).addTo(storeMap);
+                    marker.bindPopup(`<b>${storeName}</b><br>${address}`).openPopup();
+                    
+                    console.log('[地图] 地图初始化成功');
+                } catch (error) {
+                    console.error('[地图] 初始化失败:', error);
+                    alert('地图加载失败: ' + error.message);
                 }
-                storeMap = L.map('storeMapContainer').setView([lat, lng], 16);
-                
-                // 添加地图图层
-                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-                }).addTo(storeMap);
-                
-                // 添加标记
-                const marker = L.marker([lat, lng]).addTo(storeMap);
-                marker.bindPopup(`<b>${storeName}</b><br>${address}`).openPopup();
             }, 100);
         }
         

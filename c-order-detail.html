@@ -493,9 +493,9 @@
     <!-- 顶部状态 -->
     <div class="status-card" id="statusCard">
       <!-- 返回订单列表按钮 -->
-      <a href="c-orders.html" class="back-btn">
+      <button onclick="returnToOrders()" class="back-btn">
         <i class="fas fa-arrow-left"></i>
-      </a>
+      </button>
       <div class="status-icon-large" id="statusIcon">
         <i class="fas fa-spinner fa-spin"></i>
       </div>
@@ -1611,7 +1611,18 @@
       localStorage.setItem('currentOrder', JSON.stringify(currentOrder));
       
       updateOrderUI(currentOrder);
+      
+      // 触发订单更新事件，通知列表页刷新
+      window.dispatchEvent(new CustomEvent('orderUpdated', { 
+        detail: { orderId: orderId, status: 'cancelled' } 
+      }));
+      
       alert(isPaid ? '订单已取消，退款将在1-3个工作日到账' : '订单已取消');
+      
+      // 返回订单列表
+      setTimeout(() => {
+        returnToOrders();
+      }, 1500);
     }
     
     // 修改订单
@@ -1686,7 +1697,10 @@
         case 'pending':
           mainBtn.textContent = '去支付';
           mainBtn.className = 'btn-action btn-success';
-          mainBtn.onclick = () => window.location.href = 'c-payment.html';
+          mainBtn.onclick = () => {
+            sessionStorage.setItem('fromPaymentPage', 'true');
+            window.location.href = 'c-payment.html';
+          };
           break;
         case 'paid':
         case 'delivering':
@@ -2001,6 +2015,13 @@
     // 发消息给配送员
     function messageDriver() {
       alert('发送消息功能开发中');
+    }
+    
+    // 返回订单列表
+    function returnToOrders() {
+      // 标记刚从详情页返回，通知列表页刷新
+      sessionStorage.setItem('fromOrderDetail', 'true');
+      window.location.href = 'c-orders.html';
     }
     
     // 监听来自其他页面的数据更新（跨标签页同步）

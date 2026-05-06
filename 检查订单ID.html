@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>订单ID诊断</title>
+</head>
+<body>
+    <h1>订单ID诊断工具</h1>
+    <button onclick="checkOrders()">检查本地订单</button>
+    <pre id="output" style="white-space: pre-wrap; word-wrap: break-word;"></pre>
+    
+    <script>
+        function checkOrders() {
+            const output = document.getElementById('output');
+            const orders = JSON.parse(localStorage.getItem('orders') || '[]');
+            const storeOrders = JSON.parse(localStorage.getItem('store_orders') || '[]');
+            
+            let text = '=== C端订单列表 (orders) ===\n';
+            text += `总计: ${orders.length} 条\n\n`;
+            orders.forEach((o, i) => {
+                text += `${i+1}. orderId: ${o.orderId || 'undefined'}\n`;
+                text += `   id: ${o.id || 'undefined'}\n`;
+                text += `   _id: ${o._id || 'undefined'}\n`;
+                text += `   orderNo: ${o.orderNo || 'undefined'}\n`;
+                text += `   status: ${o.status}\n`;
+                text += `   source: ${o.source || 'unknown'}\n`;
+                text += `   创建时间: ${o.createTime || o.createdAt}\n\n`;
+            });
+            
+            text += '\n=== M端门店订单 (store_orders) ===\n';
+            text += `总计: ${storeOrders.length} 条\n\n`;
+            storeOrders.forEach((o, i) => {
+                text += `${i+1}. orderId: ${o.orderId || 'undefined'}\n`;
+                text += `   id: ${o.id || 'undefined'}\n`;
+                text += `   _id: ${o._id || 'undefined'}\n`;
+                text += `   orderNo: ${o.orderNo || 'undefined'}\n`;
+                text += `   status: ${o.status}\n`;
+                text += `   storeId: ${o.storeId || 'undefined'}\n`;
+                text += `   创建时间: ${o.createTime || o.createdAt}\n\n`;
+            });
+            
+            output.textContent = text;
+        }
+    </script>
+</body>
+</html>
