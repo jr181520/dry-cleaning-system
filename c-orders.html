@@ -686,23 +686,56 @@
             }
         }
 
-        // 取消订单
-        function cancelOrder(orderId) {
-            if (confirm('确定要取消该订单吗？')) {
-                const orders = JSON.parse(localStorage.getItem('orders') || '[]');
-                const orderIndex = orders.findIndex(o => o.orderId === orderId);
-                if (orderIndex > -1) {
-                    orders[orderIndex].status = 'cancelled';
-                    orders[orderIndex].cancelledAt = new Date().toISOString();
-                    orders[orderIndex].updatedAt = new Date().toISOString();
-                    localStorage.setItem('orders', JSON.stringify(orders));
-                    
-                    // 同步到门店订单（让M端能看到更新）
-                    syncOrderToStore(orders[orderIndex]);
-                    
-                    loadOrders();
-                    showToast('订单已取消', 'success');
-                }
+        // 取消订单（仅更新本地，未支付订单）
+        async function cancelOrder(orderId) {
+            console.log('[取消] 开始取消订单:', orderId);
+            
+            if (!confirm('确定要取消该订单吗？')) {
+                return;
+            }
+            
+            // 获取token
+            const token = localStorage.getItem('userToken') || localStorage.getItem('authToken') || '';
+            
+            // 先尝试调用API
+            try {
+                const response = await fetch(`http://localhost:3000/api/cleaning/orders/${orderId}/cancel`, {
+                    method: 'POST',
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'Authorization': token ? `Bearer ${token}` : ''
+                    },
+                    body: JSON.stringify({
+                        reason: '用户主动取消',
+                        requestTime: new Date().toISOString()
+                    })
+                });
+                const result = await response.json();
+                console.log('[取消] API响应:', result);
+            } catch (error) {
+                console.warn('[取消] API调用失败，使用本地处理:', error);
+            }
+            
+            // 更新本地状态
+            const orders = JSON.parse(localStorage.getItem('orders') || '[]');
+            const orderIndex = orders.findIndex(o => 
+                o.orderId === orderId || o.orderNo === orderId || o.id === orderId
+            );
+            
+            if (orderIndex > -1) {
+                orders[orderIndex].status = 'cancelled';
+                orders[orderIndex].cancelledAt = new Date().toISOString();
+                orders[orderIndex].updatedAt = new Date().toISOString();
+                localStorage.setItem('orders', JSON.stringify(orders));
+                
+                // 同步到门店订单（让M端能看到更新）
+                syncOrderToStore(orders[orderIndex]);
+                
+                loadOrders();
+                showToast('订单已取消', 'success');
+                console.log('[取消] 订单已取消:', orderId);
+            } else {
+                showToast('订单不存在', 'error');
             }
         }
 
@@ -714,9 +747,11 @@
             // 如果本地没有，尝试从API获取
             if (!order) {
                 try {
+                    const token = localStorage.getItem('userToken') || localStorage.getItem('authToken') || '';
                     const response = await fetch(`http://localhost:3000/api/cleaning/orders/${orderId}`, {
                         headers: {
-                            'Authorization': 'Bearer ' + (localStorage.getItem('authToken') || '')
+                            'Authorization': token ? `Bearer ${token}` : '',
+                            'Content-Type': 'application/json'
                         }
                     });
                     const result = await response.json();
@@ -770,10 +805,16 @@
 
             if (confirm(`确定要申请取消订单并退款吗？\n订单金额：¥${order.fees?.total || 0}\n退款将原路返回至您的支付账户`)) {
                 try {
+                    // 获取token
+                    const token = localStorage.getItem('userToken') || localStorage.getItem('authToken') || '';
+                    
                     // 调用后端API申请退款
                     const response = await fetch(`http://localhost:3000/api/cleaning/orders/${orderId}/cancel`, {
                         method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
+                        headers: { 
+                            'Content-Type': 'application/json',
+                            'Authorization': token ? `Bearer ${token}` : ''
+                        },
                         body: JSON.stringify({
                             reason: reason || '用户主动取消',
                             refundMethod: 'original',
@@ -781,12 +822,16 @@
                         })
                     });
                     const result = await response.json();
+                    console.log('[取消退款] API响应:', result);
                     
                     if (result.success) {
                         showToast('取消申请已提交，退款将在1-3个工作日到账', 'success');
+                    } else {
+                        showToast(result.error || '取消失败', 'error');
                     }
                 } catch (error) {
                     console.warn('API调用失败，本地处理:', error);
+                    showToast('网络错误，已本地处理', 'warning');
                 }
 
                 // 重新读取订单列表（确保获取最新数据）
