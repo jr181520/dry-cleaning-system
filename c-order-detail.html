@@ -1577,7 +1577,10 @@
         // 调用后端API
         const response = await fetch(`http://localhost:3000/api/cleaning/orders/${orderId}/cancel`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + (localStorage.getItem('authToken') || localStorage.getItem('userToken') || '')
+          },
           body: JSON.stringify({
             reason: reason,
             refundMethod: 'original',
@@ -1587,6 +1590,8 @@
         const result = await response.json();
         if (result.success) {
           alert(isPaid ? '取消申请已提交，退款处理中' : '订单已取消');
+        } else {
+          alert('取消失败: ' + (result.error || '未知错误'));
         }
       } catch (error) {
         console.warn('API调用失败，本地处理:', error);

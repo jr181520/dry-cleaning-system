@@ -13,6 +13,8 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <!-- 数据同步模块 -->
     <script src="js/order-sync.js"></script>
+    <!-- 统一数据同步模块 -->
+    <script src="js/unified-sync.js"></script>
     
     <script>
         tailwind.config = {
@@ -307,16 +309,25 @@
 
         // 页面初始化
         document.addEventListener('DOMContentLoaded', function() {
-            // 检查登录状态
-            if (!localStorage.getItem('userToken')) {
+            // 检查登录状态（支持 userToken 或 authToken）
+            const hasUserToken = localStorage.getItem('userToken');
+            const hasAuthToken = localStorage.getItem('authToken');
+            if (!hasUserToken && !hasAuthToken) {
+                console.warn('未登录，跳转到登录页');
                 window.location.href = 'c-login.html';
                 return;
             }
+            console.log('用户已登录，userToken:', !!hasUserToken, 'authToken:', !!hasAuthToken);
+            
+            // 启动统一同步管理器
+            if (UnifiedSync) {
+                UnifiedSync.start();
+            }
+            
+            // 同时启动旧版同步管理器（兼容）
+            OrderSyncManager.start();
             
             loadOrders();
-            
-            // 启动数据同步管理器
-            OrderSyncManager.start();
             
             // 监听同步完成事件
             window.addEventListener('ordersSynced', (e) => {
@@ -404,12 +415,28 @@
         // 从后端加载订单列表
         async function loadOrdersFromAPI() {
             try {
+                // 优先使用统一同步模块的数据
+                if (UnifiedSync && UnifiedSync.config.isEnabled) {
+                    console.log('[c-orders] 使用统一同步数据...');
+                    const syncData = UnifiedSync.getLocalOrders();
+                    if (syncData.orders.length > 0) {
+                        console.log('[c-orders] 统一同步返回订单:', syncData.orders.length);
+                        return syncData.orders;
+                    }
+                }
+                
+                // 回退到直接API调用
+                const token = localStorage.getItem('userToken') || localStorage.getItem('authToken') || '';
+                console.log('[c-orders] 加载订单，token:', token ? '存在' : '不存在');
+                
                 const response = await fetch('http://localhost:3000/api/cleaning/orders', {
                     headers: {
-                        'Authorization': 'Bearer ' + (localStorage.getItem('authToken') || '')
+                        'Authorization': 'Bearer ' + token
                     }
                 });
+                console.log('[c-orders] API响应状态:', response.status);
                 const result = await response.json();
+                console.log('[c-orders] API返回结果:', result);
                 
                 if (result.success && result.data) {
                     const serverOrders = result.data.list || [];
@@ -502,6 +529,9 @@
             // 合并订单：API订单 + 本地订单（去重，优先使用本地更新的订单）
             let orders = [];
             
+            console.log('[c-orders] localOrders数量:', localOrders.length);
+            console.log('[c-orders] apiOrders数量:', apiOrders ? apiOrders.length : 0);
+            
             // 将本地订单合并到列表中（优先使用本地订单，因为本地可能有最新状态更新）
             localOrders.forEach(localOrder => {
                 orders.push(localOrder);
@@ -525,6 +555,8 @@
                 });
             }
             
+            console.log('[c-orders] 合并后订单数量:', orders.length, '当前Tab:', currentTab);
+            
             // 过滤掉已删除的订单
             const deletedOrderIds = JSON.parse(localStorage.getItem('deleted_order_ids') || '[]');
             orders = orders.filter(o => !deletedOrderIds.includes(o.orderId));
@@ -542,6 +574,8 @@
             } else if (currentTab === 'cancelled') {
                 filteredOrders = orders.filter(o => o.status === 'cancelled');
             }
+            
+            console.log('[c-orders] 过滤后订单数量:', filteredOrders.length, '订单状态分布:', orders.map(o => o.status).join(', '));
             
             if (filteredOrders.length === 0) {
                 ordersList.innerHTML = '';
