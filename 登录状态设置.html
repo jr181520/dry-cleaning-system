@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>登录状态设置 - 数据同步诊断</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .log-container {
+            max-height: 300px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 12px;
+        }
+        .log-item { padding: 4px 8px; border-bottom: 1px solid #eee; }
+        .log-item.success { background: #e8f5e9; }
+        .log-item.error { background: #ffebee; }
+        .log-item.info { background: #e3f2fd; }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen p-4">
+    <div class="max-w-4xl mx-auto">
+        <h1 class="text-2xl font-bold text-gray-800 mb-4">🔐 登录状态设置工具</h1>
+        <p class="text-gray-600 mb-4">此工具用于设置本地测试 token，解决诊断工具无法读取登录状态的问题。</p>
+        
+        <!-- Token 设置面板 -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+            <!-- C端 Token -->
+            <div class="bg-white rounded-lg shadow p-4">
+                <h3 class="font-bold text-blue-600 mb-3">👤 C端（用户端）</h3>
+                <input type="text" id="c-token-input" placeholder="输入 userToken"
+                       class="w-full px-3 py-2 border rounded mb-2 text-sm">
+                <button onclick="setCToken()" class="w-full px-3 py-2 bg-blue-500 text-white rounded hover:bg-blue-600">
+                    设置C端Token
+                </button>
+                <div class="mt-2 text-sm">
+                    当前: <span id="c-current-token" class="text-gray-500">未设置</span>
+                </div>
+            </div>
+            
+            <!-- M端 Token -->
+            <div class="bg-white rounded-lg shadow p-4">
+                <h3 class="font-bold text-green-600 mb-3">🏪 M端（门店端）</h3>
+                <input type="text" id="m-token-input" placeholder="输入 storeToken"
+                       class="w-full px-3 py-2 border rounded mb-2 text-sm">
+                <button onclick="setMToken()" class="w-full px-3 py-2 bg-green-500 text-white rounded hover:bg-green-600">
+                    设置M端Token
+                </button>
+                <div class="mt-2 text-sm">
+                    当前: <span id="m-current-token" class="text-gray-500">未设置</span>
+                </div>
+            </div>
+            
+            <!-- Admin Token -->
+            <div class="bg-white rounded-lg shadow p-4">
+                <h3 class="font-bold text-purple-600 mb-3">⚙️ 管理端</h3>
+                <input type="text" id="admin-token-input" placeholder="输入 adminToken"
+                       class="w-full px-3 py-2 border rounded mb-2 text-sm">
+                <button onclick="setAdminToken()" class="w-full px-3 py-2 bg-purple-500 text-white rounded hover:bg-purple-600">
+                    设置Admin Token
+                </button>
+                <div class="mt-2 text-sm">
+                    当前: <span id="admin-current-token" class="text-gray-500">未设置</span>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 快速设置按钮 -->
+        <div class="bg-white rounded-lg shadow p-4 mb-4">
+            <h3 class="font-bold text-gray-700 mb-3">🚀 快速设置（模拟Token）</h3>
+            <p class="text-sm text-gray-500 mb-3">使用模拟token进行本地测试，这些token与真实后端API可能不兼容</p>
+            <button onclick="setMockTokens()" class="px-4 py-2 bg-gray-700 text-white rounded hover:bg-gray-800 mr-2">
+                设置所有模拟Token
+            </button>
+            <button onclick="clearAllTokens()" class="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600">
+                清除所有Token
+            </button>
+        </div>
+        
+        <!-- 状态检查 -->
+        <div class="bg-white rounded-lg shadow p-4 mb-4">
+            <h3 class="font-bold text-gray-700 mb-3">📊 当前登录状态</h3>
+            <div class="grid grid-cols-3 gap-4 text-center">
+                <div>
+                    <div class="text-2xl" id="c-status">❌</div>
+                    <div class="text-sm text-gray-500">C端</div>
+                </div>
+                <div>
+                    <div class="text-2xl" id="m-status">❌</div>
+                    <div class="text-sm text-gray-500">M端</div>
+                </div>
+                <div>
+                    <div class="text-2xl" id="admin-status">❌</div>
+                    <div class="text-sm text-gray-500">Admin</div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 日志 -->
+        <div class="bg-white rounded-lg shadow p-4">
+            <h3 class="font-bold text-gray-700 mb-3">📋 操作日志</h3>
+            <div id="log-container" class="log-container bg-gray-50 rounded border">
+                <div class="log-item info">等待操作...</div>
+            </div>
+        </div>
+        
+        <!-- 下一步 -->
+        <div class="mt-4 text-center">
+            <p class="text-gray-600 mb-2">设置完 Token 后，打开诊断工具检查状态</p>
+            <button onclick="openDiagnosis()" class="px-6 py-2 bg-blue-500 text-white rounded hover:bg-blue-600">
+                打开诊断工具
+            </button>
+        </div>
+    </div>
+    
+    <script>
+        const API_BASE = 'http://localhost:3000/api';
+        
+        function addLog(message, type = 'info') {
+            const container = document.getElementById('log-container');
+            const time = new Date().toLocaleTimeString();
+            const div = document.createElement('div');
+            div.className = `log-item ${type}`;
+            div.innerHTML = `<span class="text-gray-400">[${time}]</span> ${message}`;
+            container.insertBefore(div, container.firstChild);
+        }
+        
+        function checkStatus() {
+            // C端
+            const cToken = localStorage.getItem('userToken') || localStorage.getItem('authToken');
+            document.getElementById('c-status').textContent = cToken ? '✅' : '❌';
+            document.getElementById('c-current-token').textContent = cToken 
+                ? (cToken.substring(0, 15) + '...') 
+                : '未设置';
+            document.getElementById('c-token-input').value = cToken || '';
+            
+            // M端
+            const mToken = localStorage.getItem('storeToken') || localStorage.getItem('authToken');
+            document.getElementById('m-status').textContent = mToken ? '✅' : '❌';
+            document.getElementById('m-current-token').textContent = mToken 
+                ? (mToken.substring(0, 15) + '...') 
+                : '未设置';
+            document.getElementById('m-token-input').value = mToken || '';
+            
+            // Admin
+            const adminToken = localStorage.getItem('adminToken') || localStorage.getItem('adminAuthToken');
+            document.getElementById('admin-status').textContent = adminToken ? '✅' : '❌';
+            document.getElementById('admin-current-token').textContent = adminToken 
+                ? (adminToken.substring(0, 15) + '...') 
+                : '未设置';
+            document.getElementById('admin-token-input').value = adminToken || '';
+        }
+        
+        function setCToken() {
+            const token = document.getElementById('c-token-input').value.trim();
+            if (!token) {
+                addLog('C端 Token 不能为空', 'error');
+                return;
+            }
+            localStorage.setItem('userToken', token);
+            addLog(`已设置 C端 Token: ${token.substring(0, 20)}...`, 'success');
+            checkStatus();
+        }
+        
+        function setMToken() {
+            const token = document.getElementById('m-token-input').value.trim();
+            if (!token) {
+                addLog('M端 Token 不能为空', 'error');
+                return;
+            }
+            localStorage.setItem('storeToken', token);
+            addLog(`已设置 M端 Token: ${token.substring(0, 20)}...`, 'success');
+            checkStatus();
+        }
+        
+        function setAdminToken() {
+            const token = document.getElementById('admin-token-input').value.trim();
+            if (!token) {
+                addLog('Admin Token 不能为空', 'error');
+                return;
+            }
+            localStorage.setItem('adminToken', token);
+            addLog(`已设置 Admin Token: ${token.substring(0, 20)}...`, 'success');
+            checkStatus();
+        }
+        
+        function setMockTokens() {
+            localStorage.setItem('userToken', 'mock-user-token-' + Date.now());
+            localStorage.setItem('storeToken', 'mock-store-token-' + Date.now());
+            localStorage.setItem('adminToken', 'mock-admin-token-' + Date.now());
+            addLog('已设置所有模拟 Token（仅用于本地测试）', 'success');
+            checkStatus();
+        }
+        
+        function clearAllTokens() {
+            localStorage.removeItem('userToken');
+            localStorage.removeItem('authToken');
+            localStorage.removeItem('storeToken');
+            localStorage.removeItem('adminToken');
+            localStorage.removeItem('adminAuthToken');
+            addLog('已清除所有 Token', 'info');
+            checkStatus();
+        }
+        
+        function openDiagnosis() {
+            window.open('诊断工具.html', '_blank');
+        }
+        
+        // 页面加载时检查状态
+        window.onload = () => {
+            checkStatus();
+            addLog('登录状态设置工具已就绪', 'info');
+        };
+    </script>
+</body>
+</html>
