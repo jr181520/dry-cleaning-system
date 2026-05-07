@@ -38,6 +38,21 @@ async function authMiddleware(req, res, next) {
     
     const parsed = authService.parseToken(token);
     
+    // 开发模式：处理开发管理员token
+    if (process.env.NODE_ENV !== 'production' && parsed && parsed.userId.startsWith('dev-admin-')) {
+      req.user = {
+        id: parsed.userId,
+        userNo: 'DEV001',
+        phone: '13800138000',
+        name: '开发管理员',
+        roles: ['admin'],
+        storeId: null,
+        creditScore: 100
+      };
+      next();
+      return;
+    }
+    
     if (!parsed) {
       return res.status(401).json({ 
         success: false, 

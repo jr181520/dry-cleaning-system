@@ -586,9 +586,15 @@
             emptyState.classList.add('hidden');
             
             ordersList.innerHTML = filteredOrders.map(order => {
+                // 兼容处理：确保services字段存在
+                const orderServices = Array.isArray(order.services) ? order.services : 
+                                      Array.isArray(order.items) ? order.items : 
+                                      [];
+                
                 const status = statusMap[order.status] || statusMap['pending'];
-                const servicesPreview = order.services.slice(0, 3).map(s => s.icon).join('');
-                const moreCount = order.services.length > 3 ? `+${order.services.length - 3}` : '';
+                const servicesPreview = orderServices.slice(0, 3).map(s => s.icon || '📦').join('');
+                const moreCount = orderServices.length > 3 ? `+${orderServices.length - 3}` : '';
+                const firstService = orderServices[0] || { name: '服务', icon: '📦' };
                 
                 // 判断是否是已完成或已取消状态
                 const isCompletedOrCancelled = ['completed', 'cancelled', 'delivered'].includes(order.status);
@@ -597,10 +603,10 @@
                     <div class="order-card" onclick="viewOrder('${order.orderId}')">
                         <div class="flex items-center justify-between mb-4 pb-3 border-b border-gray-100">
                             <div class="flex items-center gap-3">
-                                <span class="text-3xl">${order.services[0]?.icon || '📦'}</span>
+                                <span class="text-3xl">${firstService.icon || '📦'}</span>
                                 <div class="flex-1">
                                     <span class="font-semibold text-gray-800 block">
-                                        ${order.services.length > 1 ? `${order.services[0]?.name || ''}等${order.services.length}项` : order.services[0]?.name || '服务'}
+                                        ${orderServices.length > 1 ? `${firstService.name || ''}等${orderServices.length}项` : firstService.name || '服务'}
                                     </span>
                                     <span class="text-xs text-gray-400">${servicesPreview}${moreCount}</span>
                                 </div>
@@ -711,6 +717,14 @@
                     </div>
                 `;
             }).join('');
+            
+            // 将HTML设置到DOM
+            ordersList.innerHTML = ordersHTML;
+            
+            // 存储当前订单列表（用于详情页）
+            localStorage.setItem('current_orders', JSON.stringify(filteredOrders));
+            
+            console.log('[c-orders] 订单列表渲染完成，共', filteredOrders.length, '条');
         }
 
         // 查看订单详情

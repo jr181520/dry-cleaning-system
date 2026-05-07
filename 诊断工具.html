@@ -23,6 +23,22 @@
     <div class="max-w-4xl mx-auto">
         <h1 class="text-2xl font-bold text-gray-800 mb-4">🔧 数据同步诊断工具</h1>
         
+        <!-- 重要提示 -->
+        <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4">
+            <div class="flex items-start">
+                <span class="text-2xl mr-3">💡</span>
+                <div>
+                    <h3 class="font-bold text-yellow-800 mb-1">使用说明</h3>
+                    <ul class="text-sm text-yellow-700 space-y-1">
+                        <li>• <strong>Token 状态</strong>：显示当前页面 localStorage 中的登录状态</li>
+                        <li>• <strong>需要登录</strong>：点击各端的"登录"按钮跳转到登录页面</li>
+                        <li>• <strong>同步数据</strong>：登录后返回此页面，点击"同步"获取服务器数据</li>
+                        <li>• <strong>重要</strong>：登录和诊断需要在同一个浏览器标签中进行</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+        
         <!-- 诊断控制面板 -->
         <div class="bg-white rounded-lg shadow p-4 mb-4">
             <h2 class="text-lg font-semibold mb-3">诊断控制</h2>
@@ -39,6 +55,9 @@
                 <button onclick="exportDiagnosis()" class="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600">
                     📥 导出报告
                 </button>
+                <button onclick="quickTestLogin()" class="px-4 py-2 bg-orange-500 text-white rounded hover:bg-orange-600">
+                    🔑 快速测试登录
+                </button>
             </div>
         </div>
         
@@ -50,12 +69,17 @@
                 <div class="text-sm space-y-1">
                     <div>Token: <span id="c-token" class="text-gray-500">检查中...</span></div>
                     <div>本地订单: <span id="c-orders-count" class="font-bold">-</span></div>
-                    <div>最后更新: <span id="c-orders-time" class="text-gray-500">-</span></div>
+                    <div>存储位置: <span id="c-storage" class="text-gray-500 text-xs">-</span></div>
                     <div>API订单: <span id="c-api-orders" class="font-bold">-</span></div>
                 </div>
-                <button onclick="syncEndpoint('c')" class="mt-2 w-full px-3 py-1 bg-blue-100 text-blue-600 rounded hover:bg-blue-200">
-                    同步C端
-                </button>
+                <div class="mt-2 flex gap-1">
+                    <a href="c-login.html" target="_blank" class="flex-1 text-center px-2 py-1 bg-blue-100 text-blue-600 rounded text-sm hover:bg-blue-200">
+                        登录
+                    </a>
+                    <button onclick="syncEndpoint('c')" class="flex-1 px-2 py-1 bg-blue-100 text-blue-600 rounded hover:bg-blue-200">
+                        同步
+                    </button>
+                </div>
             </div>
             
             <!-- M端 -->
@@ -64,12 +88,18 @@
                 <div class="text-sm space-y-1">
                     <div>Token: <span id="m-token" class="text-gray-500">检查中...</span></div>
                     <div>本地订单: <span id="m-orders-count" class="font-bold">-</span></div>
+                    <div>存储位置: <span id="m-storage" class="text-gray-500 text-xs">-</span></div>
                     <div>门店ID: <span id="m-store-id" class="text-gray-500">-</span></div>
                     <div>API订单: <span id="m-api-orders" class="font-bold">-</span></div>
                 </div>
-                <button onclick="syncEndpoint('m')" class="mt-2 w-full px-3 py-1 bg-green-100 text-green-600 rounded hover:bg-green-200">
-                    同步M端
-                </button>
+                <div class="mt-2 flex gap-1">
+                    <a href="m-login.html" target="_blank" class="flex-1 text-center px-2 py-1 bg-green-100 text-green-600 rounded text-sm hover:bg-green-200">
+                        登录
+                    </a>
+                    <button onclick="syncEndpoint('m')" class="flex-1 px-2 py-1 bg-green-100 text-green-600 rounded hover:bg-green-200">
+                        同步
+                    </button>
+                </div>
             </div>
             
             <!-- Admin端 -->
@@ -78,18 +108,24 @@
                 <div class="text-sm space-y-1">
                     <div>Token: <span id="admin-token" class="text-gray-500">检查中...</span></div>
                     <div>本地订单: <span id="admin-orders-count" class="font-bold">-</span></div>
-                    <div>全部订单: <span id="admin-api-orders" class="font-bold">-</span></div>
+                    <div>存储位置: <span id="admin-storage" class="text-gray-500 text-xs">-</span></div>
+                    <div>API订单: <span id="admin-api-orders" class="font-bold">-</span></div>
                 </div>
-                <button onclick="syncEndpoint('admin')" class="mt-2 w-full px-3 py-1 bg-purple-100 text-purple-600 rounded hover:bg-purple-200">
-                    同步Admin
-                </button>
+                <div class="mt-2 flex gap-1">
+                    <a href="admin-login.html" target="_blank" class="flex-1 text-center px-2 py-1 bg-purple-100 text-purple-600 rounded text-sm hover:bg-purple-200">
+                        登录
+                    </a>
+                    <button onclick="syncEndpoint('admin')" class="flex-1 px-2 py-1 bg-purple-100 text-purple-600 rounded hover:bg-purple-200">
+                        同步
+                    </button>
+                </div>
             </div>
         </div>
         
         <!-- 服务器状态 -->
         <div class="bg-white rounded-lg shadow p-4 mb-4">
-            <h2 class="text-lg font-semibold mb-3">🖥️ 服务器状态</h2>
-            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <h2 class="text-lg font-semibold mb-3">🖥️ 服务器状态（localhost:3000）</h2>
+            <div class="grid grid-cols-2 md:grid-cols-5 gap-4 mb-4">
                 <div class="text-center">
                     <div class="text-3xl font-bold" id="server-total-orders">-</div>
                     <div class="text-sm text-gray-500">总订单数</div>
@@ -103,8 +139,34 @@
                     <div class="text-sm text-gray-500">已支付</div>
                 </div>
                 <div class="text-center">
+                    <div class="text-3xl font-bold text-purple-600" id="server-received-orders">-</div>
+                    <div class="text-sm text-gray-500">已入库</div>
+                </div>
+                <div class="text-center">
                     <div class="text-3xl font-bold text-green-600" id="server-completed-orders">-</div>
                     <div class="text-sm text-gray-500">已完成</div>
+                </div>
+            </div>
+            <!-- 服务器连接诊断 -->
+            <div class="border-t pt-3">
+                <h3 class="font-medium mb-2">🔌 服务器连接诊断</h3>
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-2 text-sm">
+                    <div class="flex items-center">
+                        <span class="mr-2">后端API:</span>
+                        <span id="check-backend-api" class="text-gray-500">检查中...</span>
+                    </div>
+                    <div class="flex items-center">
+                        <span class="mr-2">MongoDB:</span>
+                        <span id="check-mongodb" class="text-gray-500">检查中...</span>
+                    </div>
+                    <div class="flex items-center">
+                        <span class="mr-2">EMQX:</span>
+                        <span id="check-emqx" class="text-gray-500">检查中...</span>
+                    </div>
+                    <div class="flex items-center">
+                        <span class="mr-2">存储状态:</span>
+                        <span id="check-storage" class="text-gray-500">检查中...</span>
+                    </div>
                 </div>
             </div>
         </div>
@@ -135,19 +197,22 @@
         // 端点配置
         const endpoints = {
             c: {
-                storageKey: 'c_orders',
+                storageKeys: ['c_orders', 'orders'],  // 支持多个存储 key
                 tokenKeys: ['userToken', 'authToken'],
-                name: 'C端'
+                name: 'C端',
+                loginPage: 'c-login.html'
             },
             m: {
-                storageKey: 'm_orders',
+                storageKeys: ['m_orders', 'store_orders'],  // 支持多个存储 key
                 tokenKeys: ['storeToken', 'authToken'],
-                name: 'M端'
+                name: 'M端',
+                loginPage: 'm-login.html'
             },
             admin: {
-                storageKey: 'admin_orders',
+                storageKeys: ['admin_orders', 'orders'],
                 tokenKeys: ['adminToken', 'adminAuthToken'],
-                name: 'Admin'
+                name: 'Admin',
+                loginPage: 'admin-login.html'
             }
         };
         
@@ -161,7 +226,7 @@
             container.insertBefore(div, container.firstChild);
         }
         
-        // 获取token
+        // 获取token（用于显示）
         function getToken(endpoint) {
             const keys = endpoints[endpoint].tokenKeys;
             for (const key of keys) {
@@ -171,20 +236,52 @@
             return null;
         }
         
-        // 获取本地订单数
-        function getLocalOrdersCount(endpoint) {
-            const key = endpoints[endpoint].storageKey;
-            try {
-                const orders = JSON.parse(localStorage.getItem(key) || '[]');
-                return orders.length;
-            } catch {
-                return 0;
+        // 获取完整token（用于API调用）
+        function getFullToken(endpoint) {
+            const keys = endpoints[endpoint].tokenKeys;
+            for (const key of keys) {
+                const token = localStorage.getItem(key);
+                if (token) return { key, token: token };
             }
+            return null;
+        }
+        
+        // 获取本地订单数（检查所有可能的存储 key）
+        function getLocalOrdersCount(endpoint) {
+            const keys = endpoints[endpoint].storageKeys;
+            let total = 0;
+            for (const key of keys) {
+                try {
+                    const orders = JSON.parse(localStorage.getItem(key) || '[]');
+                    if (Array.isArray(orders)) {
+                        total += orders.length;
+                    }
+                } catch {}
+            }
+            return total;
+        }
+        
+        // 获取实际使用的存储 key
+        function getUsedStorageKeys(endpoint) {
+            const keys = endpoints[endpoint].storageKeys;
+            const used = [];
+            for (const key of keys) {
+                try {
+                    const data = localStorage.getItem(key);
+                    if (data && data !== '[]') {
+                        const parsed = JSON.parse(data);
+                        if (Array.isArray(parsed) && parsed.length > 0) {
+                            used.push(`${key}(${parsed.length}条)`);
+                        }
+                    }
+                } catch {}
+            }
+            return used.join(', ') || '无';
         }
         
         // 从API获取订单数
         async function getAPIOrdersCount(endpoint) {
-            const tokenData = getToken(endpoint);
+            const tokenData = getFullToken(endpoint);  // 使用完整token
             if (!tokenData) return { count: 0, error: '未登录' };
             
             try {
@@ -216,6 +313,12 @@
             document.getElementById(`${endpoint}-orders-count`).textContent = 
                 data.localCount !== undefined ? data.localCount : '-';
             
+            // 显示存储位置
+            const storageEl = document.getElementById(`${endpoint}-storage`);
+            if (storageEl && data.storageInfo) {
+                storageEl.textContent = data.storageInfo;
+            }
+            
             if (endpoint === 'm') {
                 const storeId = localStorage.getItem('currentStore') || localStorage.getItem('storeUser');
                 if (storeId) {
@@ -231,7 +334,7 @@
         async function syncEndpoint(endpoint) {
             addLog(`开始同步 ${endpoints[endpoint].name}...`, 'info');
             
-            const tokenData = getToken(endpoint);
+            const tokenData = getFullToken(endpoint);  // 使用完整token
             if (!tokenData) {
                 addLog(`${endpoints[endpoint].name} 未登录，跳过`, 'warn');
                 return;
@@ -239,7 +342,7 @@
             
             try {
                 const response = await fetch(`${API_BASE}/cleaning/orders`, {
-                    headers: { 'Authorization': `Bearer ${localStorage.getItem(tokenData.key)}` }
+                    headers: { 'Authorization': `Bearer ${tokenData.token}` }
                 });
                 
                 if (!response.ok) {
@@ -251,15 +354,16 @@
                 if (result.success) {
                     const orders = result.data?.list || result.data || [];
                     
-                    // 保存到本地
-                    localStorage.setItem(endpoints[endpoint].storageKey, JSON.stringify(orders));
+                    // 保存到本地（第一个storageKey）
+                    localStorage.setItem(endpoints[endpoint].storageKeys[0], JSON.stringify(orders));
                     
                     addLog(`${endpoints[endpoint].name} 同步成功，获取 ${orders.length} 条订单`, 'success');
                     
                     // 更新显示
                     updateUI(endpoint, { 
-                        token: tokenData,
-                        localCount: orders.length 
+                        token: { key: tokenData.key, token: tokenData.token.substring(0, 20) + '...' },
+                        localCount: orders.length,
+                        storageInfo: `${endpoints[endpoint].storageKeys[0]}(${orders.length}条)`
                     });
                 }
             } catch (e) {
@@ -288,16 +392,27 @@
         
         // 获取服务器统计
         async function getServerStats() {
-            const tokenData = getToken('admin') || getToken('c');
+            // 检查后端 API 连接
+            await checkBackendAPI();
+            
+            // 检查 MongoDB 连接
+            await checkMongoDB();
+            
+            // 检查 EMQX 连接
+            await checkEMQX();
+            
+            // 获取订单统计
+            const tokenData = getFullToken('admin') || getFullToken('c');
             if (!tokenData) {
                 addLog('无有效Token，无法获取服务器统计', 'warn');
+                document.getElementById('check-storage').textContent = '⚠️ 无Token';
+                document.getElementById('check-storage').className = 'text-yellow-600';
                 return;
             }
             
-            const key = tokenData.key;
             try {
                 const response = await fetch(`${API_BASE}/cleaning/orders`, {
-                    headers: { 'Authorization': `Bearer ${localStorage.getItem(key)}` }
+                    headers: { 'Authorization': `Bearer ${tokenData.token}` }
                 });
                 
                 if (!response.ok) return;
@@ -311,14 +426,91 @@
                         orders.filter(o => o.status === 'pending').length;
                     document.getElementById('server-paid-orders').textContent = 
                         orders.filter(o => o.status === 'paid').length;
+                    document.getElementById('server-received-orders').textContent = 
+                        orders.filter(o => ['delivering', 'received', 'processing'].includes(o.status)).length;
                     document.getElementById('server-completed-orders').textContent = 
                         orders.filter(o => ['completed', 'cleaned', 'ready'].includes(o.status)).length;
+                    
+                    // 存储状态检查
+                    document.getElementById('check-storage').textContent = '✓ 正常';
+                    document.getElementById('check-storage').className = 'text-green-600';
                     
                     return orders;
                 }
             } catch (e) {
                 addLog('获取服务器统计失败', 'error');
             }
+        }
+        
+        // 检查后端 API 连接
+        async function checkBackendAPI() {
+            try {
+                const response = await fetch('http://localhost:3000/api/health', {
+                    method: 'GET',
+                    timeout: 3000
+                });
+                if (response.ok) {
+                    document.getElementById('check-backend-api').textContent = '✓ 正常';
+                    document.getElementById('check-backend-api').className = 'text-green-600';
+                    return true;
+                }
+            } catch (e) {
+                // 尝试备用端点
+                try {
+                    const response = await fetch('http://localhost:3000/api/cleaning/orders', {
+                        method: 'GET',
+                        timeout: 3000
+                    });
+                    // 即使返回401也说明服务正常
+                    document.getElementById('check-backend-api').textContent = '✓ 正常';
+                    document.getElementById('check-backend-api').className = 'text-green-600';
+                    return true;
+                } catch (e2) {}
+            }
+            document.getElementById('check-backend-api').textContent = '✗ 失败';
+            document.getElementById('check-backend-api').className = 'text-red-600';
+            return false;
+        }
+        
+        // 检查 MongoDB 连接（通过API）
+        async function checkMongoDB() {
+            try {
+                // 通过后端API间接检查MongoDB
+                const response = await fetch(`${API_BASE}/stores`, {
+                    method: 'GET',
+                    timeout: 3000
+                });
+                if (response.ok || response.status === 401) {
+                    document.getElementById('check-mongodb').textContent = '✓ 正常';
+                    document.getElementById('check-mongodb').className = 'text-green-600';
+                    return true;
+                }
+            } catch (e) {
+                // 如果API请求失败，标记为未知
+                document.getElementById('check-mongodb').textContent = '? 未知';
+                document.getElementById('check-mongodb').className = 'text-gray-500';
+            }
+            return false;
+        }
+        
+        // 检查 EMQX 连接
+        async function checkEMQX() {
+            try {
+                const response = await fetch('http://localhost:8083/api/v4/health/check', {
+                    method: 'GET',
+                    timeout: 3000
+                });
+                if (response.ok) {
+                    document.getElementById('check-emqx').textContent = '✓ 正常';
+                    document.getElementById('check-emqx').className = 'text-green-600';
+                    return true;
+                }
+            } catch (e) {
+                // EMQX 可能未运行或无法访问
+                document.getElementById('check-emqx').textContent = '✗ 未连接';
+                document.getElementById('check-emqx').className = 'text-gray-500';
+            }
+            return false;
         }
         
         // 诊断问题
@@ -392,7 +584,8 @@
             for (const [ep, cfg] of Object.entries(endpoints)) {
                 const token = getToken(ep);
                 const localCount = getLocalOrdersCount(ep);
-                updateUI(ep, { token, localCount });
+                const storageInfo = getUsedStorageKeys(ep);
+                updateUI(ep, { token, localCount, storageInfo });
                 addLog(`${cfg.name}: Token=${token ? '✓' : '✗'}, 本地=${localCount}`, token ? 'success' : 'warn');
             }
             
@@ -454,6 +647,41 @@
         window.onload = () => {
             setTimeout(runFullDiagnosis, 500);
         };
+        
+        // 快速测试登录（设置模拟token）
+        function quickTestLogin() {
+            addLog('开始快速测试登录...', 'info');
+            
+            // C端测试用户
+            localStorage.setItem('userToken', 'test-c-user-token-' + Date.now());
+            localStorage.setItem('userInfo', JSON.stringify({
+                id: 'test-c-001',
+                phone: '13800001001',
+                name: '测试用户C端'
+            }));
+            
+            // M端测试门店
+            localStorage.setItem('storeToken', 'test-m-store-token-' + Date.now());
+            localStorage.setItem('storeUser', JSON.stringify({
+                storeId: 'ST002',
+                name: '测试门店',
+                phone: '13900001002'
+            }));
+            
+            // Admin测试账号
+            localStorage.setItem('adminToken', 'test-admin-token-' + Date.now());
+            localStorage.setItem('adminInfo', JSON.stringify({
+                id: 'test-admin-001',
+                username: 'admin',
+                name: '测试管理员'
+            }));
+            
+            addLog('✓ 已设置所有测试Token', 'success');
+            addLog('⚠️ 注意：这些是模拟Token，无法与真实服务器通信', 'warn');
+            
+            // 重新诊断
+            setTimeout(runFullDiagnosis, 300);
+        }
     </script>
 </body>
 </html>
