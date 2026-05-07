@@ -1644,6 +1644,7 @@
     // 选择取件方式
     function selectPickupMethod(method) {
       selectedPickupMethod = method;
+      console.log('[取件方式] 用户选择:', method, '| 当前订单状态:', currentOrder?.status);
       
       // 更新UI
       document.querySelectorAll('.pickup-method-option').forEach(option => {
@@ -1675,10 +1676,24 @@
               localStorage.setItem('orders', JSON.stringify(orders));
             }
             localStorage.setItem('currentOrder', JSON.stringify(currentOrder));
+            
+            console.log('[取件方式] 已设置deliveryMethod为courier，更新配送信息显示');
           }
+        }
+        
+        // 立即更新配送信息显示（包括跑腿服务商选择栏）
+        if (currentOrder) {
+          updateDeliveryInfo(currentOrder);
+          console.log('[取件方式] 已调用updateDeliveryInfo，显示跑腿服务商选择栏');
         }
       } else {
         deliveryForm.classList.remove('show');
+        
+        // 立即更新配送信息显示
+        if (currentOrder) {
+          updateDeliveryInfo(currentOrder);
+          console.log('[取件方式] 已调用updateDeliveryInfo，隐藏跑腿服务商选择栏');
+        }
       }
       
       // 如果当前是ready状态，更新底部按钮
@@ -2049,12 +2064,27 @@
     let isPageLoading = false;
     let lastKnownOrderStatus = null;
     let lastKnownUpdatedAt = null;
+    
+    // 防抖变量：避免频繁更新UI
+    let updatePending = false;
+    let lastUpdateTime = 0;
+    const UPDATE_DEBOUNCE = 1000; // 1秒内不重复更新UI
 
     // 刷新订单数据（同时检查localStorage和API）
     async function refreshOrderData() {
       if (!orderId) return;
       
+      // 防抖：如果正在更新或上次更新时间在1秒内，跳过这次检查
+      const now = Date.now();
+      if (updatePending || (now - lastUpdateTime < UPDATE_DEBOUNCE)) {
+        console.log('[刷新] 跳过（防抖）| 当前:', now, '| 上次:', lastUpdateTime, '| 间隔:', now - lastUpdateTime);
+        return;
+      }
+      
       try {
+        // 标记为正在更新
+        updatePending = true;
+        
         // 1. 首先检查localStorage是否有更新（M端会实时更新这里）
         const ordersStr = localStorage.getItem('orders');
         if (ordersStr) {
@@ -2070,21 +2100,40 @@
             const localUpdatedAt = order.updatedAt ? new Date(order.updatedAt) : null;
             const currentUpdatedAt = lastKnownUpdatedAt ? new Date(lastKnownUpdatedAt) : null;
             
-            // 无论有没有 lastKnownUpdatedAt，只要找到订单就检查状态变化
-            // 状态变化的条件：(1)之前没记录 或 (2)时间戳更新 或 (3)状态本身变化
-            const timeChanged = !lastKnownUpdatedAt || (localUpdatedAt && (!currentUpdatedAt || localUpdatedAt > currentUpdatedAt));
-            const statusChanged = lastKnownOrderStatus && order.status !== lastKnownOrderStatus;
+            // 状态变化的条件：(1)之前没记录 或 (2)时间戳更新 且 状态真的变化了
+            // 注意：不能仅根据时间戳更新就刷新UI，必须确保状态真的有变化
+            const statusChanged = !lastKnownOrderStatus || order.status !== lastKnownOrderStatus;
+            const timeChanged = localUpdatedAt && currentUpdatedAt && localUpdatedAt > currentUpdatedAt;
             
-            if (timeChanged || statusChanged) {
-              console.log('[同步检测] localStorage订单状态:', order.status, '| 上次状态:', lastKnownOrderStatus, '| 时间:', localUpdatedAt);
+            console.log('[同步检测] 状态:', order.status, '| 上次:', lastKnownOrderStatus, '| 变化:', statusChanged, '| 时间更新:', timeChanged);
+            
+            // 只有状态真正变化了才更新UI
+            if (statusChanged) {
+              console.log('[同步检测] 检测到状态变化，更新UI | ', order.status, '->', lastKnownOrderStatus);
               
               currentOrder = order;
               lastKnownOrderStatus = order.status;
               lastKnownUpdatedAt = order.updatedAt;
+              lastUpdateTime = Date.now();
               updateOrderUI(currentOrder);
               
               // 更新页面标题显示最新状态
               document.title = `订单详情 - ${getStatusText(order.status)}`;
+              
+              setTimeout(() => {
+                updatePending = false;
+              }, UPDATE_DEBOUNCE);
+              return;
+            } else if (timeChanged && !statusChanged) {
+              // 时间戳更新但状态没变，说明是其他字段更新（如updatedAt），更新本地记录但不刷新UI
+              console.log('[同步检测] 时间戳更新但状态未变，仅更新本地记录');
+              currentOrder = order;
+              lastKnownOrderStatus = order.status;
+              lastKnownUpdatedAt = order.updatedAt;
+              
+              setTimeout(() => {
+                updatePending = false;
+              }, UPDATE_DEBOUNCE);
               return;
             }
           } else {
@@ -2103,11 +2152,12 @@
         
         if (result.success && result.data) {
           const apiOrder = result.data;
-          const apiUpdatedAt = apiOrder.updatedAt ? new Date(apiOrder.updatedAt) : null;
           
-          // 如果API数据比当前显示的更新
-          if (!lastKnownUpdatedAt || (apiUpdatedAt && apiUpdatedAt > new Date(lastKnownUpdatedAt))) {
-            console.log('[API刷新] 检测到API有新数据:', apiOrder.status, '时间:', apiUpdatedAt);
+          // 检查API状态是否与本地状态不同
+          const apiStatusChanged = !lastKnownOrderStatus || apiOrder.status !== lastKnownOrderStatus;
+          
+          if (apiStatusChanged) {
+            console.log('[API刷新] 检测到API状态变化:', apiOrder.status, '| 上次:', lastKnownOrderStatus);
             
             // 合并数据：优先使用API的最新状态
             if (currentOrder) {
@@ -2124,11 +2174,21 @@
             
             lastKnownOrderStatus = currentOrder.status;
             lastKnownUpdatedAt = currentOrder.updatedAt;
+            lastUpdateTime = Date.now();
             updateOrderUI(currentOrder);
+            
+            setTimeout(() => {
+              updatePending = false;
+            }, UPDATE_DEBOUNCE);
+            return;
           }
         }
+        
+        // 3. 都没有变化，解除锁定
+        updatePending = false;
       } catch (error) {
         console.log('[刷新] 获取失败，保留当前数据:', error.message);
+        updatePending = false;
       }
     }
     
