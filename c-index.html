@@ -542,6 +542,9 @@
             const orders = JSON.parse(localStorage.getItem('orders') || '[]');
             pendingOrders = orders.filter(order => order.status === 'ready' || order.status === 'delivered');
             
+            // 区分门店自提和配送订单
+            const pickupOrders = pendingOrders.filter(order => order.deliveryMethod === 'pickup');
+            
             const noticeEl = document.getElementById('pending-notice');
             const badgeEl = document.getElementById('badge-count');
             const titleEl = document.getElementById('notice-title');
@@ -551,18 +554,58 @@
             if (pendingOrders.length > 0) {
                 noticeEl.classList.remove('hidden');
                 badgeEl.textContent = pendingOrders.length;
-                titleEl.textContent = `您有 ${pendingOrders.length} 件待取件`;
+                
+                // 根据订单类型显示不同标题
+                if (pickupOrders.length > 0) {
+                    titleEl.textContent = `您有 ${pendingOrders.length} 件待取件 (${pickupOrders.length}件门店自提)`;
+                } else {
+                    titleEl.textContent = `您有 ${pendingOrders.length} 件待取件`;
+                }
+                
                 dotEl.classList.remove('hidden');
                 
-                ordersEl.innerHTML = pendingOrders.slice(0, 3).map(order => `
-                    <div class="flex flex-col gap-1">
-                        <span class="text-xs font-semibold text-amber-800">${order.orderId}</span>
-                        <span class="text-xs text-amber-600">${order.createTime || ''}</span>
-                    </div>
-                `).join('');
+                // 渲染订单列表
+                let ordersHtml = '';
+                
+                // 门店自提订单
+                if (pickupOrders.length > 0) {
+                    ordersHtml += pickupOrders.slice(0, 2).map(order => `
+                        <div class="flex flex-col gap-1 cursor-pointer" onclick="goToStorePickup('${order.orderId}')">
+                            <span class="text-xs font-semibold text-blue-800 flex items-center gap-1">
+                                🏪 门店自提: ${order.orderId}
+                            </span>
+                            <span class="text-xs text-blue-600">${order.storeName || '门店'}</span>
+                        </div>
+                    `).join('');
+                }
+                
+                // 其他订单
+                const otherOrders = pendingOrders.filter(order => order.deliveryMethod !== 'pickup');
+                if (otherOrders.length > 0) {
+                    ordersHtml += otherOrders.slice(0, 2).map(order => `
+                        <div class="flex flex-col gap-1">
+                            <span class="text-xs font-semibold text-amber-800">${order.orderId}</span>
+                            <span class="text-xs text-amber-600">${order.createTime || ''}</span>
+                        </div>
+                    `).join('');
+                }
+                
+                ordersEl.innerHTML = ordersHtml;
             } else {
                 noticeEl.classList.add('hidden');
                 dotEl.classList.add('hidden');
+            }
+        }
+        
+        // 跳转到门店自提详情页
+        function goToStorePickup(orderId) {
+            if (orderId) {
+                // 保存当前要查看的订单ID
+                localStorage.setItem('currentPickupOrder', orderId);
+                window.location.href = 'c-store-pickup.html';
+            } else {
+                // 打开门店自提页面
+                window.location.href = 'c-store-pickup.html';
             }
         }
 

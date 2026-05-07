@@ -796,7 +796,8 @@
       cleaning: { text: '清洗中', icon: 'fa-cog fa-spin', color: '#ff5722', gradient: 'linear-gradient(135deg, #ff5722, #e64a19)' },
       cleaned: { text: '清洗完成', icon: 'fa-check-circle', color: '#9c27b0', gradient: 'linear-gradient(135deg, #9c27b0, #7b1fa2)' },
       ready: { text: '待取件', icon: 'fa-box', color: '#00bcd4', gradient: 'linear-gradient(135deg, #00bcd4, #0097a7)' },
-      delivering_back: { text: '配送中', icon: 'fa-truck', color: '#2196f3', gradient: 'linear-gradient(135deg, #2196f3, #1976d2)' },
+      delivering_back: { text: '配送中', icon: 'fa-motorcycle', color: '#ff5722', gradient: 'linear-gradient(135deg, #ff5722, #e64a19)' },
+      awaiting_store_outbound: { text: '等待出库', icon: 'fa-box', color: '#9c27b0', gradient: 'linear-gradient(135deg, #9c27b0, #7b1fa2)' },
       completed: { text: '已完成', icon: 'fa-flag-checkered', color: '#4caf50', gradient: 'linear-gradient(135deg, #4caf50, #388e3c)' },
       cancelled: { text: '已取消', icon: 'fa-times-circle', color: '#9e9e9e', gradient: 'linear-gradient(135deg, #9e9e9e, #757575)' }
     };
@@ -1766,15 +1767,19 @@
           mainBtn.onclick = scanStoreQRCode;
           break;
         case 'delivering_back':
-          // 配送中状态
-          mainBtn.textContent = '查看配送';
+          // 骑手配送中状态
+          mainBtn.textContent = '查看配送跟踪';
           mainBtn.className = 'btn-action btn-primary';
           mainBtn.onclick = () => window.location.href = `c-delivery-tracking.html?orderId=${orderId}`;
-          break;
-        case 'delivering_back':
-          mainBtn.textContent = '查看配送';
-          mainBtn.className = 'btn-action btn-primary';
-          mainBtn.onclick = () => alert('配送信息');
+          if (secondaryBtn) {
+            secondaryBtn.textContent = '联系骑手';
+            secondaryBtn.onclick = () => {
+              const courierPhone = currentOrder?.courierPhone || currentOrder?.courier?.phone || '138****1234';
+              if (confirm(`拨打骑手电话：${courierPhone}？`)) {
+                alert(`拨号功能：${courierPhone}`);
+              }
+            };
+          }
           break;
         case 'completed':
           mainBtn.textContent = '去评价';
@@ -2068,23 +2073,48 @@
     // 防抖变量：避免频繁更新UI
     let updatePending = false;
     let lastUpdateTime = 0;
-    const UPDATE_DEBOUNCE = 1000; // 1秒内不重复更新UI
+    const UPDATE_DEBOUNCE = 1000; // 1秒防抖
 
-    // 刷新订单数据（同时检查localStorage和API）
+    // 统一的状态更新函数（包含防抖逻辑）
+    function scheduleUIUpdate(order) {
+      if (updatePending) {
+        console.log('[防抖] 跳过更新（锁定中）| 订单:', order?.orderNo || orderId);
+        return;
+      }
+      
+      updatePending = true;
+      lastUpdateTime = Date.now();
+      
+      console.log('[防抖] 计划更新UI | 订单:', order?.orderNo || orderId, '| 状态:', order?.status);
+      
+      // 立即更新UI
+      currentOrder = order;
+      lastKnownOrderStatus = order.status;
+      lastKnownUpdatedAt = order.updatedAt;
+      updateOrderUI(currentOrder);
+      
+      // 更新页面标题
+      document.title = `订单详情 - ${getStatusText(order.status)}`;
+      
+      // 防抖锁定 1 秒
+      setTimeout(() => {
+        updatePending = false;
+        console.log('[防抖] 解锁 | 上次更新时间:', lastUpdateTime);
+      }, UPDATE_DEBOUNCE);
+    }
+
+    // 刷新订单数据（统一入口，整合防抖）
     async function refreshOrderData() {
       if (!orderId) return;
       
-      // 防抖：如果正在更新或上次更新时间在1秒内，跳过这次检查
+      // 防抖检查：如果上次更新时间在1秒内，跳过这次检查
       const now = Date.now();
-      if (updatePending || (now - lastUpdateTime < UPDATE_DEBOUNCE)) {
-        console.log('[刷新] 跳过（防抖）| 当前:', now, '| 上次:', lastUpdateTime, '| 间隔:', now - lastUpdateTime);
+      if (now - lastUpdateTime < UPDATE_DEBOUNCE) {
+        console.log('[刷新] 跳过（防抖）| 当前:', now, '| 上次:', lastUpdateTime, '| 间隔:', now - lastUpdateTime, 'ms');
         return;
       }
       
       try {
-        // 标记为正在更新
-        updatePending = true;
-        
         // 1. 首先检查localStorage是否有更新（M端会实时更新这里）
         const ordersStr = localStorage.getItem('orders');
         if (ordersStr) {
@@ -2097,47 +2127,26 @@
           );
           
           if (order) {
+            // 状态变化检查
+            const statusChanged = order.status !== lastKnownOrderStatus;
             const localUpdatedAt = order.updatedAt ? new Date(order.updatedAt) : null;
             const currentUpdatedAt = lastKnownUpdatedAt ? new Date(lastKnownUpdatedAt) : null;
-            
-            // 状态变化的条件：(1)之前没记录 或 (2)时间戳更新 且 状态真的变化了
-            // 注意：不能仅根据时间戳更新就刷新UI，必须确保状态真的有变化
-            const statusChanged = !lastKnownOrderStatus || order.status !== lastKnownOrderStatus;
             const timeChanged = localUpdatedAt && currentUpdatedAt && localUpdatedAt > currentUpdatedAt;
             
-            console.log('[同步检测] 状态:', order.status, '| 上次:', lastKnownOrderStatus, '| 变化:', statusChanged, '| 时间更新:', timeChanged);
+            console.log('[同步检测] 状态:', order.status, '| 上次:', lastKnownOrderStatus, '| 变化:', statusChanged);
             
-            // 只有状态真正变化了才更新UI
             if (statusChanged) {
-              console.log('[同步检测] 检测到状态变化，更新UI | ', order.status, '->', lastKnownOrderStatus);
-              
-              currentOrder = order;
-              lastKnownOrderStatus = order.status;
-              lastKnownUpdatedAt = order.updatedAt;
-              lastUpdateTime = Date.now();
-              updateOrderUI(currentOrder);
-              
-              // 更新页面标题显示最新状态
-              document.title = `订单详情 - ${getStatusText(order.status)}`;
-              
-              setTimeout(() => {
-                updatePending = false;
-              }, UPDATE_DEBOUNCE);
+              // 状态变化，使用统一更新函数
+              scheduleUIUpdate(order);
               return;
             } else if (timeChanged && !statusChanged) {
-              // 时间戳更新但状态没变，说明是其他字段更新（如updatedAt），更新本地记录但不刷新UI
+              // 时间戳更新但状态没变，仅更新本地记录
               console.log('[同步检测] 时间戳更新但状态未变，仅更新本地记录');
               currentOrder = order;
               lastKnownOrderStatus = order.status;
               lastKnownUpdatedAt = order.updatedAt;
-              
-              setTimeout(() => {
-                updatePending = false;
-              }, UPDATE_DEBOUNCE);
               return;
             }
-          } else {
-            console.log('[同步检测] localStorage中未找到订单:', orderId);
           }
         }
         
@@ -2152,43 +2161,20 @@
         
         if (result.success && result.data) {
           const apiOrder = result.data;
+          const apiStatusChanged = apiOrder.status !== lastKnownOrderStatus;
           
-          // 检查API状态是否与本地状态不同
-          const apiStatusChanged = !lastKnownOrderStatus || apiOrder.status !== lastKnownOrderStatus;
+          console.log('[API刷新] 检测到API状态变化:', apiOrder.status, '| 上次:', lastKnownOrderStatus, '| 变化:', apiStatusChanged);
           
           if (apiStatusChanged) {
-            console.log('[API刷新] 检测到API状态变化:', apiOrder.status, '| 上次:', lastKnownOrderStatus);
-            
-            // 合并数据：优先使用API的最新状态
-            if (currentOrder) {
-              currentOrder.status = apiOrder.status || currentOrder.status;
-              currentOrder.deliveryStatus = apiOrder.deliveryStatus || currentOrder.deliveryStatus;
-              currentOrder.deliveryMethod = apiOrder.deliveryMethod || currentOrder.deliveryMethod;
-              currentOrder.selectedProvider = apiOrder.selectedProvider || currentOrder.selectedProvider;
-              currentOrder.deliveryFee = apiOrder.deliveryFee || currentOrder.deliveryFee;
-              currentOrder.deliveryFeePaid = apiOrder.deliveryFeePaid || currentOrder.deliveryFeePaid;
-              currentOrder.updatedAt = apiOrder.updatedAt || currentOrder.updatedAt;
-            } else {
-              currentOrder = apiOrder;
-            }
-            
-            lastKnownOrderStatus = currentOrder.status;
-            lastKnownUpdatedAt = currentOrder.updatedAt;
-            lastUpdateTime = Date.now();
-            updateOrderUI(currentOrder);
-            
-            setTimeout(() => {
-              updatePending = false;
-            }, UPDATE_DEBOUNCE);
+            // API状态变化，使用统一更新函数
+            scheduleUIUpdate(apiOrder);
             return;
           }
         }
         
-        // 3. 都没有变化，解除锁定
-        updatePending = false;
+        console.log('[刷新] 数据无变化，保持当前状态:', lastKnownOrderStatus);
       } catch (error) {
         console.log('[刷新] 获取失败，保留当前数据:', error.message);
-        updatePending = false;
       }
     }
     
