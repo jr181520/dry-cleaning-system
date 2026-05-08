@@ -2820,6 +2820,17 @@
                     loadStoreOrders();
                 }
                 
+                // 监听C端门店自提灯条请求
+                if (e.key && e.key.startsWith('light_request_')) {
+                    console.log('【M端】收到C端灯条请求通知');
+                    try {
+                        const lightRequest = JSON.parse(e.newValue);
+                        handleLightRequest(lightRequest);
+                    } catch (err) {
+                        console.error('解析灯条请求失败:', err);
+                    }
+                }
+                
                 // 监听C端跑腿订单支付通知
                 if (e.key && e.key.startsWith('courier_order_paid_')) {
                     console.log('【M端】收到C端跑腿订单支付通知');
@@ -5270,6 +5281,79 @@ ${(order.items || order.services || []).map((item, idx) => `${idx + 1}. ${item.n
             
             console.log(`[状态同步] 配送状态 ${deliveryStatus} -> 物品状态 ${itemStatus}`);
         };
+        
+        // ============================================
+        // 处理C端门店自提灯条请求
+        // ============================================
+        function handleLightRequest(lightRequest) {
+            console.log('[M端] 处理灯条请求:', lightRequest);
+            
+            const currentStore = JSON.parse(localStorage.getItem('currentStore') || '{}');
+            const storeId = currentStore.storeId || 'ST002';
+            
+            // 检查是否属于自己的门店
+            if (lightRequest.storeId && lightRequest.storeId !== storeId) {
+                console.log('[M端] 忽略非本门店的灯条请求');
+                return;
+            }
+            
+            // 检查请求是否过期（超过60秒）
+            if (Date.now() - lightRequest.timestamp > 60000) {
+                console.log('[M端] 灯条请求已过期');
+                return;
+            }
+            
+            // 1. 显示通知
+            showNotification(`📢 新取件请求！订单号: ${lightRequest.orderId}`, 'success');
+            
+            // 2. 刷新门店自提订单列表
+            loadStorePickupOrders();
+            
+            // 3. 刷新灯条绑定（如果有）
+            if (typeof refreshLightBindings === 'function') {
+                refreshLightBindings();
+            }
+            
+            // 4. 播放提示音（如果有）
+            playNotificationSound();
+        }
+        
+        // 显示通知
+        function showNotification(message, type = 'info') {
+            const colors = {
+                success: 'bg-green-500',
+                warning: 'bg-yellow-500',
+                error: 'bg-red-500',
+                info: 'bg-blue-500'
+            };
+            
+            const toast = document.createElement('div');
+            toast.className = `fixed top-20 right-4 ${colors[type]} text-white px-6 py-3 rounded-lg shadow-lg z-50 transition-all transform translate-x-full`;
+            toast.innerHTML = `<i class="fa fa-bell mr-2"></i>${message}`;
+            document.body.appendChild(toast);
+            
+            // 动画显示
+            setTimeout(() => {
+                toast.classList.remove('translate-x-full');
+            }, 100);
+            
+            // 3秒后移除
+            setTimeout(() => {
+                toast.classList.add('translate-x-full');
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+        
+        // 播放提示音
+        function playNotificationSound() {
+            try {
+                const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdH2Onp6agHFkYXKEkpqYjoJ4cHR/jJaTiXx4e4ySko+Be3p+iZCRj4CAfnyAhYqLjIyJh4WCgYWIi4yMioeEgYKGiIqLiomGhIOEh4qLi4qIhYOCg4aIiYqJiISCgoOEg4SEg4KBgYODhISEg4KBgYOEg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4KBgYODg4SEg4');
+                audio.volume = 0.5;
+                audio.play().catch(() => {});
+            } catch (e) {
+                console.warn('播放提示音失败:', e);
+            }
+        }
         
         // ============================================
         // 处理C端跑腿订单支付完成通知
