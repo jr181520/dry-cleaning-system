@@ -6,8 +6,8 @@ const mqtt = require('mqtt');
 
 // 动态读取配置（确保 dotenv 已加载）
 const getMqttConfig = () => ({
-  broker: process.env.MQTT_BROKER || 'mqtt://localhost:1883', // 修复：默认改为 1883
-  wsPort: process.env.MQTT_WS_PORT || 8083,
+  broker: process.env.MQTT_BROKER || 'mqtt://localhost:1884', // 修复：改为与 production-broker.js 一致的端口
+  wsPort: process.env.MQTT_WS_PORT || 8084,
   keepalive: parseInt(process.env.MQTT_KEEPALIVE) || 60,
   reconnectPeriod: parseInt(process.env.MQTT_RECONNECT_PERIOD) || 5000,
   clientPrefix: process.env.MQTT_CLIENT_PREFIX || 'backend_server_',
@@ -39,7 +39,9 @@ class LightService {
           clientId: MQTT_CONFIG.clientPrefix + 'backend_' + Date.now(),
           keepalive: MQTT_CONFIG.keepalive,
           reconnectPeriod: MQTT_CONFIG.reconnectPeriod,
-          connectTimeout: MQTT_CONFIG.connectTimeout
+          connectTimeout: MQTT_CONFIG.connectTimeout,
+          username: 'admin',  // 后端客户端使用 admin 账号
+          password: 'admin123'
         });
 
         mqttClient.on('connect', () => {

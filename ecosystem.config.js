@@ -27,7 +27,8 @@ module.exports = {
       max_memory_restart: '500M',          // 内存超过500MB时自动重启（防止内存泄漏）
       env: {
         NODE_ENV: 'production',            // 环境变量：生产环境
-        PORT: 3000                          // 端口号
+        PORT: 3000,                         // 端口号
+        MQTT_BROKER: 'mqtt://localhost:1884' // MQTT Broker 地址
       },
       env_development: {
         NODE_ENV: 'development',

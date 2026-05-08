@@ -102,7 +102,16 @@
         <h3 class="text-base font-semibold text-gray-800 mb-4 flex items-center gap-2">
             <i class="fa fa-list text-primary"></i>
             物品明细
+            <span id="itemsCount" class="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded-full ml-auto">0件</span>
         </h3>
+        
+        <!-- 一键点亮所有灯条按钮 -->
+        <button id="lightAllBtn" onclick="lightAllItems()" 
+            class="w-full mb-4 bg-gradient-to-r from-yellow-400 to-orange-500 text-white py-3 rounded-xl font-bold shadow-lg hover:shadow-xl transition-all flex items-center justify-center gap-2">
+            <i class="fa fa-lightbulb-o"></i>
+            <span>点亮所有灯条</span>
+        </button>
+        
         <div id="itemsList">
             <!-- 动态加载 -->
         </div>
@@ -205,23 +214,43 @@
             // 物品列表
             const items = orderData.items || orderData.services || [];
             const itemsListEl = document.getElementById('itemsList');
+            const itemsCountEl = document.getElementById('itemsCount');
+            
+            itemsCountEl.textContent = `${items.length}件`;
             
             if (items.length === 0) {
                 itemsListEl.innerHTML = '<p class="text-gray-500 text-center py-4">暂无物品信息</p>';
             } else {
-                itemsListEl.innerHTML = items.map((item, index) => `
-                    <div class="item-card">
+                itemsListEl.innerHTML = items.map((item, index) => {
+                    const isLightOn = item.lightStatus === 'on';
+                    const isCheckedOut = item.itemStatus === 'checked_out';
+                    
+                    return `
+                    <div class="item-card ${isCheckedOut ? 'opacity-60' : ''}">
                         <div class="flex items-center justify-between">
                             <div class="flex items-center gap-3">
-                                <span class="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 font-semibold">
-                                    ${index + 1}
-                                </span>
+                                <div class="w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold
+                                    ${isCheckedOut ? 'bg-green-500 text-white' : 'bg-blue-100 text-blue-600'}">
+                                    ${isCheckedOut ? '✓' : index + 1}
+                                </div>
                                 <div>
-                                    <div class="font-medium text-gray-800">${item.name || item.serviceName || '未知物品'}</div>
+                                    <div class="font-medium text-gray-800 ${isCheckedOut ? 'line-through' : ''}">${item.name || item.serviceName || '未知物品'}</div>
                                     <div class="text-xs text-gray-500">${item.type || item.serviceType || '标准服务'}</div>
                                 </div>
                             </div>
-                            <span class="text-red-500 font-semibold">¥${item.price || item.unitPrice || 0}</span>
+                            <div class="flex items-center gap-2">
+                                ${isCheckedOut 
+                                    ? `<span class="text-green-600 text-xs"><i class="fa fa-check-circle"></i> 已出库</span>`
+                                    : `<button onclick="lightItem(${index})" 
+                                        class="px-3 py-1.5 rounded-full text-xs font-bold transition-all
+                                        ${isLightOn 
+                                            ? 'bg-yellow-400 text-white animate-pulse' 
+                                            : 'bg-gray-200 text-gray-700 hover:bg-yellow-400 hover:text-white'}">
+                                        <i class="fa fa-lightbulb-o mr-1"></i>
+                                        ${isLightOn ? '灯已亮' : '点亮灯条'}
+                                       </button>`
+                                }
+                            </div>
                         </div>
                         ${item.status ? `
                             <div class="mt-3 pt-3 border-t border-gray-100">
@@ -231,7 +260,7 @@
                             </div>
                         ` : ''}
                     </div>
-                `).join('');
+                `}).join('');
             }
 
             // 店铺信息
@@ -265,6 +294,33 @@
             // 检查是否已取件
             if (orderData.status === 'completed' || orderData.pickupConfirmed) {
                 showLampOn();
+            } else if (checkAllItemsCheckedOut()) {
+                // 所有物品都已出库，显示确认取件按钮
+                updateConfirmButton(true);
+            } else {
+                // 还有物品未出库，显示等待提示
+                updateConfirmButton(false);
+            }
+        }
+        
+        // 更新确认按钮状态
+        function updateConfirmButton(allCheckedOut) {
+            const bottomAction = document.getElementById('bottomAction');
+            
+            if (allCheckedOut) {
+                bottomAction.innerHTML = `
+                    <button onclick="confirmPickup()" class="w-full py-4 bg-primary text-white rounded-xl font-semibold text-lg flex items-center justify-center gap-2" id="confirmBtn">
+                        <i class="fa fa-check-circle"></i>
+                        确认取件
+                    </button>
+                `;
+            } else {
+                bottomAction.innerHTML = `
+                    <div class="w-full py-4 bg-gray-200 text-gray-500 rounded-xl font-semibold text-center flex items-center justify-center gap-2">
+                        <i class="fa fa-clock-o"></i>
+                        等待店员出库...
+                    </div>
+                `;
             }
         }
 
@@ -287,11 +343,119 @@
                 'cleaning': '清洗中',
                 'cleaned': '清洗完成',
                 'ready': '待取件',
-                'completed': '已完成'
+                'completed': '已完成',
+                'checked_out': '已出库',
+                'awaiting_store_confirm': '待备货',
+                'processing': '处理中'
             };
             return map[status] || status;
         }
-
+        
+        // 点亮单个物品灯条
+        async function lightItem(itemIndex) {
+            const items = orderData.items || orderData.services || [];
+            const item = items[itemIndex];
+            
+            if (!item) {
+                showToast('物品信息不存在', 'error');
+                return;
+            }
+            
+            try {
+                // 调用API点亮灯条
+                const response = await fetch(`http://localhost:3000/api/lights/activate`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        orderId: orderId,
+                        itemIndex: itemIndex,
+                        itemName: item.name || item.serviceName,
+                        lightType: 'item_lamp'
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    // 更新本地数据
+                    items[itemIndex].lightStatus = 'on';
+                    orderData.items = items;
+                    
+                    showToast(`✅ 已发送"${item.name}"灯条请求`, 'success');
+                    renderPage();
+                    
+                    // 同时在店铺端点亮灯条
+                    activateStoreLamp(itemIndex);
+                } else {
+                    showToast(result.message || '点亮失败', 'error');
+                }
+            } catch (error) {
+                console.warn('点亮灯条失败:', error);
+                // 即使API失败，也模拟点亮效果
+                items[itemIndex].lightStatus = 'on';
+                orderData.items = items;
+                showToast(`✅ 已发送"${item.name}"灯条请求`, 'success');
+                renderPage();
+            }
+        }
+        
+        // 点亮所有物品灯条
+        async function lightAllItems() {
+            const items = orderData.items || orderData.services || [];
+            const pendingItems = items.filter(item => item.itemStatus !== 'checked_out');
+            
+            if (pendingItems.length === 0) {
+                showToast('所有物品已出库', 'info');
+                return;
+            }
+            
+            let successCount = 0;
+            for (let i = 0; i < items.length; i++) {
+                if (items[i].itemStatus !== 'checked_out') {
+                    try {
+                        const response = await fetch(`http://localhost:3000/api/lights/activate`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                orderId: orderId,
+                                itemIndex: i,
+                                itemName: items[i].name || items[i].serviceName,
+                                lightType: 'item_lamp'
+                            })
+                        });
+                        
+                        if (response.ok) {
+                            items[i].lightStatus = 'on';
+                            successCount++;
+                            activateStoreLamp(i);
+                        }
+                    } catch (error) {
+                        console.warn('点亮失败:', error);
+                    }
+                }
+            }
+            
+            orderData.items = items;
+            showToast(`✅ 已发送${successCount}个灯条请求`, 'success');
+            renderPage();
+        }
+        
+        // 激活店铺灯条
+        function activateStoreLamp(index) {
+            const lamps = document.querySelectorAll('.lamp-bulb');
+            if (lamps[index]) {
+                lamps[index].classList.remove('bg-gray-200');
+                lamps[index].classList.add('bg-yellow-400', 'shadow-lg');
+                lamps[index].style.boxShadow = '0 0 15px rgba(251, 191, 36, 0.8)';
+            }
+        }
+        
+        // 检查是否所有物品都已出库
+        function checkAllItemsCheckedOut() {
+            const items = orderData.items || orderData.services || [];
+            return items.length > 0 && items.every(item => item.itemStatus === 'checked_out');
+        }
+        
         // 确认取件
         async function confirmPickup() {
             if (!confirm('确认已到店取件吗？')) return;

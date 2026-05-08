@@ -274,10 +274,11 @@ const OrderSyncManager = {
     }
 };
 
-// 自动启动（可选）- 如果页面需要自动同步，取消下面注释
-// document.addEventListener('DOMContentLoaded', () => {
-//     OrderSyncManager.start();
-// });
+// 自动启动 - 页面加载时自动同步订单数据
+document.addEventListener('DOMContentLoaded', () => {
+    OrderSyncManager.start();
+    console.log('[同步] 已自动启动订单数据同步');
+});
 
 // 监听页面可见性变化，在页面重新可见时同步
 document.addEventListener('visibilitychange', () => {
