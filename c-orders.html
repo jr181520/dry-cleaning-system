@@ -360,6 +360,44 @@
                 }
             }
             
+            // 监听M端的出库完成通知
+            window.addEventListener('pickupCompleted', (e) => {
+                console.log('[C端] 收到M端出库完成通知，刷新订单列表...', e.detail);
+                loadOrders();
+                if (OrderSyncManager) {
+                    OrderSyncManager.sync();
+                }
+            });
+            
+            // 监听localStorage变化（M端和C端跨标签页通信）
+            window.addEventListener('storage', (e) => {
+                if (e.key === 'c_pickup_update') {
+                    console.log('[C端] 检测到localStorage变化，刷新订单列表...');
+                    const update = JSON.parse(e.newValue || '{}');
+                    if (update.type === 'pickup_completed') {
+                        loadOrders();
+                        if (OrderSyncManager) {
+                            OrderSyncManager.sync();
+                        }
+                    }
+                }
+            });
+            
+            // 定期检查订单更新（每5秒）
+            setInterval(() => {
+                const latestUpdate = localStorage.getItem('c_pickup_update');
+                if (latestUpdate) {
+                    const update = JSON.parse(latestUpdate);
+                    if (Date.now() - update.timestamp < 10000) { // 10秒内的更新
+                        console.log('[C端] 检测到最近更新，刷新订单列表...');
+                        loadOrders();
+                        if (OrderSyncManager) {
+                            OrderSyncManager.sync();
+                        }
+                    }
+                }
+            }, 5000);
+            
             // 检查是否刚从支付页返回（通过 sessionStorage）
             if (sessionStorage.getItem('fromPaymentPage') === 'true') {
                 console.log('刚从支付页返回，刷新订单列表...');
