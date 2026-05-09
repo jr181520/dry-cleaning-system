@@ -3397,6 +3397,30 @@
         //     }, 1000);
         // });
         
+        // 计算订单总金额
+        function calculateOrderTotal(order) {
+            // 优先使用明确的total字段
+            if (order.total) return order.total;
+            
+            // 后端返回的amounts.total
+            if (order.amounts?.total) return order.amounts.total;
+            
+            // 兼容fees.total
+            if (order.fees?.total) return order.fees.total;
+            
+            // 从items计算总价
+            const items = order.items || order.services || [];
+            if (items.length > 0) {
+                return items.reduce((sum, item) => {
+                    const price = item.price || 0;
+                    const qty = item.quantity || 1;
+                    return sum + (price * qty);
+                }, 0);
+            }
+            
+            return 0;
+        }
+        
         // 订单状态定义
         const ORDER_STATUS = {
             pending: { text: '待支付', color: 'gray', bgClass: 'bg-gray-100', textClass: 'text-gray-800' },
@@ -3609,7 +3633,7 @@
                         ${order.items ? order.items.map(i => i.name || i.serviceName || '服务').join(', ') : '服务项目'}
                     </div>
                     <div class="text-right mt-2">
-                        <span class="text-lg font-bold text-primary">¥${order.total || order.fees?.total || 0}</span>
+                        <span class="text-lg font-bold text-primary">¥${order.total || order.amounts?.total || order.fees?.total || calculateOrderTotal(order) || 0}</span>
                     </div>
                 </div>
             `).join('');
@@ -3706,7 +3730,7 @@
                         <td class="py-3 px-4 text-sm text-gray-800">
                             <div>${order.items ? order.items.map(i => i.name || i.serviceName || '服务').join(', ') : order.services ? order.services.map(s => s.name).join(', ') : '服务项目'}</div>
                         </td>
-                        <td class="py-3 px-4 text-sm font-semibold text-primary">¥${order.total || order.fees?.total || 0}</td>
+                        <td class="py-3 px-4 text-sm font-semibold text-primary">¥${order.total || order.amounts?.total || order.fees?.total || calculateOrderTotal(order) || 0}</td>
                         <td class="py-3 px-4">${getStatusDisplay(order.status)}</td>
                         <td class="py-3 px-4">
                             <div class="flex flex-wrap gap-1">
@@ -4399,7 +4423,7 @@
                         </div>
                         <div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid #e5e7eb; text-align: right;">
                             <span style="font-size: 16px; font-weight: bold; color: #1e40af;">
-                                合计：¥${order.totalPrice || order.total || order.fees?.total || 0}
+                                合计：¥${order.totalPrice || order.total || order.amounts?.total || order.fees?.total || calculateOrderTotal(order) || 0}
                             </span>
                         </div>
                     </div>
@@ -5501,19 +5525,20 @@ ${(order.items || order.services || []).map((item, idx) => `${idx + 1}. ${item.n
         }
         
         // 处理灯条取件
-        window.processLightPickup = function(orderId, itemIndex) {
+        window.processLightPickup = async function(orderId, itemIndex) {
             closeLightGuideModal();
             
             // 更新物品状态为已出库
-            const allOrders = JSON.parse(localStorage.getItem('store_orders') || '[]');
-            const orderIndex = allOrders.findIndex(o => o.orderId === orderId);
+            const storeOrders = JSON.parse(localStorage.getItem('store_orders') || '[]');
+            const cOrders = JSON.parse(localStorage.getItem('orders') || '[]');
+            const orderIndex = storeOrders.findIndex(o => o.orderId === orderId);
             
             if (orderIndex === -1) {
                 alert('订单未找到');
                 return;
             }
             
-            const order = allOrders[orderIndex];
+            const order = storeOrders[orderIndex];
             
             if (itemIndex !== null && itemIndex !== undefined && order.items && order.items[itemIndex]) {
                 // 更新单个物品
@@ -5538,9 +5563,62 @@ ${(order.items || order.services || []).map((item, idx) => `${idx + 1}. ${item.n
                 order.completedAt = new Date().toISOString();
             }
             
-            // 保存更新
-            allOrders[orderIndex] = order;
-            localStorage.setItem('store_orders', JSON.stringify(allOrders));
+            // 更新时间戳
+            order.updatedAt = new Date().toISOString();
+            
+            // 保存M端订单更新
+            storeOrders[orderIndex] = order;
+            localStorage.setItem('store_orders', JSON.stringify(storeOrders));
+            
+            // 同步到C端订单列表
+            const cOrderIndex = cOrders.findIndex(o => o.orderId === orderId);
+            if (cOrderIndex > -1) {
+                // 更新C端订单的物品状态
+                if (itemIndex !== null && itemIndex !== undefined && cOrders[cOrderIndex].items && cOrders[cOrderIndex].items[itemIndex]) {
+                    cOrders[cOrderIndex].items[itemIndex].itemStatus = 'checked_out';
+                    cOrders[cOrderIndex].items[itemIndex].checkedOutAt = new Date().toISOString();
+                    
+                    const allCheckedOut = cOrders[cOrderIndex].items.every(item => item.itemStatus === 'checked_out');
+                    if (allCheckedOut) {
+                        cOrders[cOrderIndex].status = 'completed';
+                        cOrders[cOrderIndex].completedAt = new Date().toISOString();
+                    } else {
+                        cOrders[cOrderIndex].status = 'ready';
+                    }
+                } else {
+                    // 更新所有物品
+                    (cOrders[cOrderIndex].items || []).forEach(item => {
+                        item.itemStatus = 'checked_out';
+                        item.checkedOutAt = new Date().toISOString();
+                    });
+                    cOrders[cOrderIndex].status = 'completed';
+                    cOrders[cOrderIndex].completedAt = new Date().toISOString();
+                }
+                
+                cOrders[cOrderIndex].updatedAt = order.updatedAt;
+                localStorage.setItem('orders', JSON.stringify(cOrders));
+                console.log('[M端→C端] 物品出库状态已同步到C端:', orderId);
+                
+                // 通知C端刷新
+                window.dispatchEvent(new CustomEvent('pickupCompleted', {
+                    detail: { orderId: orderId }
+                }));
+            }
+            
+            // 尝试同步到后端API
+            try {
+                await fetch('http://localhost:3000/api/cleaning/orders/' + orderId + '/pickup', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        userId: order.customerPhone || 'store',
+                        itemIndex: itemIndex
+                    })
+                });
+                console.log('[M端] 后端API同步成功');
+            } catch (apiError) {
+                console.log('[M端] 后端API同步失败（使用本地存储）:', apiError.message);
+            }
             
             // 清除灯条请求
             if (itemIndex !== null && itemIndex !== undefined) {
@@ -5550,10 +5628,15 @@ ${(order.items || order.services || []).map((item, idx) => `${idx + 1}. ${item.n
             // 显示成功消息
             showNotification(`✅ 订单 ${orderId} 已完成出库`, 'success');
             
-            // 刷新列表
+            // 刷新M端列表
             loadStorePickupOrders();
             if (typeof refreshLightBindings === 'function') {
                 refreshLightBindings();
+            }
+            
+            // 通知C端刷新（如果C端页面打开的话）
+            if (typeof window.refreshCustomerOrders === 'function') {
+                window.refreshCustomerOrders();
             }
         };
         
