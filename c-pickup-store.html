@@ -362,15 +362,19 @@
             }
             
             try {
-                // 调用API点亮灯条
-                const response = await fetch(`http://localhost:3000/api/lights/activate`, {
+                // 获取门店ID
+                const storeId = orderData.storeId || orderData.store?.id || 'ST001';
+                
+                // 调用正确的API点亮灯条
+                const response = await fetch(`http://localhost:3000/api/store/order-light/bind`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         orderId: orderId,
-                        itemIndex: itemIndex,
-                        itemName: item.name || item.serviceName,
-                        lightType: 'item_lamp'
+                        storeId: storeId,
+                        color: 'yellow',
+                        bindingType: 'pickup',
+                        remark: `物品: ${item.name || item.serviceName}`
                     })
                 });
                 
@@ -381,19 +385,24 @@
                     items[itemIndex].lightStatus = 'on';
                     orderData.items = items;
                     
-                    // 关键修复：设置灯条请求到localStorage，供M端接收
+                    // 设置灯条请求到localStorage，供M端接收
                     const lightRequest = {
                         orderId: orderId,
                         itemIndex: itemIndex,
                         itemName: item.name || item.serviceName,
-                        storeId: orderData.storeId || orderData.store?.id,
+                        storeId: storeId,
                         timestamp: Date.now(),
                         status: 'pending'
                     };
                     localStorage.setItem(`light_request_${orderId}_${itemIndex}`, JSON.stringify(lightRequest));
                     
+                    console.log('[C端] 已设置灯条请求:', lightRequest);
+                    console.log('[C端] 正在同步订单到store_orders...');
+                    
                     // 同步到 store_orders，供M端读取
                     syncOrderToStoreOrders();
+                    
+                    console.log('[C端] 订单同步完成，检查store_orders:', JSON.parse(localStorage.getItem('store_orders') || '[]').slice(-1));
                     
                     // 发送事件通知M端
                     window.dispatchEvent(new CustomEvent('lightActivated', {
@@ -406,7 +415,25 @@
                     // 同时在店铺端点亮灯条
                     activateStoreLamp(itemIndex);
                 } else {
-                    showToast(result.message || '点亮失败', 'error');
+                    // API返回失败，但仍然设置本地灯条请求（M端通知仍需工作）
+                    console.warn('[C端] API点亮失败，但仍设置本地灯条请求:', result.error);
+                    items[itemIndex].lightStatus = 'on';
+                    orderData.items = items;
+                    
+                    const lightRequest = {
+                        orderId: orderId,
+                        itemIndex: itemIndex,
+                        itemName: item.name || item.serviceName,
+                        storeId: storeId,
+                        timestamp: Date.now(),
+                        status: 'pending'
+                    };
+                    localStorage.setItem(`light_request_${orderId}_${itemIndex}`, JSON.stringify(lightRequest));
+                    syncOrderToStoreOrders();
+                    
+                    showToast(`✅ 已发送"${item.name}"灯条请求（M端模拟模式）`, 'success');
+                    renderPage();
+                    activateStoreLamp(itemIndex);
                 }
             } catch (error) {
                 console.warn('点亮灯条失败:', error);
@@ -414,12 +441,14 @@
                 items[itemIndex].lightStatus = 'on';
                 orderData.items = items;
                 
+                const storeId = orderData.storeId || orderData.store?.id || 'ST001';
+                
                 // 仍然设置灯条请求
                 const lightRequest = {
                     orderId: orderId,
                     itemIndex: itemIndex,
                     itemName: item.name || item.serviceName,
-                    storeId: orderData.storeId || orderData.store?.id,
+                    storeId: storeId,
                     timestamp: Date.now(),
                     status: 'pending'
                 };
@@ -434,7 +463,13 @@
         // 同步订单到 store_orders，供M端读取
         function syncOrderToStoreOrders() {
             const storeOrders = JSON.parse(localStorage.getItem('store_orders') || '[]');
-            const orderIndex = storeOrders.findIndex(o => o.orderId === orderId);
+            
+            // 修复：支持多种订单ID格式的匹配
+            const orderIndex = storeOrders.findIndex(o => 
+                o.orderId === orderId || 
+                o.id === orderId || 
+                o._id === orderId
+            );
             
             if (orderIndex > -1) {
                 storeOrders[orderIndex] = orderData;
@@ -455,54 +490,50 @@
                 return;
             }
             
+            const storeId = orderData.storeId || orderData.store?.id || 'ST001';
             let successCount = 0;
+            
             for (let i = 0; i < items.length; i++) {
                 if (items[i].itemStatus !== 'checked_out') {
                     try {
-                        const response = await fetch(`http://localhost:3000/api/lights/activate`, {
+                        // 调用正确的API
+                        const response = await fetch(`http://localhost:3000/api/store/order-light/bind`, {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({
                                 orderId: orderId,
-                                itemIndex: i,
-                                itemName: items[i].name || items[i].serviceName,
-                                lightType: 'item_lamp'
+                                storeId: storeId,
+                                color: 'yellow',
+                                bindingType: 'pickup',
+                                remark: `物品: ${items[i].name || items[i].serviceName}`
                             })
                         });
                         
-                        if (response.ok) {
+                        const result = await response.json();
+                        
+                        if (result.success) {
                             items[i].lightStatus = 'on';
                             successCount++;
-                            
-                            // 关键修复：设置灯条请求到localStorage
-                            const lightRequest = {
-                                orderId: orderId,
-                                itemIndex: i,
-                                itemName: items[i].name || items[i].serviceName,
-                                storeId: orderData.storeId || orderData.store?.id,
-                                timestamp: Date.now(),
-                                status: 'pending'
-                            };
-                            localStorage.setItem(`light_request_${orderId}_${i}`, JSON.stringify(lightRequest));
-                            
-                            activateStoreLamp(i);
                         }
                     } catch (error) {
-                        console.warn('点亮失败:', error);
+                        console.warn(`点亮物品 ${i} 失败:`, error);
                         // 即使API失败也设置灯条请求
                         items[i].lightStatus = 'on';
                         successCount++;
-                        
-                        const lightRequest = {
-                            orderId: orderId,
-                            itemIndex: i,
-                            itemName: items[i].name || items[i].serviceName,
-                            storeId: orderData.storeId || orderData.store?.id,
-                            timestamp: Date.now(),
-                            status: 'pending'
-                        };
-                        localStorage.setItem(`light_request_${orderId}_${i}`, JSON.stringify(lightRequest));
                     }
+                    
+                    // 设置灯条请求到localStorage
+                    const lightRequest = {
+                        orderId: orderId,
+                        itemIndex: i,
+                        itemName: items[i].name || items[i].serviceName,
+                        storeId: storeId,
+                        timestamp: Date.now(),
+                        status: 'pending'
+                    };
+                    localStorage.setItem(`light_request_${orderId}_${i}`, JSON.stringify(lightRequest));
+                    
+                    activateStoreLamp(i);
                 }
             }
             

@@ -21,7 +21,8 @@ module.exports = {
       name: 'dry-cleaning-backend',        // 应用名称
       script: 'server.js',                  // 启动脚本
       cwd: './backend',                     // 工作目录
-      instances: 1,                         // 实例数量（开发环境1个，生产环境可根据CPU核心数调整）
+      exec_mode: 'fork',                    // 明确使用fork模式（非集群模式）
+      instances: 1,                         // 实例数量（开发环境1个）
       autorestart: true,                    // 崩溃后自动重启
       watch: false,                         // 开发模式可开启，监听文件变化自动重启
       max_memory_restart: '500M',          // 内存超过500MB时自动重启（防止内存泄漏）
@@ -58,6 +59,7 @@ module.exports = {
       name: 'mqtt-broker',                 // 应用名称
       script: 'production-broker.js',       // 启动脚本
       cwd: './backend',                     // 工作目录
+      exec_mode: 'fork',                    // 明确使用fork模式
       instances: 1,                         // 单实例（MQTT Broker通常只需要一个）
       autorestart: true,                    // 崩溃后自动重启
       watch: false,                         // 不监听文件变化

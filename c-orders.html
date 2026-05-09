@@ -425,11 +425,19 @@
                     }
                 }
                 
-                // 回退到直接API调用
+                // 获取userId（优先使用localStorage中保存的用户ID）
+                const userId = localStorage.getItem('userId');
                 const token = localStorage.getItem('userToken') || localStorage.getItem('authToken') || '';
-                console.log('[c-orders] 加载订单，token:', token ? '存在' : '不存在');
                 
-                const response = await fetch('http://localhost:3000/api/cleaning/orders', {
+                console.log('[c-orders] 加载订单', { userId, hasToken: !!token });
+                
+                // 构建API URL，包含userId参数
+                let apiUrl = 'http://localhost:3000/api/cleaning/orders';
+                if (userId) {
+                    apiUrl += `?userId=${encodeURIComponent(userId)}`;
+                }
+                
+                const response = await fetch(apiUrl, {
                     headers: {
                         'Authorization': 'Bearer ' + token
                     }
@@ -574,6 +582,9 @@
             } else if (currentTab === 'cancelled') {
                 filteredOrders = orders.filter(o => o.status === 'cancelled');
             }
+            
+            // 按创建时间倒序排列（最新的在前）
+            filteredOrders.sort((a, b) => new Date(b.createdAt || b.orderTime || 0) - new Date(a.createdAt || a.orderTime || 0));
             
             console.log('[c-orders] 过滤后订单数量:', filteredOrders.length, '订单状态分布:', orders.map(o => o.status).join(', '));
             

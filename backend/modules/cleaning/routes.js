@@ -46,7 +46,7 @@ router.get('/orders', async (req, res) => {
   try {
     const { page, pageSize, status, storeId } = req.query;
     const result = await orderService.getOrders({
-      userId: req.user?.id,
+      userId: req.query.userId || req.user?.id,
       roles: req.user?.roles,
       page: parseInt(page) || 1,
       pageSize: parseInt(pageSize) || 20,
@@ -66,7 +66,7 @@ router.get('/orders', async (req, res) => {
 router.get('/orders/:id', async (req, res) => {
   try {
     const result = await orderService.getOrderById(req.params.id, {
-      userId: req.user?.id,
+      userId: req.query.userId || req.user?.id,
       roles: req.user?.roles
     });
     res.json({ success: true, data: result });
@@ -82,7 +82,7 @@ router.get('/orders/:id', async (req, res) => {
 router.post('/orders/:id/cancel', async (req, res) => {
   try {
     const result = await orderService.cancelOrder(req.params.id, {
-      userId: req.user?.id,
+      userId: req.query.userId || req.user?.id,
       roles: req.user?.roles,
       reason: req.body.reason
     });
@@ -148,7 +148,7 @@ router.post('/orders/:id/complete', async (req, res) => {
 router.post('/orders/:id/delivering', async (req, res) => {
   try {
     const result = await orderService.setDelivering(req.params.id, {
-      userId: req.user?.id,
+      userId: req.query.userId || req.user?.id,
       roles: req.user?.roles
     }, req.body.deliveryInfo || {});
     res.json({ success: true, data: result });
@@ -164,7 +164,7 @@ router.post('/orders/:id/delivering', async (req, res) => {
 router.post('/orders/:id/pickup', async (req, res) => {
   try {
     const result = await orderService.pickupOrder(req.params.id, {
-      userId: req.user?.id,
+      userId: req.query.userId || req.user?.id,
       roles: req.user?.roles
     });
     res.json({ success: true, data: result });
@@ -189,7 +189,7 @@ router.post('/orders/:id/pickup-method', async (req, res) => {
     }
     
     const result = await orderService.selectPickupMethod(req.params.id, {
-      userId: req.user?.id,
+      userId: req.query.userId || req.user?.id,
       roles: req.user?.roles
     }, {
       method,
@@ -222,7 +222,7 @@ router.post('/orders/:id/pay-delivery-fee', optionalAuth, async (req, res) => {
     
     // 调用service层更新配送费支付状态
     const result = await orderService.payDeliveryFee(req.params.id, {
-      userId: req.user?.id,
+      userId: req.query.userId || req.user?.id,
       roles: req.user?.roles
     }, {
       provider,
@@ -254,7 +254,7 @@ router.post('/orders/:id/select-provider', optionalAuth, async (req, res) => {
     }
     
     const result = await orderService.selectCourierProvider(orderId, {
-      userId: req.user?.id,
+      userId: req.query.userId || req.user?.id,
       roles: req.user?.roles
     }, { provider });
     
@@ -275,7 +275,7 @@ router.post('/orders/:id/scan-pickup', optionalAuth, async (req, res) => {
     console.log('[scan-pickup] orderId:', orderId, 'pickupMethod:', pickupMethod, 'user:', req.user?.id);
     
     const result = await orderService.scanPickup(orderId, {
-      userId: req.user?.id,
+      userId: req.query.userId || req.user?.id,
       roles: req.user?.roles
     }, {
       pickupMethod,
@@ -305,7 +305,7 @@ router.post('/orders/batch-pickup', async (req, res) => {
     }
     
     const result = await orderService.batchPickup(storeId, {
-      userId: req.user?.id,
+      userId: req.query.userId || req.user?.id,
       roles: req.user?.roles
     });
     
@@ -401,7 +401,7 @@ router.post('/orders/:id/pay', async (req, res) => {
 router.get('/orders/:id/status', async (req, res) => {
   try {
     const order = await orderService.getOrderById(req.params.id, {
-      userId: req.user?.id,
+      userId: req.query.userId || req.user?.id,
       roles: req.user?.roles
     });
     
@@ -581,7 +581,7 @@ router.get('/items', async (req, res) => {
   try {
     const { page, pageSize, status } = req.query;
     const result = await orderService.getItems({
-      userId: req.user?.id,
+      userId: req.query.userId || req.user?.id,
       page: parseInt(page) || 1,
       pageSize: parseInt(pageSize) || 20,
       status

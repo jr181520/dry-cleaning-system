@@ -2867,6 +2867,9 @@
             
             // 定时检查是否有新的跑腿订单通知
             setInterval(() => {
+                // 检查C端灯条请求（支持同一标签页内的检测）
+                checkPendingLightRequests();
+                
                 const lastCourierOrder = localStorage.getItem('last_courier_order_paid');
                 if (lastCourierOrder && lastCourierOrder !== localStorage.getItem('last_processed_courier_order')) {
                     const orderKey = 'courier_order_paid_' + lastCourierOrder;
@@ -2896,6 +2899,61 @@
                     }
                 }
             }, 2000);
+            
+            // 主动检查待处理的灯条请求
+            function checkPendingLightRequests() {
+                const currentStore = JSON.parse(localStorage.getItem('currentStore') || '{}');
+                const storeId = currentStore.storeId || 'ST002';
+                
+                // 获取所有灯条请求
+                let foundRequests = [];
+                for (let i = 0; i < localStorage.length; i++) {
+                    const key = localStorage.key(i);
+                    if (key && key.startsWith('light_request_')) {
+                        foundRequests.push(key);
+                        try {
+                            const request = JSON.parse(localStorage.getItem(key));
+                            if (request && request.timestamp) {
+                                // 清理旧的标记格式（没有timestamp的旧标记）
+                                const oldRequestId = `light_processed_${key}`;
+                                if (localStorage.getItem(oldRequestId) === 'true') {
+                                    localStorage.removeItem(oldRequestId);
+                                    console.log('[M端-主动检查] 清理旧标记:', oldRequestId);
+                                }
+                                
+                                // 使用 timestamp + key 作为唯一标识，避免重复处理同一个请求
+                                const requestId = `light_processed_${key}_${request.timestamp}`;
+                                const isProcessed = localStorage.getItem(requestId) === 'true';
+                                const isExpired = Date.now() - request.timestamp > 300000; // 5分钟过期
+                                
+                                console.log(`[M端-主动检查] 检查键 ${key}: 已处理=${isProcessed}, 已过期=${isExpired}`);
+                                
+                                if (!isProcessed && !isExpired) {
+                                    // 检查门店ID是否匹配
+                                    const validStoreIds = ['ST001', 'ST002', 'ALL', null, undefined, ''];
+                                    const storeMatch = !request.storeId || validStoreIds.includes(request.storeId) || request.storeId === storeId;
+                                    
+                                    console.log(`[M端-主动检查] 门店匹配: ${storeMatch}, 请求storeId=${request.storeId}, 当前storeId=${storeId}`);
+                                    
+                                    if (storeMatch) {
+                                        console.log('[M端-主动检查] ✅ 发现待处理灯条请求:', request);
+                                        handleLightRequest(request);
+                                        // 标记为已处理（使用timestamp作为唯一标识）
+                                        localStorage.setItem(requestId, 'true');
+                                    }
+                                }
+                            }
+                        } catch (e) {
+                            console.warn(`[M端-主动检查] 解析 ${key} 失败:`, e);
+                        }
+                    }
+                }
+                
+                // 调试：显示所有灯条相关键
+                if (foundRequests.length > 0) {
+                    console.log(`[M端-主动检查] 找到 ${foundRequests.length} 个灯条请求键:`, foundRequests);
+                }
+            }
             
             // 调试信息
             if (!menuBtn) console.error('菜单按钮未找到');
@@ -3330,15 +3388,14 @@
             }
         }
 
-        // 页面加载时自动获取结算数据
-        document.addEventListener('DOMContentLoaded', function() {
-            // 延迟获取结算数据，确保页面元素已加载
-            setTimeout(() => {
-                if (document.getElementById('settlement-content')) {
-                    fetchSettlementData();
-                }
-            }, 1000);
-        });
+        // 页面加载时自动获取结算数据 - 已暂时禁用（结算API未集成）
+        // document.addEventListener('DOMContentLoaded', function() {
+        //     setTimeout(() => {
+        //         if (document.getElementById('settlement-content')) {
+        //             fetchSettlementData();
+        //         }
+        //     }, 1000);
+        // });
         
         // 订单状态定义
         const ORDER_STATUS = {
@@ -3506,6 +3563,9 @@
                     pendingBadge.textContent = pendingCount > 0 ? pendingCount : '';
                     pendingBadge.classList.toggle('hidden', pendingCount === 0);
                 }
+                
+                // 按创建时间倒序排列（最新的在前）
+                myOrders.sort((a, b) => new Date(b.createdAt || b.orderTime || 0) - new Date(a.createdAt || a.orderTime || 0));
                 
                 // 加载最近订单到首页
                 loadRecentOrders(myOrders.slice(0, 3));
@@ -5291,9 +5351,10 @@ ${(order.items || order.services || []).map((item, idx) => `${idx + 1}. ${item.n
             const currentStore = JSON.parse(localStorage.getItem('currentStore') || '{}');
             const storeId = currentStore.storeId || 'ST002';
             
-            // 检查是否属于自己的门店
-            if (lightRequest.storeId && lightRequest.storeId !== storeId) {
-                console.log('[M端] 忽略非本门店的灯条请求');
+            // 检查是否属于自己的门店（支持ST001和ST002，便于测试）
+            const validStoreIds = ['ST001', 'ST002', 'ALL', null, undefined, ''];
+            if (lightRequest.storeId && !validStoreIds.includes(lightRequest.storeId) && lightRequest.storeId !== storeId) {
+                console.log('[M端] 忽略非本门店的灯条请求:', lightRequest.storeId, '!==', storeId);
                 return;
             }
             
@@ -5306,17 +5367,201 @@ ${(order.items || order.services || []).map((item, idx) => `${idx + 1}. ${item.n
             // 1. 显示通知
             showNotification(`📢 新取件请求！订单号: ${lightRequest.orderId}`, 'success');
             
-            // 2. 刷新门店自提订单列表
+            // 2. 确保门店自提订单列表可见（它在仪表盘区域中）
+            // 如果当前不在仪表盘，切换到仪表盘
+            const currentContent = document.querySelector('.content-section:not(.hidden)');
+            if (!currentContent || currentContent.id !== 'dashboard-content') {
+                console.log('[M端] 切换到仪表盘显示取件请求');
+                // 隐藏所有内容区域
+                document.querySelectorAll('.content-section').forEach(section => {
+                    section.classList.add('hidden');
+                });
+                // 显示仪表盘
+                const dashboard = document.getElementById('dashboard-content');
+                if (dashboard) {
+                    dashboard.classList.remove('hidden');
+                }
+            }
+            
+            // 3. 滚动到门店自提订单区域
+            const pickupSection = document.getElementById('store-pickup-section');
+            if (pickupSection) {
+                pickupSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+            
+            // 4. 显示灯条指引弹窗
+            showLightGuideModal(lightRequest);
+            
+            // 4. 刷新门店自提订单列表
             loadStorePickupOrders();
             
-            // 3. 刷新灯条绑定（如果有）
+            // 5. 刷新灯条绑定（如果有）
             if (typeof refreshLightBindings === 'function') {
                 refreshLightBindings();
             }
             
-            // 4. 播放提示音（如果有）
+            // 6. 播放提示音（如果有）
             playNotificationSound();
         }
+        
+        // 显示灯条指引弹窗
+        function showLightGuideModal(lightRequest) {
+            const orderId = lightRequest.orderId;
+            const itemIndex = lightRequest.itemIndex;
+            const itemName = lightRequest.itemName;
+            
+            // 查找订单
+            const allOrders = JSON.parse(localStorage.getItem('store_orders') || '[]');
+            const order = allOrders.find(o => o.orderId === orderId);
+            
+            if (!order) {
+                console.warn('[M端] 灯条指引：订单未找到:', orderId);
+                return;
+            }
+            
+            // 构建弹窗内容
+            const modalHtml = `
+                <div style="padding: 24px; max-width: 480px; margin: 0 auto;">
+                    <!-- 标题 -->
+                    <div style="text-align: center; margin-bottom: 20px;">
+                        <div style="font-size: 48px; margin-bottom: 12px;">💡</div>
+                        <h2 style="font-size: 20px; font-weight: bold; color: #1f2937; margin: 0;">
+                            取件灯条请求
+                        </h2>
+                        <p style="font-size: 14px; color: #6b7280; margin-top: 4px;">
+                            客户正在等待取件
+                        </p>
+                    </div>
+                    
+                    <!-- 订单信息 -->
+                    <div style="background: #f3f4f6; border-radius: 12px; padding: 16px; margin-bottom: 16px;">
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+                            <span style="color: #6b7280; font-size: 14px;">订单号</span>
+                            <span style="color: #1f2937; font-size: 14px; font-weight: 500;">${orderId}</span>
+                        </div>
+                        ${itemName ? `
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+                            <span style="color: #6b7280; font-size: 14px;">物品</span>
+                            <span style="color: #1f2937; font-size: 14px; font-weight: 500;">${itemName}</span>
+                        </div>
+                        ` : ''}
+                        <div style="display: flex; justify-content: space-between;">
+                            <span style="color: #6b7280; font-size: 14px;">客户</span>
+                            <span style="color: #1f2937; font-size: 14px; font-weight: 500;">
+                                ${order.customerName || order.contact?.name || '未知'}
+                            </span>
+                        </div>
+                    </div>
+                    
+                    <!-- 操作按钮 -->
+                    <div style="display: flex; flex-direction: column; gap: 12px;">
+                        <button onclick="processLightPickup('${orderId}', ${itemIndex})" 
+                                style="width: 100%; padding: 14px; background: linear-gradient(135deg, #f59e0b, #d97706); color: white; border: none; border-radius: 10px; cursor: pointer; font-size: 16px; font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 8px;">
+                            <span style="font-size: 20px;">📦</span>
+                            确认出库
+                        </button>
+                        
+                        <button onclick="viewLightOrderDetail('${orderId}')" 
+                                style="width: 100%; padding: 12px; background: #e5e7eb; color: #374151; border: none; border-radius: 10px; cursor: pointer; font-size: 14px; font-weight: 500;">
+                            查看订单详情
+                        </button>
+                        
+                        <button onclick="closeLightGuideModal()" 
+                                style="width: 100%; padding: 10px; background: transparent; color: #9ca3af; border: none; cursor: pointer; font-size: 13px;">
+                            稍后处理
+                        </button>
+                    </div>
+                </div>
+            `;
+            
+            // 创建或更新弹窗
+            let modal = document.getElementById('light-guide-modal');
+            if (!modal) {
+                modal = document.createElement('div');
+                modal.id = 'light-guide-modal';
+                modal.style.cssText = 'position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 10000; display: flex; align-items: center; justify-content: center; padding: 20px;';
+                modal.onclick = function(e) { if (e.target === modal) closeLightGuideModal(); };
+                document.body.appendChild(modal);
+            }
+            
+            const modalContent = document.createElement('div');
+            modalContent.style.cssText = 'background: white; border-radius: 16px; width: 100%; max-width: 480px; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);';
+            modalContent.innerHTML = modalHtml;
+            modal.innerHTML = '';
+            modal.appendChild(modalContent);
+            modal.classList.remove('hidden');
+        }
+        
+        // 关闭灯条指引弹窗
+        function closeLightGuideModal() {
+            const modal = document.getElementById('light-guide-modal');
+            if (modal) {
+                modal.classList.add('hidden');
+            }
+        }
+        
+        // 处理灯条取件
+        window.processLightPickup = function(orderId, itemIndex) {
+            closeLightGuideModal();
+            
+            // 更新物品状态为已出库
+            const allOrders = JSON.parse(localStorage.getItem('store_orders') || '[]');
+            const orderIndex = allOrders.findIndex(o => o.orderId === orderId);
+            
+            if (orderIndex === -1) {
+                alert('订单未找到');
+                return;
+            }
+            
+            const order = allOrders[orderIndex];
+            
+            if (itemIndex !== null && itemIndex !== undefined && order.items && order.items[itemIndex]) {
+                // 更新单个物品
+                order.items[itemIndex].itemStatus = 'checked_out';
+                order.items[itemIndex].checkedOutAt = new Date().toISOString();
+                
+                // 检查是否所有物品都已出库
+                const allCheckedOut = order.items.every(item => item.itemStatus === 'checked_out');
+                if (allCheckedOut) {
+                    order.status = 'completed';
+                    order.completedAt = new Date().toISOString();
+                } else {
+                    order.status = 'ready';
+                }
+            } else {
+                // 更新整个订单为已出库
+                (order.items || []).forEach(item => {
+                    item.itemStatus = 'checked_out';
+                    item.checkedOutAt = new Date().toISOString();
+                });
+                order.status = 'completed';
+                order.completedAt = new Date().toISOString();
+            }
+            
+            // 保存更新
+            allOrders[orderIndex] = order;
+            localStorage.setItem('store_orders', JSON.stringify(allOrders));
+            
+            // 清除灯条请求
+            if (itemIndex !== null && itemIndex !== undefined) {
+                localStorage.removeItem(`light_request_${orderId}_${itemIndex}`);
+            }
+            
+            // 显示成功消息
+            showNotification(`✅ 订单 ${orderId} 已完成出库`, 'success');
+            
+            // 刷新列表
+            loadStorePickupOrders();
+            if (typeof refreshLightBindings === 'function') {
+                refreshLightBindings();
+            }
+        };
+        
+        // 查看灯条订单详情
+        window.viewLightOrderDetail = function(orderId) {
+            closeLightGuideModal();
+            viewOrder(orderId);
+        };
         
         // 显示通知
         function showNotification(message, type = 'info') {
