@@ -1,0 +1,689 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>门店灯条 - 干洗服务</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#1e40af',
+                        secondary: '#3b82f6',
+                        accent: '#60a5fa',
+                        success: '#10b981',
+                        warning: '#f59e0b',
+                        danger: '#ef4444'
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        * { -webkit-tap-highlight-color: transparent; }
+        
+        .lamp-indicator {
+            width: 120rpx;
+            height: 120rpx;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 48rpx;
+            transition: all 0.5s ease;
+        }
+        .lamp-off {
+            background: #e5e7eb;
+            color: #9ca3af;
+            box-shadow: inset 0 2rpx 8rpx rgba(0,0,0,0.1);
+        }
+        .lamp-on {
+            background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
+            color: #fff;
+            box-shadow: 0 0 40rpx rgba(251, 191, 36, 0.6), 0 4rpx 12rpx rgba(245, 158, 11, 0.3);
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+        
+        .item-card {
+            background: #ffffff;
+            border-radius: 16rpx;
+            padding: 20rpx;
+            margin-bottom: 16rpx;
+            box-shadow: 0 2rpx 8rpx rgba(0,0,0,0.04);
+            transition: all 0.3s;
+        }
+        .item-card.selected {
+            border: 2px solid #3b82f6;
+            background: #eff6ff;
+        }
+        
+        .lamp-bulb {
+            width: 40rpx;
+            height: 40rpx;
+            border-radius: 50%;
+            transition: all 0.5s ease;
+        }
+        .lamp-bulb.off {
+            background: #e5e7eb;
+            box-shadow: inset 0 2rpx 4rpx rgba(0,0,0,0.1);
+        }
+        .lamp-bulb.on {
+            background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
+            box-shadow: 0 0 20rpx rgba(251, 191, 36, 0.8);
+            animation: bulbPulse 1.5s infinite;
+        }
+        @keyframes bulbPulse {
+            0%, 100% { box-shadow: 0 0 20rpx rgba(251, 191, 36, 0.8); }
+            50% { box-shadow: 0 0 30rpx rgba(251, 191, 36, 1); }
+        }
+        
+        /* 扫码成功动画 */
+        .scan-success {
+            animation: scanSuccess 0.5s ease;
+        }
+        @keyframes scanSuccess {
+            0% { transform: scale(0.8); opacity: 0; }
+            50% { transform: scale(1.1); }
+            100% { transform: scale(1); opacity: 1; }
+        }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen pb-32">
+    <!-- 顶部导航 -->
+    <header class="bg-gradient-to-r from-purple-600 to-pink-600 sticky top-0 z-50">
+        <div class="flex items-center justify-between px-4 py-4">
+            <a href="c-index.html" class="text-white flex items-center gap-2">
+                <i class="fa fa-home text-lg"></i>
+            </a>
+            <span class="text-lg font-semibold text-white" id="pageTitle">灯条取件</span>
+            <span class="w-8"></span>
+        </div>
+    </header>
+
+    <!-- 门店信息 -->
+    <div class="bg-white mx-4 mt-4 rounded-2xl p-4 shadow-sm" id="storeInfoCard">
+        <div class="flex items-center gap-3">
+            <div class="w-16 h-16 bg-purple-100 rounded-xl flex items-center justify-center text-3xl">
+                🏪
+            </div>
+            <div class="flex-1">
+                <div class="font-bold text-gray-800 text-lg" id="storeName">加载中...</div>
+                <div class="text-sm text-gray-500 mt-1" id="storeAddress">
+                    <i class="fa fa-map-marker-alt text-primary mr-1"></i>
+                    正在获取门店信息
+                </div>
+            </div>
+            <div class="text-center">
+                <div class="bg-purple-100 text-purple-600 text-xs font-semibold px-3 py-1 rounded-full">
+                    扫码取件
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 扫码成功提示 -->
+    <div id="scanSuccessPanel" class="mx-4 mt-4 bg-green-50 border border-green-200 rounded-xl p-4 hidden scan-success">
+        <div class="flex items-center gap-3">
+            <div class="text-3xl">✅</div>
+            <div class="flex-1">
+                <div class="font-semibold text-green-800">扫码成功！</div>
+                <div class="text-sm text-green-700 mt-1" id="scanSuccessDesc">正在点亮灯条...</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 操作提示 -->
+    <div class="mx-4 mt-4 bg-amber-50 border border-amber-200 rounded-xl p-4">
+        <div class="flex items-start gap-3">
+            <span class="text-2xl">💡</span>
+            <div>
+                <div class="font-semibold text-amber-800">灯条取件说明</div>
+                <div class="text-sm text-amber-700 mt-1">
+                    1. 选择您需要取的物品<br>
+                    2. 系统自动点亮对应灯条<br>
+                    3. 店员收到通知后准备物品<br>
+                    4. 凭取件码到店取件
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 灯条状态 -->
+    <div class="mx-4 mt-4 bg-white rounded-2xl p-4 shadow-sm" id="lampStatusCard">
+        <div class="flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <div class="w-12 h-12 rounded-full flex items-center justify-center text-2xl" id="lampIcon">
+                    💡
+                </div>
+                <div>
+                    <div class="font-semibold text-gray-800" id="lampStatus">等待点亮</div>
+                    <div class="text-sm text-gray-500" id="lampDesc">请选择下方物品</div>
+                </div>
+            </div>
+            <div id="lampCount" class="bg-amber-100 text-amber-600 px-3 py-1 rounded-full text-sm font-semibold">
+                0 个物品
+            </div>
+        </div>
+    </div>
+
+    <!-- 待取订单列表 -->
+    <div class="px-4 mt-4" id="ordersContainer">
+        <div class="flex items-center justify-between mb-3">
+            <span class="font-semibold text-gray-800">待取物品</span>
+            <button onclick="selectAllItems()" class="text-sm text-blue-600 hover:text-blue-700">
+                全选
+            </button>
+        </div>
+        <div id="ordersList">
+            <!-- 动态加载订单列表 -->
+            <div class="text-center py-8 text-gray-400">
+                <i class="fa fa-spinner fa-spin text-3xl mb-2"></i>
+                <p>正在加载...</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- 一键取货按钮 -->
+    <div class="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-4 max-w-2xl mx-auto">
+        <button id="confirmPickupBtn" onclick="confirmPickup()" class="w-full bg-gradient-to-r from-amber-400 to-orange-500 text-white py-4 rounded-2xl font-bold text-lg shadow-lg flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+            <i class="fa fa-lightbulb-o"></i>
+            <span>点亮灯条 (0)</span>
+        </button>
+    </div>
+
+    <!-- 等待店员确认 -->
+    <div id="waitingPanel" class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center hidden">
+        <div class="bg-white rounded-2xl p-6 mx-4 max-w-sm w-full text-center">
+            <div class="text-6xl mb-4 animate-bounce">💡</div>
+            <h3 class="text-xl font-bold text-gray-800 mb-2">灯条已点亮！</h3>
+            <p class="text-gray-600 mb-4" id="waitingDesc">店员已收到通知，正在准备您的物品</p>
+            <div class="bg-amber-50 rounded-xl p-4 mb-4">
+                <div class="text-sm text-gray-600 mb-1">取件码</div>
+                <div class="text-3xl font-bold text-amber-600 font-mono" id="waitingPickupCode">P000000</div>
+            </div>
+            <p class="text-sm text-gray-500 mb-4">请等待店员确认后凭此码取件</p>
+            <button onclick="closeWaitingPanel()" class="w-full bg-gray-100 text-gray-700 py-3 rounded-xl font-semibold">
+                我知道了
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // 全局变量
+        let storeId = null;
+        let orders = [];
+        let selectedItems = new Set();
+        let currentStore = null;
+
+        // 初始化
+        function init() {
+            // 从URL获取门店ID
+            const urlParams = new URLSearchParams(window.location.search);
+            storeId = urlParams.get('store') || localStorage.getItem('currentStoreId') || 'ST001';
+            
+            console.log('[灯条扫码] 初始化，门店ID:', storeId);
+            
+            // 加载门店信息
+            loadStoreInfo();
+            
+            // 加载待取订单
+            loadReadyOrders();
+            
+            // 监听灯条响应
+            window.addEventListener('storage', handleStorageChange);
+            
+            // 定期检查灯条响应
+            setInterval(checkLightResponse, 1000);
+        }
+
+        // 加载门店信息
+        function loadStoreInfo() {
+            // 尝试从多个来源获取门店信息
+            const sources = [
+                localStorage.getItem('currentStore'),
+                localStorage.getItem('stores'),
+                localStorage.getItem('storeQRCode')
+            ];
+            
+            for (const source of sources) {
+                if (source) {
+                    try {
+                        const data = JSON.parse(source);
+                        if (Array.isArray(data)) {
+                            // 门店列表
+                            currentStore = data.find(s => 
+                                s.storeId === storeId || 
+                                s.id === storeId ||
+                                s._id === storeId
+                            );
+                        } else {
+                            // 单个门店
+                            currentStore = data;
+                        }
+                        
+                        if (currentStore) {
+                            updateStoreUI(currentStore);
+                            break;
+                        }
+                    } catch (e) {
+                        console.warn('解析门店信息失败:', e);
+                    }
+                }
+            }
+            
+            // 如果没有找到门店信息，使用默认值
+            if (!currentStore) {
+                currentStore = {
+                    storeId: storeId,
+                    storeName: '干洗门店',
+                    storeAddress: '门店地址'
+                };
+                updateStoreUI(currentStore);
+            }
+        }
+
+        // 更新门店UI
+        function updateStoreUI(store) {
+            const nameEl = document.getElementById('storeName');
+            const addrEl = document.getElementById('storeAddress');
+            const titleEl = document.getElementById('pageTitle');
+            
+            if (nameEl) nameEl.textContent = store.storeName || store.name || '干洗门店';
+            if (addrEl) addrEl.innerHTML = `<i class="fa fa-map-marker-alt text-primary mr-1"></i>${store.storeAddress || store.address || '门店地址'}`;
+            if (titleEl) titleEl.textContent = store.storeName ? `${store.storeName} - 灯条取件` : '灯条取件';
+            
+            // 保存当前门店
+            localStorage.setItem('currentStoreId', store.storeId || store.id || storeId);
+        }
+
+        // 加载待取订单
+        async function loadReadyOrders() {
+            const container = document.getElementById('ordersList');
+            
+            try {
+                // 首先尝试从 localStorage 加载
+                const ordersData = localStorage.getItem('orders') || localStorage.getItem('store_orders');
+                
+                if (ordersData) {
+                    const allOrders = JSON.parse(ordersData);
+                    
+                    // 筛选当前门店的待取件订单
+                    orders = allOrders.filter(order => {
+                        const orderStoreId = order.storeId || (order.store ? order.store.id : null);
+                        return (orderStoreId === storeId || !orderStoreId) && 
+                               ['ready', 'awaiting_store_outbound', 'awaiting_pickup'].includes(order.status);
+                    });
+                    
+                    console.log('[灯条扫码] 从localStorage加载订单:', orders.length);
+                }
+                
+                // 尝试从API获取
+                try {
+                    const response = await fetch(`http://localhost:3000/api/cleaning/orders?store=${storeId}&status=ready`, {
+                        headers: { 'Cache-Control': 'no-cache' }
+                    });
+                    const result = await response.json();
+                    
+                    if (result.success && result.data) {
+                        orders = result.data;
+                        console.log('[灯条扫码] 从API加载订单:', orders.length);
+                    }
+                } catch (e) {
+                    console.warn('[灯条扫码] API获取失败，使用本地数据');
+                }
+                
+                // 渲染订单列表
+                renderOrders();
+                
+            } catch (error) {
+                console.error('[灯条扫码] 加载订单失败:', error);
+                container.innerHTML = `
+                    <div class="text-center py-8 text-gray-400">
+                        <i class="fa fa-exclamation-triangle text-3xl mb-2"></i>
+                        <p>加载失败，请刷新重试</p>
+                    </div>
+                `;
+            }
+        }
+
+        // 渲染订单列表
+        function renderOrders() {
+            const container = document.getElementById('ordersList');
+            
+            if (orders.length === 0) {
+                container.innerHTML = `
+                    <div class="text-center py-8 text-gray-400">
+                        <i class="fa fa-inbox text-3xl mb-2"></i>
+                        <p>暂无待取物品</p>
+                        <p class="text-sm mt-1">如有订单请到门店自提</p>
+                    </div>
+                `;
+                updateLampUI();
+                return;
+            }
+            
+            container.innerHTML = orders.map((order, orderIndex) => {
+                const items = order.items || order.services || [];
+                const pickupCode = order.pickupCode || 'P' + String(order.orderNo || order.orderId || '').slice(-6);
+                
+                return `
+                    <div class="order-card mb-4" id="order-${orderIndex}">
+                        <div class="flex items-center justify-between mb-3">
+                            <div class="flex items-center gap-2">
+                                <span class="font-semibold text-gray-800">订单号:</span>
+                                <span class="text-gray-600 font-mono text-sm">${order.orderNo || order.orderId || ''}</span>
+                            </div>
+                            <span class="bg-green-100 text-green-600 px-2 py-1 rounded-full text-xs">待取件</span>
+                        </div>
+                        
+                        ${items.length > 0 ? items.map((item, itemIndex) => `
+                            <div class="item-card flex items-center gap-3 ${selectedItems.has(`${orderIndex}-${itemIndex}`) ? 'selected' : ''}" 
+                                 onclick="toggleItem('${orderIndex}', '${itemIndex}')"
+                                 id="item-${orderIndex}-${itemIndex}">
+                                <div class="lamp-bulb ${selectedItems.has(`${orderIndex}-${itemIndex}`) ? 'on' : 'off'}" id="lamp-${orderIndex}-${itemIndex}">
+                                </div>
+                                <div class="flex-1">
+                                    <div class="font-semibold text-gray-800">${item.name || item.serviceName || '物品'}</div>
+                                    <div class="text-xs text-gray-500">${item.serviceType || ''}</div>
+                                </div>
+                                <div class="text-amber-600 font-semibold">¥${item.price || 0}</div>
+                            </div>
+                        `).join('') : `
+                            <div class="item-card flex items-center gap-3 ${selectedItems.has(`${orderIndex}-0`) ? 'selected' : ''}" 
+                                 onclick="toggleItem('${orderIndex}', '0')"
+                                 id="item-${orderIndex}-0">
+                                <div class="lamp-bulb ${selectedItems.has(`${orderIndex}-0`) ? 'on' : 'off'}" id="lamp-${orderIndex}-0">
+                                </div>
+                                <div class="flex-1">
+                                    <div class="font-semibold text-gray-800">待取物品</div>
+                                </div>
+                            </div>
+                        `}
+                        
+                        <div class="mt-3 pt-3 border-t border-gray-100 flex items-center justify-between">
+                            <div class="text-xs text-gray-500">
+                                <i class="fa fa-clock-o mr-1"></i>${formatTime(order.updatedAt || order.createTime)}
+                            </div>
+                            <div class="text-xs">
+                                <span class="text-gray-500">取件码:</span>
+                                <span class="font-mono font-bold text-amber-600 ml-1">${pickupCode}</span>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+            
+            updateLampUI();
+        }
+
+        // 切换物品选择
+        function toggleItem(orderIndex, itemIndex) {
+            const key = `${orderIndex}-${itemIndex}`;
+            const lampEl = document.getElementById(`lamp-${orderIndex}-${itemIndex}`);
+            const itemEl = document.getElementById(`item-${orderIndex}-${itemIndex}`);
+            
+            if (selectedItems.has(key)) {
+                selectedItems.delete(key);
+                lampEl.className = 'lamp-bulb off';
+                itemEl.classList.remove('selected');
+            } else {
+                selectedItems.add(key);
+                lampEl.className = 'lamp-bulb on';
+                itemEl.classList.add('selected');
+            }
+            
+            updateLampUI();
+        }
+
+        // 全选
+        function selectAllItems() {
+            const allItems = document.querySelectorAll('.item-card');
+            const isAllSelected = selectedItems.size === getTotalItemCount();
+            
+            if (isAllSelected) {
+                // 取消全选
+                selectedItems.clear();
+            } else {
+                // 全选
+                orders.forEach((order, orderIndex) => {
+                    const items = order.items || order.services || [{}];
+                    items.forEach((item, itemIndex) => {
+                        selectedItems.add(`${orderIndex}-${itemIndex}`);
+                    });
+                });
+            }
+            
+            renderOrders();
+        }
+
+        // 获取总物品数
+        function getTotalItemCount() {
+            let count = 0;
+            orders.forEach(order => {
+                const items = order.items || order.services || [{}];
+                count += items.length || 1;
+            });
+            return count;
+        }
+
+        // 更新灯条UI
+        function updateLampUI() {
+            const count = selectedItems.size;
+            const btn = document.getElementById('confirmPickupBtn');
+            const lampCount = document.getElementById('lampCount');
+            const lampIcon = document.getElementById('lampIcon');
+            const lampStatus = document.getElementById('lampStatus');
+            const lampDesc = document.getElementById('lampDesc');
+            
+            if (btn) {
+                btn.disabled = count === 0;
+                btn.querySelector('span').textContent = `点亮灯条 (${count})`;
+            }
+            
+            if (lampCount) {
+                lampCount.textContent = `${count} 个物品`;
+                lampCount.className = count > 0 ? 'bg-amber-100 text-amber-600 px-3 py-1 rounded-full text-sm font-semibold' : 'bg-gray-100 text-gray-600 px-3 py-1 rounded-full text-sm font-semibold';
+            }
+            
+            if (lampIcon) {
+                if (count > 0) {
+                    lampIcon.className = 'w-12 h-12 rounded-full flex items-center justify-center text-2xl bg-amber-100';
+                    lampIcon.innerHTML = '💡';
+                } else {
+                    lampIcon.className = 'w-12 h-12 rounded-full flex items-center justify-center text-2xl bg-gray-100';
+                    lampIcon.innerHTML = '💡';
+                }
+            }
+            
+            if (lampStatus) {
+                lampStatus.textContent = count > 0 ? '已选择物品' : '等待选择';
+            }
+            
+            if (lampDesc) {
+                lampDesc.textContent = count > 0 ? '点击按钮点亮灯条' : '请在上方选择物品';
+            }
+        }
+
+        // 确认取货
+        async function confirmPickup() {
+            if (selectedItems.size === 0) {
+                alert('请先选择要取的物品');
+                return;
+            }
+            
+            // 显示扫码成功
+            const successPanel = document.getElementById('scanSuccessPanel');
+            const successDesc = document.getElementById('scanSuccessDesc');
+            if (successPanel) {
+                successDesc.textContent = `已选择 ${selectedItems.size} 个物品，正在通知门店...`;
+                successPanel.classList.remove('hidden');
+            }
+            
+            // 禁用按钮
+            const btn = document.getElementById('confirmPickupBtn');
+            if (btn) {
+                btn.disabled = true;
+                btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> 通知中...';
+            }
+            
+            // 收集选中的物品信息
+            const selectedOrderItems = [];
+            orders.forEach((order, orderIndex) => {
+                const items = order.items || order.services || [{}];
+                items.forEach((item, itemIndex) => {
+                    if (selectedItems.has(`${orderIndex}-${itemIndex}`)) {
+                        selectedOrderItems.push({
+                            orderId: order.orderId || order.id || order._id,
+                            orderNo: order.orderNo,
+                            itemId: `${order.orderId || order.id}-${itemIndex}`,
+                            itemName: item.name || item.serviceName || '物品',
+                            lampIndex: selectedOrderItems.length,
+                            pickupCode: order.pickupCode || 'P' + String(order.orderNo || order.orderId || '').slice(-6),
+                            customerName: localStorage.getItem('userName') || '客户'
+                        });
+                    }
+                });
+            });
+            
+            // 触发灯条请求
+            const storeId = currentStore?.storeId || localStorage.getItem('currentStoreId') || 'ST001';
+            
+            const lightRequest = {
+                type: 'customer_light_request',
+                orderId: selectedOrderItems[0]?.orderId,
+                storeId: storeId,
+                timestamp: Date.now(),
+                customerId: localStorage.getItem('userId') || 'customer',
+                customerName: selectedOrderItems[0]?.customerName || '客户',
+                status: 'pending',
+                items: selectedOrderItems,
+                pickupCode: selectedOrderItems[0]?.pickupCode || generatePickupCode()
+            };
+            
+            // 保存到 localStorage，M端会监听
+            localStorage.setItem('store_light_request', JSON.stringify(lightRequest));
+            
+            // 为每个物品单独保存灯条请求
+            selectedOrderItems.forEach(item => {
+                localStorage.setItem(`light_request_${item.orderId}_${item.lampIndex}`, JSON.stringify({
+                    ...item,
+                    storeId: storeId,
+                    timestamp: Date.now(),
+                    status: 'active'
+                }));
+            });
+            
+            // 触发自定义事件
+            window.dispatchEvent(new CustomEvent('storePickupRequested', {
+                detail: lightRequest
+            }));
+            
+            console.log('[灯条扫码] 灯条请求已触发:', lightRequest);
+            
+            // 显示等待面板
+            setTimeout(() => {
+                showWaitingPanel(selectedOrderItems[0]?.pickupCode);
+            }, 500);
+            
+            // 模拟M端响应（用于测试）
+            setTimeout(() => {
+                const response = {
+                    action: 'items_ready',
+                    timestamp: Date.now()
+                };
+                localStorage.setItem('store_light_response', JSON.stringify(response));
+            }, 2000);
+        }
+
+        // 显示等待面板
+        function showWaitingPanel(pickupCode) {
+            const panel = document.getElementById('waitingPanel');
+            const codeEl = document.getElementById('waitingPickupCode');
+            const descEl = document.getElementById('waitingDesc');
+            
+            if (panel) {
+                panel.classList.remove('hidden');
+            }
+            
+            if (codeEl) {
+                codeEl.textContent = pickupCode || generatePickupCode();
+            }
+            
+            if (descEl) {
+                descEl.textContent = `已通知 ${currentStore?.storeName || '门店'} 准备您的物品`;
+            }
+        }
+
+        // 关闭等待面板
+        function closeWaitingPanel() {
+            const panel = document.getElementById('waitingPanel');
+            if (panel) {
+                panel.classList.add('hidden');
+            }
+        }
+
+        // 检查灯条响应
+        function checkLightResponse() {
+            const responseStr = localStorage.getItem('store_light_response');
+            if (responseStr) {
+                try {
+                    const response = JSON.parse(responseStr);
+                    if (response.action === 'items_ready') {
+                        const descEl = document.getElementById('waitingDesc');
+                        if (descEl) {
+                            descEl.textContent = '店员已收到通知，正在准备您的物品！';
+                        }
+                        
+                        // 清除响应
+                        localStorage.removeItem('store_light_response');
+                    }
+                } catch (e) {
+                    console.warn('解析灯条响应失败:', e);
+                }
+            }
+        }
+
+        // 处理 localStorage 变化
+        function handleStorageChange(e) {
+            if (e.key === 'store_light_response') {
+                checkLightResponse();
+            }
+        }
+
+        // 生成取件码
+        function generatePickupCode() {
+            return 'P' + String(Math.floor(100000 + Math.random() * 900000));
+        }
+
+        // 格式化时间
+        function formatTime(isoString) {
+            if (!isoString) return '';
+            const date = new Date(isoString);
+            const now = new Date();
+            const diff = now - date;
+            
+            if (diff < 60000) return '刚刚';
+            if (diff < 3600000) return Math.floor(diff / 60000) + '分钟前';
+            if (diff < 86400000) return Math.floor(diff / 3600000) + '小时前';
+            
+            return date.toLocaleString('zh-CN', {
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+        }
+
+        // 启动
+        init();
+    </script>
+</body>
+</html>

@@ -216,14 +216,21 @@
                     <div class="text-sm text-green-800 mb-3">
                         <i class="fa fa-flask mr-1"></i> 测试模式 - 快捷登录
                     </div>
-                    <div class="grid grid-cols-2 gap-2">
+                    <div class="grid grid-cols-3 gap-2">
                         <button onclick="quickLogin('13900001001')" class="px-3 py-2 bg-white border border-green-200 rounded-lg text-sm text-green-700 hover:bg-green-50 transition-colors">
-                            <div class="font-medium">店员测试</div>
+                            <div class="font-medium">店员</div>
                             <div class="text-xs text-gray-500">13900001001</div>
+                            <div class="text-xs text-green-600">ST002</div>
                         </button>
                         <button onclick="quickLogin('13900001002')" class="px-3 py-2 bg-white border border-purple-200 rounded-lg text-sm text-purple-700 hover:bg-purple-50 transition-colors">
-                            <div class="font-medium">店长测试</div>
+                            <div class="font-medium">店长</div>
                             <div class="text-xs text-gray-500">13900001002</div>
+                            <div class="text-xs text-purple-600">ST002</div>
+                        </button>
+                        <button onclick="quickLogin('13900001003')" class="px-3 py-2 bg-white border border-blue-200 rounded-lg text-sm text-blue-700 hover:bg-blue-50 transition-colors">
+                            <div class="font-medium">管理员</div>
+                            <div class="text-xs text-gray-500">13900001003</div>
+                            <div class="text-xs text-blue-600">ST001</div>
                         </button>
                     </div>
                 </div>
@@ -444,7 +451,8 @@
         function quickLogin(phone) {
             const mockStaff = {
                 '13900001001': { id: 'mock-staff-001', userNo: 'S001', phone: '13900001001', name: '店员小王', roles: ['store_staff'], storeId: 'ST002', storeName: '测试门店ST002' },
-                '13900001002': { id: 'mock-owner-001', userNo: 'S002', phone: '13900001002', name: '店长李明', roles: ['store_owner'], storeId: 'ST002', storeName: '测试门店ST002' }
+                '13900001002': { id: 'mock-owner-001', userNo: 'S002', phone: '13900001002', name: '店长李明', roles: ['store_owner'], storeId: 'ST002', storeName: '测试门店ST002' },
+                '13900001003': { id: 'mock-admin-001', userNo: 'S003', phone: '13900001003', name: '管理员老张', roles: ['store_owner'], storeId: 'ST001', storeName: '测试门店ST001' }
             };
             
             const staff = mockStaff[phone];
@@ -453,6 +461,22 @@
                 localStorage.setItem('storeUser', JSON.stringify(staff));
                 localStorage.setItem('storeAccount', JSON.stringify({ type: 'phone', value: phone, name: staff.name }));
                 localStorage.setItem('isMockStoreUser', 'true');
+                // 同步设置 currentStore，确保门店ID正确
+                // 门店地址从storeAccounts列表中获取
+                const storeAccounts = {
+                    'ST001': { address: '北京市朝阳区XX路123号' },
+                    'ST002': { address: '北京市海淀区XX路456号' },
+                    'ST003': { address: '北京市西城区XX路789号' }
+                };
+                const storeAddress = storeAccounts[staff.storeId]?.address || '地址待完善';
+                const storeData = {
+                    storeId: staff.storeId,
+                    storeName: staff.storeName,
+                    storeAddress: storeAddress,
+                    address: storeAddress,
+                    phone: phone
+                };
+                localStorage.setItem('currentStore', JSON.stringify(storeData));
                 // 清除访客模式标记，允许下次正常登录
                 localStorage.removeItem('guestModeHandled');
                 alert('模拟登录成功: ' + staff.name + '\n门店: ' + staff.storeName);

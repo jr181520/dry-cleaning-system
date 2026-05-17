@@ -2,15 +2,8 @@ App({
   onLaunch(options) {
     console.log('小程序启动', options);
     
-    // 检查是否是扫码进入
-    if (options.query && options.query.code) {
-      console.log('扫码进入，取件码:', options.query.code);
-      // 将取件码存储到全局数据
-      this.globalData.pendingPickupCode = options.query.code;
-    }
-    
-    // 检查场景值
-    console.log('场景值:', options.scene);
+    // 检查是否是扫码进入（小程序码场景）
+    this.handleScanEntry(options);
     
     // 加载模块配置（动态菜单）
     this.loadModuleConfig();
@@ -22,10 +15,89 @@ App({
   onShow(options) {
     console.log('小程序显示', options);
     
-    // 如果是扫码进入，更新取件码
+    // 如果是扫码进入，更新扫码数据
+    if (options.query && (options.query.id || options.query.scene)) {
+      this.handleScanEntry(options);
+    }
+    
+    // 检查取件码
     if (options.query && options.query.code) {
       this.globalData.pendingPickupCode = options.query.code;
     }
+  },
+  
+  // 处理扫码进入
+  handleScanEntry(options) {
+    const { query, scene } = options;
+    console.log('[扫码进入] scene:', scene, 'query:', query);
+    
+    // 优先使用query参数
+    if (query) {
+      // 小程序码参数：id=订单ID&s=门店ID&a=金额
+      if (query.id) {
+        console.log('[扫码进入] 订单支付场景:', query);
+        this.globalData.scanPayOrder = {
+          orderId: query.id,
+          storeId: query.s || '',
+          amount: parseFloat(query.a) || 0
+        };
+      }
+      // 门店二维码参数
+      else if (query.store) {
+        console.log('[扫码进入] 门店场景:', query.store);
+        this.globalData.scanStoreId = query.store;
+      }
+      // 取件码
+      else if (query.code) {
+        console.log('[扫码进入] 取件码:', query.code);
+        this.globalData.pendingPickupCode = query.code;
+      }
+    }
+    
+    // 处理scene参数（部分场景可能通过scene传递）
+    if (scene && !query) {
+      try {
+        // scene参数可能是URL编码的JSON
+        let sceneData = decodeURIComponent(scene);
+        
+        // 检查是否是URL参数格式 (id=xxx&s=xxx&a=xxx)
+        if (sceneData.includes('=')) {
+          const params = new URLSearchParams(sceneData);
+          if (params.has('id')) {
+            this.globalData.scanPayOrder = {
+              orderId: params.get('id'),
+              storeId: params.get('s') || '',
+              amount: parseFloat(params.get('a')) || 0
+            };
+          }
+        } 
+        // 如果scene直接是订单ID（无=符号），直接作为订单ID使用
+        else if (sceneData && sceneData.length > 5) {
+          console.log('[扫码进入] scene直接作为订单ID:', sceneData);
+          this.globalData.scanPayOrder = {
+            orderId: sceneData,
+            storeId: '',
+            amount: 0
+          };
+        }
+      } catch (e) {
+        console.error('[扫码进入] scene解析失败:', e);
+        // 尝试直接使用scene作为订单ID
+        if (scene && scene.length > 5) {
+          this.globalData.scanPayOrder = {
+            orderId: scene,
+            storeId: '',
+            amount: 0
+          };
+        }
+      }
+    }
+  },
+  
+  // 清除扫码数据
+  clearScanData() {
+    this.globalData.scanPayOrder = null;
+    this.globalData.scanStoreId = null;
   },
   
   // 加载模块配置
@@ -122,6 +194,13 @@ App({
     storeId: 'ST001',
     storeName: '干洗店',
     pendingPickupCode: null,
+    // 扫码相关
+    scanPayOrder: null,    // 扫码支付订单信息
+    scanStoreId: null,     // 扫码门店ID
+    // 订单相关
+    currentOrder: null,    // 当前订单（用于支付页面）
+    orders: [],           // 订单列表
+    // API配置
     apiBaseUrl: 'http://localhost:3000/api',
     // 聚合配送API配置
     deliveryApi: {

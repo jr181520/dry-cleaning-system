@@ -1,5 +1,5 @@
 {
-  "appid": "wxc9ed6e100e8f8f6a",
+  "appid": "wxea6be32e3d17d977",
   "projectname": "dry-cleaning-pickup",
   "description": "干洗店取件微信小程序",
   "setting": {
@@ -71,6 +71,20 @@
           "pathName": "pages/pickup/index",
           "query": "code=P000123456",
           "scene": 1011
+        },
+        {
+          "id": 2,
+          "name": "订单详情-扫码支付",
+          "pathName": "pages/order/detail/index",
+          "query": "id=ORD123456&s=ST001&a=88",
+          "scene": 1047
+        },
+        {
+          "id": 3,
+          "name": "订单详情-普通",
+          "pathName": "pages/order/detail/index",
+          "query": "id=ORD123456",
+          "scene": 1035
         }
       ]
     }

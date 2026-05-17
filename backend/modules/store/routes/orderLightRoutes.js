@@ -14,7 +14,7 @@ const lightService = require('../../../services/lightService');
 // ============================================
 router.post('/bind', async (req, res) => {
   try {
-    const { orderId, storeId, lightId, color, bindingType, userId, remark } = req.body;
+    const { orderId, storeId, lightId, color, bindingType, userId, remark, itemIndex } = req.body;
     
     // 参数校验
     if (!orderId || !storeId) {
@@ -24,22 +24,22 @@ router.post('/bind', async (req, res) => {
       });
     }
     
-    // 检查是否已有活跃绑定
-    const existingBinding = await LightBinding.findOne({ 
-      orderId, 
-      status: 'active' 
-    });
-    
-    if (existingBinding) {
-      return res.status(400).json({
-        success: false,
-        error: '该订单已有活跃的灯条绑定',
-        data: existingBinding
-      });
+    // 检查是否已有相同的活跃绑定（同一个订单 + 同一个物品索引 = 一个绑定）
+    const filter = { orderId, status: 'active' };
+    if (itemIndex !== undefined && itemIndex !== null) {
+      // 如果指定了物品索引，则检查该物品是否已有绑定
+      filter.itemIndex = itemIndex;
     }
     
-    // 创建绑定记录
-    const binding = new LightBinding({
+    const existingBinding = await LightBinding.findOne(filter);
+    
+    if (existingBinding) {
+      // 如果已有绑定，直接返回成功（幂等操作）
+      console.log(`[灯条绑定] 物品 ${itemIndex} 已存在绑定，更新即可`);
+    }
+    
+    // 创建绑定记录（如果不存在则创建，存在则更新）
+    const bindingData = {
       orderId,
       storeId,
       lightId: lightId || 'ALL',
@@ -48,9 +48,22 @@ router.post('/bind', async (req, res) => {
       userId,
       remark,
       status: 'active'
-    });
+    };
     
-    await binding.save();
+    if (itemIndex !== undefined && itemIndex !== null) {
+      bindingData.itemIndex = itemIndex;
+    }
+    
+    let binding;
+    if (existingBinding) {
+      // 更新现有绑定
+      Object.assign(existingBinding, bindingData);
+      binding = await existingBinding.save();
+    } else {
+      // 创建新绑定
+      binding = new LightBinding(bindingData);
+      await binding.save();
+    }
     
     // 发布MQTT命令点亮灯条
     const topic = `dryclean/prod/${storeId}/light`;
@@ -59,13 +72,14 @@ router.post('/bind', async (req, res) => {
       lightIds: lightId ? [lightId] : [],
       color: color || 'green',
       priority: bindingType === 'urgent' ? 'high' : 'normal',
-      orderId, // 携带订单ID供终端识别
+      orderId,
+      itemIndex: itemIndex,
       timestamp: Date.now()
     };
     
     lightService.publish(topic, mqttMessage);
     
-    console.log(`[灯条绑定] 激活 - 订单: ${orderId}, 门店: ${storeId}, 颜色: ${color || 'green'}`);
+    console.log(`[灯条绑定] 激活 - 订单: ${orderId}, 物品: ${itemIndex}, 门店: ${storeId}, 颜色: ${color || 'green'}`);
     
     res.json({
       success: true,
@@ -74,6 +88,7 @@ router.post('/bind', async (req, res) => {
         orderId,
         storeId,
         lightId: binding.lightId,
+        itemIndex: itemIndex,
         status: 'active',
         mqttConnected: lightService.isConnected()
       }

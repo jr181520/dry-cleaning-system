@@ -1,6 +1,24 @@
 <view class="order-detail-page">
+  <!-- 扫码支付横幅 -->
+  <view class="scan-pay-banner" wx:if="{{showScanPayBanner}}">
+    <view class="banner-content">
+      <view class="banner-icon">📱</view>
+      <view class="banner-text">
+        <view class="banner-title">扫码支付订单</view>
+        <view class="banner-amount">¥{{scanPayAmount}}</view>
+      </view>
+    </view>
+    <view class="banner-actions">
+      <button class="banner-btn banner-btn-primary" bindtap="onScanPay">立即支付</button>
+      <button class="banner-btn banner-btn-secondary" bindtap="onLaterPay">稍后支付</button>
+    </view>
+    <view class="banner-close" bindtap="closeScanPayBanner">
+      <text class="iconfont icon-close"></text>
+    </view>
+  </view>
+
   <!-- 顶部状态卡片 -->
-  <view class="status-card" style="background: {{statusConfig.gradient}}">
+  <view class="status-card" style="background: {{statusConfig.gradient}}" wx:if="{{!showScanPayBanner}}">
     <!-- 返回首页按钮 -->
     <view class="home-btn" bindtap="onGoHome">
       <text class="iconfont icon-home"></text>

@@ -8,6 +8,8 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Font Awesome -->
     <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+    <!-- html5-qrcode 二维码扫描库 -->
+    <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
     
     <script>
         tailwind.config = {
@@ -739,6 +741,240 @@
                     window.location.href = 'c-profile.html';
                     break;
             }
+        }
+        
+        // ========== 扫码取件功能 ==========
+        let html5QrCode = null;
+        let isScanning = false;
+        
+        // 修改 goToPickup 函数：打开摄像头扫码
+        function goToPickup() {
+            showQRScanner();
+        }
+        
+        // 显示二维码扫描弹窗
+        function showQRScanner() {
+            const modalHtml = `
+                <div id="qr-scanner-modal" style="position:fixed;inset:0;background:rgba(0,0,0,0.9);z-index:99999;display:flex;flex-direction:column;align-items:center;justify-content:center;">
+                    <div style="position:absolute;top:16px;right:16px;">
+                        <button onclick="closeQRScanner()" style="background:rgba(255,255,255,0.2);border:none;color:white;width:40px;height:40px;border-radius:50%;font-size:20px;cursor:pointer;">
+                            <i class="fa fa-times"></i>
+                        </button>
+                    </div>
+                    
+                    <div style="text-align:center;margin-bottom:20px;">
+                        <h3 style="color:white;font-size:18px;font-weight:bold;margin-bottom:8px;">扫描门店二维码</h3>
+                        <p style="color:rgba(255,255,255,0.7);font-size:14px;">将二维码对准扫描框</p>
+                    </div>
+                    
+                    <div id="qr-reader" style="width:280px;height:280px;border:2px solid rgba(255,255,255,0.3);border-radius:16px;overflow:hidden;position:relative;">
+                        <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:200px;height:200px;border:2px solid #3b82f6;border-radius:8px;pointer-events:none;">
+                            <div style="position:absolute;top:-2px;left:-2px;width:30px;height:30px;border-top:4px solid #3b82f6;border-left:4px solid #3b82f6;border-radius:8px 0 0 0;"></div>
+                            <div style="position:absolute;top:-2px;right:-2px;width:30px;height:30px;border-top:4px solid #3b82f6;border-right:4px solid #3b82f6;border-radius:0 8px 0 0;"></div>
+                            <div style="position:absolute;bottom:-2px;left:-2px;width:30px;height:30px;border-bottom:4px solid #3b82f6;border-left:4px solid #3b82f6;border-radius:0 0 0 8px;"></div>
+                            <div style="position:absolute;bottom:-2px;right:-2px;width:30px;height:30px;border-bottom:4px solid #3b82f6;border-right:4px solid #3b82f6;border-radius:0 0 8px 0;"></div>
+                        </div>
+                    </div>
+                    
+                    <div style="margin-top:24px;padding:16px 32px;background:rgba(255,255,255,0.1);border-radius:12px;text-align:center;">
+                        <div style="color:rgba(255,255,255,0.7);font-size:13px;margin-bottom:8px;">没有二维码？</div>
+                        <button onclick="goToManualSelect()" style="background:#3b82f6;color:white;border:none;padding:10px 24px;border-radius:20px;font-size:14px;cursor:pointer;">
+                            选择门店取件
+                        </button>
+                    </div>
+                    
+                    <div id="qr-scan-error" style="display:none;margin-top:16px;padding:12px 20px;background:#fee2e2;border-radius:8px;color:#dc2626;font-size:14px;">
+                        <i class="fa fa-exclamation-circle"></i> <span id="qr-error-text">扫描失败，请重试</span>
+                    </div>
+                </div>
+            `;
+            
+            document.body.insertAdjacentHTML('beforeend', modalHtml);
+            
+            // 延迟初始化扫描器，确保DOM已渲染
+            setTimeout(initQRScanner, 300);
+        }
+        
+        // 初始化二维码扫描器
+        async function initQRScanner() {
+            const config = {
+                fps: 10,
+                qrbox: { width: 200, height: 200 },
+                aspectRatio: 1.0
+            };
+            
+            html5QrCode = new Html5Qrcode("qr-reader");
+            
+            try {
+                isScanning = true;
+                await html5QrCode.start(
+                    { facingMode: "environment" },
+                    config,
+                    onScanSuccess,
+                    onScanFailure
+                );
+                console.log('[扫码] 摄像头已启动');
+            } catch (err) {
+                console.error('[扫码] 无法启动摄像头:', err);
+                showScanError('无法访问摄像头，请检查权限设置');
+            }
+        }
+        
+        // 扫描成功回调
+        function onScanSuccess(decodedText) {
+            console.log('[扫码] 扫描成功:', decodedText);
+            
+            // 停止扫描
+            stopQRScanner();
+            
+            // 解析二维码内容
+            let storeId = null;
+            let targetPage = 'c-store-scan.html'; // 默认跳转页面
+            let orderId = null;
+            let orderAmount = null;
+            let qrType = null;
+            
+            try {
+                // 1. 首先尝试解析为JSON
+                const data = JSON.parse(decodedText);
+                qrType = data.type;
+                
+                // 检查是否是订单支付二维码（小程序码场景）
+                if (qrType === 'order_pay') {
+                    // 这是小程序订单支付码
+                    orderId = data.orderId;
+                    orderAmount = data.amount;
+                    storeId = data.storeId;
+                    
+                    // 保存订单信息到本地存储
+                    localStorage.setItem('scannedOrderId', orderId);
+                    localStorage.setItem('scannedOrderAmount', orderAmount);
+                    localStorage.setItem('recentPickupStore', storeId);
+                    
+                    // 检测是否是微信浏览器
+                    const isWechat = /MicroMessenger/i.test(navigator.userAgent);
+                    
+                    closeQRScanner();
+                    console.log('[扫码] 订单小程序码 - 订单ID:', orderId, '金额:', orderAmount, '微信内:', isWechat);
+                    
+                    if (isWechat) {
+                        // 在微信内：提示用户使用小程序
+                        alert('此为小程序专属二维码，请在微信中长按识别小程序码');
+                    } else {
+                        // 非微信环境：跳转到H5订单详情页
+                        window.location.href = `c-order-detail.html?id=${orderId}`;
+                    }
+                    return;
+                }
+                
+                // 门店二维码处理
+                storeId = data.storeId || data.store_id || data.id || data;
+                targetPage = data.page || data.target || targetPage;
+            } catch (e) {
+                // 2. 如果不是JSON，尝试解析为URL格式
+                const text = decodedText.trim();
+                
+                // 检查是否是订单URL格式
+                if (text.includes('orderId=') || text.includes('order_id=') || text.includes('id=')) {
+                    // 从URL中提取订单参数
+                    const urlParams = new URLSearchParams(text.split('?')[1] || '');
+                    orderId = urlParams.get('orderId') || urlParams.get('order_id') || urlParams.get('id');
+                    targetPage = text.split('?')[0].replace(/.*\//, '');
+                    
+                    if (orderId) {
+                        localStorage.setItem('scannedOrderId', orderId);
+                        closeQRScanner();
+                        console.log('[扫码] 订单URL二维码 - 订单ID:', orderId);
+                        window.location.href = `${targetPage}?id=${orderId}`;
+                        return;
+                    }
+                }
+                
+                // 检查是否是完整的门店URL格式
+                if (text.includes('store=')) {
+                    // 从URL中提取store参数
+                    const urlParams = new URLSearchParams(text.split('?')[1] || '');
+                    storeId = urlParams.get('store');
+                    
+                    // 根据URL路径决定跳转页面
+                    if (text.includes('c-lamp-scan.html')) {
+                        targetPage = 'c-lamp-scan.html';
+                    } else if (text.includes('c-store-scan.html')) {
+                        targetPage = 'c-store-scan.html';
+                    } else if (text.includes('c-order-detail.html')) {
+                        targetPage = 'c-order-detail.html';
+                    }
+                } else if (text.includes('store=')) {
+                    // 只有store参数的情况
+                    storeId = text.replace(/.*store=([^&\s]*).*/i, '$1');
+                } else {
+                    // 3. 直接作为storeId使用
+                    storeId = text;
+                }
+            }
+            
+            // 清理storeId
+            if (typeof storeId === 'string') {
+                storeId = storeId.trim();
+                // 去除可能的URL路径前缀
+                storeId = storeId.replace(/.*store[_-]?id[=\s:]*([A-Z0-9_-]+).*/i, '$1');
+            }
+            
+            if (storeId && storeId.length > 0) {
+                // 保存最近使用的门店
+                localStorage.setItem('recentPickupStore', storeId);
+                
+                // 关闭扫码弹窗
+                closeQRScanner();
+                
+                // 跳转到门店扫码页面
+                console.log('[扫码] 解析结果 - 门店ID:', storeId, '页面:', targetPage);
+                window.location.href = `${targetPage}?store=${storeId}`;
+            } else {
+                showScanError('无效的二维码');
+            }
+        }
+        
+        // 扫描失败回调
+        function onScanFailure(error) {
+            // 忽略扫描失败（用户可能还没有对准二维码）
+        }
+        
+        // 停止二维码扫描
+        async function stopQRScanner() {
+            if (html5QrCode && isScanning) {
+                try {
+                    await html5QrCode.stop();
+                    html5QrCode.clear();
+                    isScanning = false;
+                    console.log('[扫码] 摄像头已关闭');
+                } catch (e) {
+                    console.error('[扫码] 关闭摄像头失败:', e);
+                }
+            }
+        }
+        
+        // 关闭扫码弹窗
+        function closeQRScanner() {
+            stopQRScanner();
+            const modal = document.getElementById('qr-scanner-modal');
+            if (modal) modal.remove();
+        }
+        
+        // 显示扫描错误
+        function showScanError(message) {
+            const errorDiv = document.getElementById('qr-scan-error');
+            const errorText = document.getElementById('qr-error-text');
+            if (errorDiv && errorText) {
+                errorText.textContent = message;
+                errorDiv.style.display = 'block';
+            }
+        }
+        
+        // 手动选择门店
+        function goToManualSelect() {
+            closeQRScanner();
+            showStoreSelectModal();
         }
     </script>
 </body>

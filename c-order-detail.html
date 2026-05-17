@@ -486,6 +486,61 @@
     .batch-pickup-btn:active {
       transform: scale(0.98);
     }
+    
+    /* 扫码支付提示横幅 */
+    .scan-pay-banner {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 12px 16px;
+      margin: -20px 16px 16px;
+      border-radius: 12px;
+      display: none;
+      box-shadow: 0 2px 12px rgba(102, 126, 234, 0.3);
+    }
+    .scan-pay-banner.show {
+      display: block;
+    }
+    .scan-pay-banner .banner-title {
+      font-weight: 600;
+      margin-bottom: 4px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .scan-pay-banner .banner-title i {
+      font-size: 16px;
+    }
+    .scan-pay-banner .banner-amount {
+      font-size: 24px;
+      font-weight: bold;
+      margin: 8px 0;
+    }
+    .scan-pay-banner .banner-tip {
+      font-size: 12px;
+      opacity: 0.9;
+    }
+    .scan-pay-banner .banner-actions {
+      margin-top: 12px;
+      display: flex;
+      gap: 8px;
+    }
+    .scan-pay-banner .banner-btn {
+      flex: 1;
+      padding: 10px;
+      border-radius: 8px;
+      border: none;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .scan-pay-banner .banner-btn-primary {
+      background: white;
+      color: #667eea;
+    }
+    .scan-pay-banner .banner-btn-secondary {
+      background: rgba(255,255,255,0.2);
+      color: white;
+    }
   </style>
 </head>
 <body>
@@ -504,6 +559,24 @@
       <div class="live-indicator" id="liveIndicator" style="display:none;">
         <span class="live-dot"></span>
         <span>实时更新中</span>
+      </div>
+    </div>
+    
+    <!-- 扫码支付提示横幅（扫码进入订单时显示） -->
+    <div class="scan-pay-banner" id="scanPayBanner">
+      <div class="banner-title">
+        <i class="fas fa-qrcode"></i>
+        <span>扫码支付订单</span>
+      </div>
+      <div class="banner-amount">¥<span id="scanPayAmount">0</span></div>
+      <div class="banner-tip">请确认订单信息并完成支付</div>
+      <div class="banner-actions">
+        <button class="banner-btn banner-btn-primary" onclick="proceedToPay()">
+          立即支付
+        </button>
+        <button class="banner-btn banner-btn-secondary" onclick="closeScanPayBanner()">
+          稍后支付
+        </button>
       </div>
     </div>
     
@@ -802,7 +875,13 @@
       cancelled: { text: '已取消', icon: 'fa-times-circle', color: '#9e9e9e', gradient: 'linear-gradient(135deg, #9e9e9e, #757575)' }
     };
     
-    const STEPS_ORDER = ['awaiting_store_confirm', 'store_confirmed', 'delivering', 'received', 'processing', 'in_progress', 'cleaning', 'cleaned', 'ready', 'completed'];
+    // 门店自提完整流程（不含pending，因为pending只在订单创建初期出现）
+    // 流程: 已支付 → 待门店确认 → 门店已确认 → 已入库 → 处理中 → 清洗中 → 清洗完成 → 等待出库 → 待取件 → 已完成
+    const STEPS_ORDER = ['paid', 'awaiting_store_confirm', 'store_confirmed', 'received', 'processing', 'in_progress', 'cleaning', 'cleaned', 'awaiting_store_outbound', 'ready', 'completed'];
+    
+    // 配送流程（不含pending）
+    // 流程: 已支付 → 配送中(取件) → 已入库 → 处理中 → 清洗中 → 清洗完成 → 配送中(送件) → 已完成
+    const DELIVERY_STEPS_ORDER = ['paid', 'delivering', 'received', 'processing', 'in_progress', 'cleaning', 'cleaned', 'delivering_back', 'completed'];
     
     // 获取状态文字
     function getStatusText(status) {
@@ -832,6 +911,9 @@
         }
       }
       
+      // 检查是否是扫码进入的订单支付
+      checkScanPayOrder();
+      
       if (!orderId) {
         // 使用演示数据
         isPageLoading = false;
@@ -844,6 +926,11 @@
             lastKnownOrderStatus = currentOrder.status;
             lastKnownUpdatedAt = currentOrder.updatedAt;
             console.log('[初始化] 订单加载完成，状态:', lastKnownOrderStatus, '开始实时同步...');
+            
+            // 如果是扫码进入且订单待支付，显示支付横幅
+            if (currentOrder.status === 'pending') {
+              showScanPayBanner();
+            }
           }
         }).catch(error => {
           console.error('[初始化] 加载订单出错:', error);
@@ -851,6 +938,44 @@
           showDemoOrder();
         });
         startRealTimeTracking();
+        
+        // 监听M端出库完成事件
+        window.addEventListener('pickupCompleted', (e) => {
+          if (e.detail.orderId === orderId) {
+            console.log('[C端] 收到出库完成事件，自动刷新订单状态');
+            refreshOrderData();
+          }
+        });
+        
+        // 监听订单状态更新事件
+        window.addEventListener('orderStatusUpdated', (e) => {
+          if (e.detail.orderId === orderId) {
+            console.log('[C端] 收到订单状态更新事件，自动刷新');
+            refreshOrderData();
+          }
+        });
+        
+        // 监听跨标签页的状态同步
+        window.addEventListener('storage', (e) => {
+          if ((e.key === 'orders' || e.key === 'store_orders' || e.key === 'store_light_request') && e.newValue) {
+            console.log('[C端] 检测到其他标签页更新:', e.key);
+            refreshOrderData();
+          }
+        });
+        
+        // 监听URL变化（支持SPA路由或历史记录导航）
+        let lastLoadedOrderId = orderId;
+        setInterval(() => {
+          const urlParams = new URLSearchParams(window.location.search);
+          const currentOrderId = urlParams.get('id') || currentOrder?.orderId || currentOrder?.id;
+          if (currentOrderId && currentOrderId !== lastLoadedOrderId) {
+            console.log('[C端] 检测到订单ID变化:', lastLoadedOrderId, '->', currentOrderId);
+            lastLoadedOrderId = currentOrderId;
+            orderId = currentOrderId;
+            // 加载新订单并初始化状态
+            loadOrderDetail();
+          }
+        }, 2000);
         
         // 10秒后如果还在加载，强制结束
         setTimeout(() => {
@@ -898,9 +1023,68 @@
       localStorage.setItem('userDeliveryInfo', JSON.stringify(info));
     }
     
+    // 检查是否是扫码进入的订单支付
+    function checkScanPayOrder() {
+      const scannedOrderId = localStorage.getItem('scannedOrderId');
+      const scannedAmount = localStorage.getItem('scannedOrderAmount');
+      
+      if (scannedOrderId && scannedAmount) {
+        console.log('[扫码支付] 检测到扫码订单:', scannedOrderId, '金额:', scannedAmount);
+        
+        // 如果URL中没有订单ID，使用扫码的订单ID
+        if (!orderId) {
+          orderId = scannedOrderId;
+        }
+      }
+    }
+    
+    // 显示扫码支付横幅
+    function showScanPayBanner() {
+      const banner = document.getElementById('scanPayBanner');
+      const amountSpan = document.getElementById('scanPayAmount');
+      const scannedAmount = localStorage.getItem('scannedOrderAmount');
+      
+      if (banner && amountSpan) {
+        // 优先使用扫码获取的金额，否则使用订单金额
+        const amount = scannedAmount || currentOrder?.fees?.total || currentOrder?.totalAmount || 0;
+        amountSpan.textContent = amount;
+        banner.classList.add('show');
+        
+        // 清除扫码数据
+        setTimeout(() => {
+          localStorage.removeItem('scannedOrderId');
+          localStorage.removeItem('scannedOrderAmount');
+        }, 5000);
+      }
+    }
+    
+    // 关闭扫码支付横幅
+    function closeScanPayBanner() {
+      const banner = document.getElementById('scanPayBanner');
+      if (banner) {
+        banner.classList.remove('show');
+      }
+      // 清除扫码数据
+      localStorage.removeItem('scannedOrderId');
+      localStorage.removeItem('scannedOrderAmount');
+    }
+    
+    // 跳转到支付页面
+    function proceedToPay() {
+      closeScanPayBanner();
+      sessionStorage.setItem('fromPaymentPage', 'true');
+      window.location.href = 'c-payment.html';
+    }
+    
     // 加载订单详情
     async function loadOrderDetail() {
       try {
+        // 切换订单时重置状态（订单隔离）
+        if (orderId) {
+          console.log('[加载] 初始化订单状态缓存:', orderId);
+          getOrderState(orderId); // 确保新订单有状态记录
+        }
+        
         console.log('[加载] 开始加载订单, orderId:', orderId);
         
         // 首先从localStorage加载最新状态（M端会实时更新这里）
@@ -1049,7 +1233,32 @@
         const result = await response.json();
         if (result.success && result.data) {
           console.log('[API] 成功获取订单，状态:', result.data.status);
-          return result.data;
+          console.log('[API] 订单物品数据:', {
+            items: result.data.items,
+            services: result.data.services,
+            amounts: result.data.amounts
+          });
+          
+          // 确保API返回的数据中items有价格信息
+          const apiOrder = result.data;
+          
+          // 如果items没有价格信息，尝试从本地存储获取
+          if (!apiOrder.items || !apiOrder.items.some(i => i.price > 0)) {
+            console.log('[API] API返回的items缺少价格，尝试从本地存储获取...');
+            const localOrders = JSON.parse(localStorage.getItem('orders') || '[]');
+            const localOrder = localOrders.find(o => 
+              o.orderId === orderId || 
+              o.id === orderId || 
+              o._id === orderId ||
+              o.orderNo === orderId
+            );
+            if (localOrder && localOrder.items && localOrder.items.some(i => i.price > 0)) {
+              console.log('[API] 使用本地存储的items数据补充价格信息');
+              apiOrder.items = localOrder.items;
+            }
+          }
+          
+          return apiOrder;
         }
         return null;
       } catch (error) {
@@ -1082,9 +1291,19 @@
               id: order.id,
               _id: order._id,
               orderNo: order.orderNo,
-              status: order.status
+              status: order.status,
+              items: order.items,
+              services: order.services,
+              debugItems: order.debugItems,
+              fees: order.fees,
+              total: order.total,
+              amount: order.amount
             });
             currentOrder = order;
+            // 确保items数据完整（合并items和debugItems）
+            if (!currentOrder.items || currentOrder.items.length === 0) {
+              currentOrder.items = currentOrder.services || [];
+            }
             updateOrderUI(currentOrder);
             return true;
           } else {
@@ -1163,21 +1382,23 @@
       document.getElementById('statusText').textContent = config.text;
       document.getElementById('statusDesc').textContent = order.statusDescription || '';
       
-      // 更新进度条
-      const currentStep = STEPS_ORDER.indexOf(order.status);
-      const progressPercent = currentStep >= 0 ? (currentStep / (STEPS_ORDER.length - 1)) * 100 : 0;
+      // 更新进度条（根据配送方式选择流程）
+      const isDeliveryOrder = order.deliveryMethod === 'home_delivery';
+      const stepsArray = isDeliveryOrder ? DELIVERY_STEPS_ORDER : STEPS_ORDER;
+      const currentStep = stepsArray.indexOf(order.status);
+      const progressPercent = currentStep >= 0 ? (currentStep / (stepsArray.length - 1)) * 100 : 0;
       document.getElementById('progressFill').style.width = `${progressPercent}%`;
       
       // 更新步骤高亮
       document.querySelectorAll('.progress-step').forEach((step, index) => {
         const stepKey = step.dataset.step;
-        const stepIndex = STEPS_ORDER.indexOf(stepKey);
-        if (stepIndex <= currentStep) {
+        const stepIndex = stepsArray.indexOf(stepKey);
+        if (stepIndex <= currentStep && stepIndex >= 0) {
           step.classList.add('active');
         } else {
           step.classList.remove('active');
         }
-        if (stepIndex === currentStep) {
+        if (stepIndex === currentStep && stepIndex >= 0) {
           step.classList.add('current');
         } else {
           step.classList.remove('current');
@@ -1185,7 +1406,23 @@
       });
       
       // 更新物品列表（优先使用items，如果没有则使用services）
-      const items = order.items || order.services || [];
+      // 合并API数据和本地数据，确保物品价格不丢失
+      let items = order.items || order.services || [];
+      
+      // 如果items没有价格信息，但debugItems有（从M端同步过来的数据），则使用debugItems
+      if ((!items || items.length === 0 || !items.some(i => i.price > 0)) && order.debugItems && order.debugItems.length > 0) {
+        console.log('[C端详情] 使用debugItems数据（包含价格信息）');
+        items = order.debugItems.map(i => ({ name: i.name, price: i.price, quantity: i.quantity }));
+      }
+      
+      console.log('[C端详情] 订单物品数据:', {
+        orderId: order.orderId,
+        itemsCount: items.length,
+        items: items.map(i => ({ name: i.name, price: i.price, quantity: i.quantity })),
+        fees: order.fees,
+        total: order.total
+      });
+      
       if (items.length > 0) {
         document.getElementById('itemList').innerHTML = items.map(item => {
           const quantity = item.quantity || 1;
@@ -1204,6 +1441,9 @@
             <div class="item-price">¥${total}</div>
           </div>
         `}).join('');
+      } else {
+        // 如果没有任何物品数据，显示提示
+        document.getElementById('itemList').innerHTML = '<div style="text-align:center;color:#999;padding:20px;">暂无物品数据</div>';
       }
       
       // 更新订单信息
@@ -1766,6 +2006,17 @@
           mainBtn.className = 'btn-action btn-success';
           mainBtn.onclick = scanStoreQRCode;
           break;
+        case 'awaiting_store_outbound':
+          // 等待门店出库状态（扫码后）
+          mainBtn.textContent = '等待店员出库...';
+          mainBtn.className = 'btn-action btn-outline';
+          mainBtn.onclick = () => alert('请耐心等待店员准备您的物品');
+          mainBtn.disabled = true;
+          if (secondaryBtn) {
+            secondaryBtn.textContent = '联系门店';
+            secondaryBtn.onclick = viewStore;
+          }
+          break;
         case 'delivering_back':
           // 骑手配送中状态
           mainBtn.textContent = '查看配送跟踪';
@@ -1820,9 +2071,28 @@
       const scanned = confirm('请扫描门店取件二维码\n\n（模拟：点击确定表示扫码成功）');
       if (!scanned) return;
       
+      // 设置扫码冷却期（30秒内阻止状态更新和灯条重复触发）
+      setCurrentUserHasScanned(true);
+      setCurrentCooldownUntil(Date.now() + SCAN_COOLDOWN);
+      
+      // 立即更新状态为等待出库（防止刷新覆盖）
+      currentOrder.status = 'awaiting_store_outbound';
+      currentOrder.pickupScannedAt = new Date().toISOString();
+      
+      // 立即更新到localStorage
+      updateOrderLocalStorage();
+      
+      // 触发灯条请求（在更新状态之后）
+      triggerStorePickupRequest();
+      
+      alert('扫码成功！已通知店员准备您的物品。\n\n请等待店员取出物品并确认取件。');
+      
+      // 更新UI
+      updateOrderUI(currentOrder);
+      
+      // 尝试调用API（异步，不阻塞主流程）
       try {
-        // 调用API通知系统用户已扫码
-        const response = await fetch(`http://localhost:3000/api/cleaning/orders/${orderId}/scan-pickup`, {
+        await fetch(`http://localhost:3000/api/cleaning/orders/${orderId}/scan-pickup`, {
           method: 'POST',
           headers: { 
             'Content-Type': 'application/json',
@@ -1830,41 +2100,132 @@
           },
           body: JSON.stringify({
             pickupMethod: 'store_pickup',
-            scanTime: new Date().toISOString()
+            scanTime: currentOrder.pickupScannedAt
           })
         });
-        
-        const result = await response.json();
-        console.log('[扫码取件] 后端返回:', result);
-        if (result.success) {
-          alert('扫码成功！已通知店员准备您的物品。\n\n请等待店员取出物品并扫码出库。');
-          // 更新订单状态为等待店员出库
-          currentOrder.status = 'awaiting_store_outbound';
-          updateOrderUI(currentOrder);
-        } else {
-          alert(result.error || '扫码失败，请重试');
-        }
       } catch (error) {
-        console.error('扫码取件失败:', error);
-        // 本地模拟 - 后端没有scan-pickup端点时使用本地模式
-        alert('扫码成功！（本地模式）\n\n已通知店员准备您的物品。\n\n请等待店员取出物品并确认取件。');
-        
-        // 更新本地状态
-        currentOrder.status = 'awaiting_store_outbound';
-        currentOrder.pickupScannedAt = new Date().toISOString();
-        
-        // 更新localStorage
-        const orders = JSON.parse(localStorage.getItem('orders') || '[]');
-        const idx = orders.findIndex(o => o.orderId === orderId || o.id === orderId);
-        if (idx > -1) {
-          orders[idx].status = 'awaiting_store_outbound';
-          orders[idx].pickupScannedAt = currentOrder.pickupScannedAt;
-          localStorage.setItem('orders', JSON.stringify(orders));
-        }
-        localStorage.setItem('currentOrder', JSON.stringify(currentOrder));
-        
-        updateOrderUI(currentOrder);
+        console.log('[扫码取件] API调用失败（本地模式）:', error.message);
       }
+    }
+    
+    // 更新订单到localStorage
+    function updateOrderLocalStorage() {
+      // 更新orders列表
+      const orders = JSON.parse(localStorage.getItem('orders') || '[]');
+      const idx = orders.findIndex(o => o.orderId === orderId || o.id === orderId);
+      if (idx > -1) {
+        orders[idx] = { ...orders[idx], ...currentOrder };
+        localStorage.setItem('orders', JSON.stringify(orders));
+      }
+      // 更新currentOrder
+      localStorage.setItem('currentOrder', JSON.stringify(currentOrder));
+    }
+    
+    // 触发门店取件灯条请求
+    function triggerStorePickupRequest() {
+      // 检查是否已触发过灯条请求（防止重复触发）- 使用订单隔离状态
+      if (getCurrentLightTriggered()) {
+        console.log('[C端] 灯条请求已触发，跳过重复触发 | 订单:', orderId);
+        return;
+      }
+      setCurrentLightTriggered(true);
+      
+      const storeId = currentOrder?.storeId || localStorage.getItem('currentStoreId') || 'ST001';
+      const items = currentOrder?.items || currentOrder?.services || [];
+      
+      console.log('[C端] 准备灯条请求，物品列表:', items);
+      
+      // 确保至少有一个物品
+      let itemsWithLamps;
+      if (items.length > 0) {
+        // 为每个物品分配灯条索引
+        itemsWithLamps = items.map((item, index) => ({
+          itemId: `${orderId}-${index}`,
+          itemName: item.name || item.serviceName || '未知物品',
+          lampIndex: index,
+          orderId: orderId,
+          customerName: currentOrder?.contact?.name || currentOrder?.customerName || '客户'
+        }));
+      } else {
+        // 如果没有物品，创建一个默认物品
+        itemsWithLamps = [{
+          itemId: `${orderId}-0`,
+          itemName: '待取物品',
+          lampIndex: 0,
+          orderId: orderId,
+          customerName: currentOrder?.contact?.name || currentOrder?.customerName || '客户'
+        }];
+        console.log('[C端] 没有物品，添加默认物品');
+      }
+      
+      const lightRequest = {
+        type: 'customer_arrival',
+        orderId: orderId,
+        storeId: storeId,
+        timestamp: Date.now(),
+        customerId: localStorage.getItem('userId') || 'customer',
+        customerName: currentOrder?.contact?.name || currentOrder?.customerName || '客户',
+        status: 'pending',
+        items: itemsWithLamps,
+        pickupCode: currentOrder?.pickupCode || generatePickupCode()
+      };
+      
+      // 保存到 localStorage，M端会监听这个变化
+      localStorage.setItem('store_light_request', JSON.stringify(lightRequest));
+      
+      // 触发自定义事件通知M端
+      window.dispatchEvent(new CustomEvent('storePickupRequested', {
+        detail: lightRequest
+      }));
+      
+      console.log('[C端] 灯条请求已触发:', lightRequest);
+      
+      // 显示提示信息
+      showToast('已通知门店准备您的物品', 'success');
+    }
+    
+    // 生成取件码
+    function generatePickupCode() {
+      return 'P' + String(Math.floor(100000 + Math.random() * 900000));
+    }
+    
+    // 显示提示信息
+    function showToast(message, type) {
+      const existing = document.querySelector('.toast-notification');
+      if (existing) existing.remove();
+      
+      const toast = document.createElement('div');
+      toast.className = 'toast-notification';
+      toast.style.cssText = `
+        position: fixed;
+        top: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: ${type === 'success' ? '#4caf50' : '#ff5722'};
+        color: white;
+        padding: 12px 24px;
+        border-radius: 8px;
+        z-index: 10000;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        animation: slideDown 0.3s ease;
+      `;
+      toast.innerHTML = `<i class="fas ${type === 'success' ? 'fa-check-circle' : 'fa-exclamation-circle'}"></i> ${message}`;
+      
+      // 添加动画样式
+      if (!document.querySelector('#toast-animation')) {
+        const style = document.createElement('style');
+        style.id = 'toast-animation';
+        style.textContent = `
+          @keyframes slideDown {
+            from { opacity: 0; transform: translateX(-50%) translateY(-20px); }
+            to { opacity: 1; transform: translateX(-50%) translateY(0); }
+          }
+        `;
+        document.head.appendChild(style);
+      }
+      
+      document.body.appendChild(toast);
+      setTimeout(() => toast.remove(), 3000);
     }
     
     // 提交取件方式并支付配送费
@@ -2070,6 +2431,67 @@
     let lastKnownOrderStatus = null;
     let lastKnownUpdatedAt = null;
     
+    // 基于订单ID的状态隔离机制（防止不同订单互相干扰）
+    const orderStateMap = new Map(); // 格式: { orderId -> { userHasScanned, lightTriggered, cooldownUntil } }
+    
+    function getOrderState(oid) {
+      if (!oid) return null;
+      if (!orderStateMap.has(oid)) {
+        orderStateMap.set(oid, {
+          userHasScanned: false,
+          lightTriggered: false,
+          cooldownUntil: 0
+        });
+      }
+      return orderStateMap.get(oid);
+    }
+    
+    function resetOrderState(oid) {
+      if (oid) {
+        orderStateMap.delete(oid);
+        console.log('[状态重置] 已清除订单状态缓存:', oid);
+      }
+    }
+    
+    // 获取当前订单的扫码冷却期（兼容旧代码）
+    function getCurrentCooldownUntil() {
+      const state = getOrderState(orderId);
+      return state ? state.cooldownUntil : 0;
+    }
+    
+    // 设置当前订单的扫码冷却期（兼容旧代码）
+    function setCurrentCooldownUntil(value) {
+      const state = getOrderState(orderId);
+      if (state) state.cooldownUntil = value;
+    }
+    
+    // 获取当前订单是否已扫码（兼容旧代码）
+    function getCurrentUserHasScanned() {
+      const state = getOrderState(orderId);
+      return state ? state.userHasScanned : false;
+    }
+    
+    // 设置当前订单已扫码状态（兼容旧代码）
+    function setCurrentUserHasScanned(value) {
+      const state = getOrderState(orderId);
+      if (state) state.userHasScanned = value;
+    }
+    
+    // 获取当前订单灯条请求触发状态（兼容旧代码）
+    function getCurrentLightTriggered() {
+      const state = getOrderState(orderId);
+      return state ? state.lightTriggered : false;
+    }
+    
+    // 设置当前订单灯条请求触发状态（兼容旧代码）
+    function setCurrentLightTriggered(value) {
+      const state = getOrderState(orderId);
+      if (state) state.lightTriggered = value;
+    }
+    
+    // 扫码冷却期（30秒）- 防止轮询触发重复灯条请求
+    const SCAN_COOLDOWN = 30000; // 30秒
+    
     // 防抖变量：避免频繁更新UI
     let updatePending = false;
     let lastUpdateTime = 0;
@@ -2115,7 +2537,38 @@
       }
       
       try {
-        // 1. 首先检查localStorage是否有更新（M端会实时更新这里）
+        // 0. 扫码冷却期检查：在扫码后30秒内，跳过所有状态更新（使用订单隔离状态）
+        const currentCooldownUntil = getCurrentCooldownUntil();
+        if (Date.now() < currentCooldownUntil) {
+          const remaining = Math.ceil((currentCooldownUntil - Date.now()) / 1000);
+          console.log('[刷新] 跳过：扫码冷却期剩余', remaining, '秒 | 订单:', orderId);
+          return;
+        }
+        
+        // 1. 状态保护：如果订单已完成，拒绝任何状态回退
+        if (lastKnownOrderStatus === 'completed') {
+          console.log('[刷新] 已完成订单，跳过所有状态更新');
+          return;
+        }
+        
+        // 2. 状态保护：防止订单被错误回退到待支付
+        // 如果当前状态不是 pending，不接受从 API/localStorage 返回的 pending 状态
+        if (lastKnownOrderStatus && lastKnownOrderStatus !== 'pending') {
+          // 检查 localStorage
+          const ordersStr = localStorage.getItem('orders');
+          if (ordersStr) {
+            const orders = JSON.parse(ordersStr);
+            const order = orders.find(o => 
+              o.orderId === orderId || o.id === orderId || o._id === orderId || o.orderNo === orderId
+            );
+            if (order && order.status === 'pending') {
+              console.log('[刷新] 跳过：拒绝 pending 状态回退（当前:', lastKnownOrderStatus, '）');
+              return;
+            }
+          }
+        }
+        
+        // 3. 首先检查localStorage是否有更新（M端会实时更新这里）
         const ordersStr = localStorage.getItem('orders');
         if (ordersStr) {
           const orders = JSON.parse(ordersStr);
@@ -2127,13 +2580,26 @@
           );
           
           if (order) {
+            // 状态保护：已完成订单拒绝任何非completed状态
+            if (order.status !== 'completed' && lastKnownOrderStatus === 'completed') {
+              console.log('[刷新] 跳过：已完成订单拒绝状态变化为', order.status);
+              return;
+            }
+            
+            // 状态保护：已扫码订单拒绝 ready 状态（防止旧数据覆盖）- 使用订单隔离状态
+            const isLocalReady = order.status === 'ready';
+            if (getCurrentUserHasScanned() && isLocalReady) {
+              console.log('[刷新] 跳过：用户已扫码，拒绝 ready 状态（旧数据）');
+              return;
+            }
+            
             // 状态变化检查
             const statusChanged = order.status !== lastKnownOrderStatus;
             const localUpdatedAt = order.updatedAt ? new Date(order.updatedAt) : null;
             const currentUpdatedAt = lastKnownUpdatedAt ? new Date(lastKnownUpdatedAt) : null;
             const timeChanged = localUpdatedAt && currentUpdatedAt && localUpdatedAt > currentUpdatedAt;
             
-            console.log('[同步检测] 状态:', order.status, '| 上次:', lastKnownOrderStatus, '| 变化:', statusChanged);
+            console.log('[刷新] localStorage状态:', order.status, '| 上次:', lastKnownOrderStatus, '| 用户已扫码:', getCurrentUserHasScanned(), '| 变化:', statusChanged);
             
             if (statusChanged) {
               // 状态变化，使用统一更新函数
@@ -2141,7 +2607,7 @@
               return;
             } else if (timeChanged && !statusChanged) {
               // 时间戳更新但状态没变，仅更新本地记录
-              console.log('[同步检测] 时间戳更新但状态未变，仅更新本地记录');
+              console.log('[刷新] 时间戳更新但状态未变，仅更新本地记录');
               currentOrder = order;
               lastKnownOrderStatus = order.status;
               lastKnownUpdatedAt = order.updatedAt;
@@ -2150,7 +2616,7 @@
           }
         }
         
-        // 2. 如果localStorage没有明显更新，再从API获取
+        // 4. 如果localStorage没有明显更新，再从API获取
         const response = await fetch(`http://localhost:3000/api/cleaning/orders/${orderId}/status`, {
           headers: {
             'Cache-Control': 'no-cache',
@@ -2161,9 +2627,29 @@
         
         if (result.success && result.data) {
           const apiOrder = result.data;
+          
+          // 状态保护：已完成订单拒绝任何状态
+          if (lastKnownOrderStatus === 'completed') {
+            console.log('[API刷新] 已完成订单，跳过API状态更新');
+            return;
+          }
+          
+          // 状态保护：拒绝 pending 状态
+          if (lastKnownOrderStatus && lastKnownOrderStatus !== 'pending' && apiOrder.status === 'pending') {
+            console.log('[API刷新] 跳过：拒绝 pending 状态回退');
+            return;
+          }
+          
+          // 状态保护：已扫码订单拒绝 ready 状态
+          const isApiReady = apiOrder.status === 'ready';
+          if (getCurrentUserHasScanned() && isApiReady) {
+            console.log('[API刷新] 跳过：用户已扫码，拒绝 API 返回 ready 状态');
+            return;
+          }
+          
           const apiStatusChanged = apiOrder.status !== lastKnownOrderStatus;
           
-          console.log('[API刷新] 检测到API状态变化:', apiOrder.status, '| 上次:', lastKnownOrderStatus, '| 变化:', apiStatusChanged);
+          console.log('[API刷新] API状态:', apiOrder.status, '| 上次:', lastKnownOrderStatus, '| 用户已扫码:', getCurrentUserHasScanned(), '| 变化:', apiStatusChanged);
           
           if (apiStatusChanged) {
             // API状态变化，使用统一更新函数

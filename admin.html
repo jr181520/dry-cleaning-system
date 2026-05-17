@@ -288,7 +288,7 @@
                     </div>
                     
                     <!-- 订单统计卡片 -->
-                    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                    <div class="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
                         <div class="bg-white rounded-lg shadow-md p-6 border-l-4 border-blue-500">
                             <div class="flex items-center justify-between">
                                 <div>
@@ -323,6 +323,15 @@
                                     <p id="completed-orders" class="text-2xl font-bold text-green-600">0</p>
                                 </div>
                                 <i class="fa fa-check-circle text-green-500 text-2xl"></i>
+                            </div>
+                        </div>
+                        <div class="bg-white rounded-lg shadow-md p-6 border-l-4 border-purple-500">
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <p class="text-gray-500 text-sm">订单总金额</p>
+                                    <p id="total-orders-amount" class="text-xl font-bold text-purple-600">¥0.00</p>
+                                </div>
+                                <i class="fa fa-money text-purple-500 text-2xl"></i>
                             </div>
                         </div>
                     </div>
@@ -395,11 +404,11 @@
                 </div>
                 
                 <!-- 订单详情弹窗 -->
-                <div id="order-detail-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center p-4">
-                    <div class="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+                <div id="order-detail-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center p-4" onclick="if(event.target === this) closeOrderDetail();">
+                    <div class="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto" onclick="event.stopPropagation();">
                         <div class="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex justify-between items-center">
                             <h3 class="text-xl font-bold text-gray-800">订单详情</h3>
-                            <button onclick="closeOrderDetail()" class="text-gray-400 hover:text-gray-600">
+                            <button onclick="closeOrderDetail(); event.stopPropagation();" class="text-gray-400 hover:text-gray-600">
                                 <i class="fa fa-times text-xl"></i>
                             </button>
                         </div>
@@ -3129,6 +3138,30 @@
             }
         }
         
+        // 全局事件委托：确保订单详情按钮点击正常工作
+        document.addEventListener('click', function(e) {
+            // 检查是否点击了订单详情按钮
+            const detailBtn = e.target.closest('[onclick^="openOrderDetail"]');
+            if (detailBtn) {
+                console.log('[全局事件] 检测到订单详情按钮点击');
+                const match = detailBtn.getAttribute('onclick').match(/openOrderDetail\(['"]([^'"]+)['"]\)/);
+                if (match && match[1]) {
+                    console.log('[全局事件] 尝试打开订单:', match[1]);
+                    openOrderDetail(match[1]);
+                }
+            }
+        });
+        
+        // ESC键关闭模态窗口
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                const modal = document.getElementById('order-detail-modal');
+                if (modal && !modal.classList.contains('hidden')) {
+                    closeOrderDetail();
+                }
+            }
+        });
+        
         // 直接打开微信小程序管理页面
         window.openMiniApp = function() {
             console.log('直接打开微信小程序管理页面');
@@ -4375,31 +4408,97 @@
             'ST003': '西城区干洗店'
         };
         
-        // 加载订单列表
-        window.loadAdminOrders = function() {
+        // 加载订单列表 - 直接从服务器获取（确保获取完整金额数据）
+        window.loadAdminOrders = async function() {
             const tbody = document.getElementById('orders-table-body');
             if (!tbody) return;
             
-            // 从localStorage读取订单数据
-            const storeOrders = JSON.parse(localStorage.getItem('store_orders') || '[]');
-            const cOrders = JSON.parse(localStorage.getItem('orders') || '[]');
+            // 显示加载状态
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="8" class="px-6 py-12 text-center text-gray-500">
+                        <i class="fa fa-spinner fa-spin text-2xl mb-2"></i>
+                        <p>正在从服务器加载订单数据...</p>
+                    </td>
+                </tr>
+            `;
             
-            // 合并订单数据（去重）- 检查所有可能的ID字段
-            const allOrders = [...storeOrders];
-            cOrders.forEach(order => {
-                const orderId = order.orderId || order.id || order._id || order.orderNo;
-                const exists = allOrders.find(o => {
-                    const oId = o.orderId || o.id || o._id || o.orderNo;
-                    return oId === orderId || 
-                           o.orderId === order.orderId ||
-                           o.id === order.id ||
-                           o._id === order._id ||
-                           o.orderNo === order.orderNo;
-                });
-                if (!exists && orderId) {
-                    allOrders.push(order);
+            let allOrders = [];  // 在try外部声明变量
+            
+            try {
+                // 直接从服务器获取订单数据（确保获取完整的amounts字段）
+                const adminToken = localStorage.getItem('adminToken') || localStorage.getItem('adminAuthToken');
+                const headers = { 'Content-Type': 'application/json' };
+                if (adminToken) {
+                    headers['Authorization'] = `Bearer ${adminToken}`;
                 }
-            });
+                
+                // 获取所有订单（不限制数量）
+                const response = await fetch('http://localhost:3000/api/admin/orders?pageSize=1000', {
+                    method: 'GET',
+                    headers: headers,
+                    signal: AbortSignal.timeout(10000)
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`服务器返回错误: ${response.status}`);
+                }
+                
+                const result = await response.json();
+                allOrders = result.data?.list || [];
+                
+                console.log('[订单管理] 从服务器获取到', allOrders.length, '条订单');
+                
+                // 转换为前端格式，添加orderId字段（用于前端显示）
+                allOrders = allOrders.map(order => ({
+                    ...order,
+                    orderId: order.orderNo || order._id,
+                    id: order.orderNo || order._id,
+                    customerName: order.customerName || order.user?.name || order.delivery?.contactName || '客户',
+                    customerPhone: order.customerPhone || order.user?.phone || order.delivery?.contactPhone || '',
+                    createdAt: order.createdAt || order.createTime,
+                    // 确保金额字段正确映射
+                    totalPrice: order.amounts?.total || order.totalPrice || order.total || order.amount || 0
+                }));
+                
+                // 同步到localStorage（供其他功能使用）
+                localStorage.setItem('admin_orders', JSON.stringify(allOrders));
+                
+            } catch (error) {
+                console.error('[订单管理] 从服务器获取订单失败:', error);
+                // 降级到本地存储
+                console.log('[订单管理] 降级到本地存储获取订单...');
+                
+                const allOrdersData = JSON.parse(localStorage.getItem('all_orders') || '[]');
+                const storeOrders = JSON.parse(localStorage.getItem('store_orders') || '[]');
+                const cOrders = JSON.parse(localStorage.getItem('orders') || '[]');
+                
+                // 合并订单数据（去重）
+                const orderMap = new Map();
+                
+                allOrdersData.forEach(order => {
+                    const orderId = order.orderId || order.id || order._id || order.orderNo;
+                    if (orderId) {
+                        orderMap.set(orderId, order);
+                    }
+                });
+                
+                storeOrders.forEach(order => {
+                    const orderId = order.orderId || order.id || order._id || order.orderNo;
+                    if (orderId && !orderMap.has(orderId)) {
+                        orderMap.set(orderId, order);
+                    }
+                });
+                
+                cOrders.forEach(order => {
+                    const orderId = order.orderId || order.id || order._id || order.orderNo;
+                    if (orderId && !orderMap.has(orderId)) {
+                        orderMap.set(orderId, order);
+                    }
+                });
+                
+                allOrders = Array.from(orderMap.values());
+            }
             
             // 获取筛选条件
             const statusFilter = document.getElementById('order-status-filter')?.value || '';
@@ -4446,7 +4545,11 @@
                 const storeName = STORE_CONFIG[order.storeId] || order.storeId || '未知门店';
                 const items = order.items || [];
                 const itemCount = items.reduce((sum, item) => sum + (item.quantity || 1), 0);
-                const totalPrice = order.totalPrice || order.amount || 0;
+                // 计算订单总金额 - 优先从amounts.total获取，其次从items计算
+                let totalPrice = order.amounts?.total || order.fees?.total || order.totalPrice || order.total || order.amount || 0;
+                if (!totalPrice && items.length > 0) {
+                    totalPrice = items.reduce((sum, item) => sum + (item.subtotal || item.price * (item.quantity || 1) || 0), 0);
+                }
                 const orderTime = formatDate(order.createdAt || order.orderTime);
                 
                 return `
@@ -4495,28 +4598,47 @@
             const cleaning = orders.filter(o => ['cleaning', 'cleaned'].includes(o.status)).length;
             const completed = orders.filter(o => o.status === 'completed').length;
             
+            // 计算订单总金额
+            let totalAmount = 0;
+            orders.forEach(order => {
+                const amount = order.amounts?.total || order.fees?.total || order.totalPrice || order.total || order.amount || 0;
+                if (!amount && order.items && order.items.length > 0) {
+                    // 如果没有总金额字段，则从items计算
+                    totalAmount += order.items.reduce((sum, item) => sum + (item.subtotal || item.price * (item.quantity || 1) || 0), 0);
+                } else {
+                    totalAmount += amount;
+                }
+            });
+            
             const totalEl = document.getElementById('total-orders');
             const pendingEl = document.getElementById('pending-orders');
             const cleaningEl = document.getElementById('cleaning-orders');
             const completedEl = document.getElementById('completed-orders');
+            const amountEl = document.getElementById('total-orders-amount');
             
             if (totalEl) totalEl.textContent = total;
             if (pendingEl) pendingEl.textContent = pending;
             if (cleaningEl) cleaningEl.textContent = cleaning;
             if (completedEl) completedEl.textContent = completed;
+            if (amountEl) amountEl.textContent = '¥' + totalAmount.toFixed(2);
         }
         
         // 打开订单详情
         window.openOrderDetail = function(orderId) {
+            console.log('[订单详情] 尝试打开订单:', orderId);
+            
             const storeOrders = JSON.parse(localStorage.getItem('store_orders') || '[]');
             const cOrders = JSON.parse(localStorage.getItem('orders') || '[]');
             
             const order = [...storeOrders, ...cOrders].find(o => o.orderId === orderId);
             
             if (!order) {
+                console.error('[订单详情] 未找到订单:', orderId);
                 alert('未找到订单信息');
                 return;
             }
+            
+            console.log('[订单详情] 找到订单:', order.orderId, '状态:', order.status);
             
             const modal = document.getElementById('order-detail-modal');
             const content = document.getElementById('order-detail-content');
@@ -4526,7 +4648,11 @@
             const statusInfo = ORDER_STATUS_CONFIG[order.status] || ORDER_STATUS_CONFIG.pending;
             const storeName = STORE_CONFIG[order.storeId] || order.storeId || '未知门店';
             const items = order.items || [];
-            const totalPrice = order.totalPrice || order.amount || 0;
+            // 计算订单总金额 - 优先从amounts.total获取，其次从items计算
+            let totalPrice = order.amounts?.total || order.fees?.total || order.totalPrice || order.total || order.amount || 0;
+            if (!totalPrice && items.length > 0) {
+                totalPrice = items.reduce((sum, item) => sum + (item.subtotal || item.price * (item.quantity || 1) || 0), 0);
+            }
             
             content.innerHTML = `
                 <div class="space-y-4">
@@ -4608,13 +4734,23 @@
             `;
             
             modal.classList.remove('hidden');
+            console.log('[订单详情] 模态窗口已显示, orderId:', orderId);
         };
         
         // 关闭订单详情
         window.closeOrderDetail = function() {
+            console.log('[订单详情] 尝试关闭模态窗口');
             const modal = document.getElementById('order-detail-modal');
+            const content = document.getElementById('order-detail-content');
+            
             if (modal) {
                 modal.classList.add('hidden');
+                console.log('[订单详情] 模态窗口已隐藏');
+            }
+            
+            if (content) {
+                // 清空内容，防止再次打开时显示旧数据
+                content.innerHTML = '<div class="text-center text-gray-500 py-8">加载中...</div>';
             }
         };
         

@@ -1,6 +1,6 @@
 /**
  * 订单详情页面
- * 支持实时状态更新和取件方式选择
+ * 支持实时状态更新、扫码支付和取件方式选择
  */
 
 const app = getApp();
@@ -31,6 +31,11 @@ Page({
     loading: true,
     polling: false,
     
+    // 扫码支付相关
+    showScanPayBanner: false,  // 显示扫码支付横幅
+    scanPayAmount: 0,          // 扫码订单金额
+    isFromScan: false,         // 是否从扫码进入
+    
     // 取件方式选择
     showPickupMethod: false,
     selectedPickupMethod: 'store_pickup', // store_pickup: 到店自提, home_delivery: 配送到家
@@ -50,7 +55,21 @@ Page({
     // 加载记忆的用户信息
     this.loadUserInfo();
     
-    if (id) {
+    // 检查是否从扫码进入
+    const scanPayOrder = app.globalData.scanPayOrder;
+    if (scanPayOrder && scanPayOrder.orderId) {
+      console.log('[订单详情] 从扫码进入:', scanPayOrder);
+      this.setData({
+        orderId: scanPayOrder.orderId,
+        isFromScan: true,
+        scanPayAmount: scanPayOrder.amount
+      });
+      this.loadOrderDetail();
+      this.startPolling();
+      
+      // 清除扫码数据
+      app.clearScanData();
+    } else if (id) {
       this.setData({ orderId: id });
       this.loadOrderDetail();
       this.startPolling();
@@ -144,6 +163,63 @@ Page({
       steps,
       currentStep,
       showPickupMethod
+    });
+    
+    // 如果是扫码进入且订单待支付，显示扫码支付横幅
+    if (this.data.isFromScan && order.status === 'pending') {
+      this.showScanPayBanner();
+    }
+  },
+  
+  // 显示扫码支付横幅
+  showScanPayBanner() {
+    const { order } = this.data;
+    if (!order) return;
+    
+    this.setData({
+      showScanPayBanner: true,
+      scanPayAmount: order.amounts?.total || order.totalAmount || 0
+    });
+  },
+  
+  // 关闭扫码支付横幅
+  closeScanPayBanner() {
+    this.setData({ showScanPayBanner: false });
+  },
+  
+  // 立即支付（扫码支付流程）
+  onScanPay() {
+    const { order, orderId } = this.data;
+    if (!order) return;
+    
+    // 设置当前订单到全局
+    app.globalData.currentOrder = {
+      orderId: orderId,
+      store: {
+        id: order.storeId || '',
+        name: order.storeName || '',
+        address: order.storeAddress || ''
+      },
+      services: order.items || [],
+      fees: {
+        serviceFee: order.amounts?.serviceFee || 0,
+        deliveryFee: order.amounts?.deliveryFee || 0,
+        totalAmount: order.amounts?.total || order.totalAmount || 0
+      },
+      deliveryMethod: order.deliveryMethod || 'pickup',
+      time: order.pickupTime || {}
+    };
+    
+    // 跳转到支付页面
+    wx.navigateTo({ url: '/pages/order/payment/index' });
+  },
+  
+  // 稍后支付
+  onLaterPay() {
+    this.closeScanPayBanner();
+    wx.showToast({
+      title: '订单已保存，可稍后支付',
+      icon: 'none'
     });
   },
 

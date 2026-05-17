@@ -21,6 +21,7 @@ const storeRouter = require('./modules/cleaning/routes/storeRoutes');
 const paymentRouter = require('./modules/common/routes/paymentRoutes');
 const deliveryRouter = require('./modules/common/routes/deliveryRoutes');
 const adminRouter = require('./modules/admin/routes/adminRoutes');
+const miniQRRouter = require('./modules/common/routes/miniQRRoutes');
 const { getEnabledModules, getModuleConfig } = require('./modules/common/middlewares/moduleGuard');
 
 const app = express();
@@ -96,6 +97,9 @@ app.use('/api/rental', rentalRouter);
 
 // 支付模块
 app.use('/api/payments', paymentRouter);
+
+// 微信小程序码模块
+app.use('/api/mini-qr', miniQRRouter);
 
 // 配送模块
 app.use('/api/delivery', deliveryRouter);

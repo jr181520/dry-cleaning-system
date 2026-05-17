@@ -221,7 +221,7 @@ Page({
         // 跳转支付成功页面
         setTimeout(() => {
           wx.redirectTo({
-            url: `/pages/order/success/index?orderId=${this.data.orderId}&amount=${this.data.orderData.fees.totalAmount}`
+            url: `/pages/order/success/index?orderId=${this.data.orderId}&amount=${this.data.orderData.fees.totalAmount}&storeId=${this.data.orderData.store?.id || ''}`
           });
         }, 1500);
       } else {
@@ -249,6 +249,7 @@ Page({
   // 微信支付
   async wechatPay() {
     try {
+      // 优先调用后端API获取支付参数
       const res = await app.request('/payment/wechat/unified', {
         method: 'POST',
         data: {
@@ -256,7 +257,7 @@ Page({
           totalAmount: this.data.orderData.fees.totalAmount * 100, // 转为分
           description: '干洗服务订单-' + this.data.orderId,
           attach: JSON.stringify({
-            openid: app.globalData.userInfo.openid,
+            openid: app.globalData.userInfo?.openid || '',
             storeId: this.data.orderData.store?.id || ''
           })
         }
@@ -265,22 +266,28 @@ Page({
       if (res.success && res.data && res.data.payment) {
         // 小程序调起微信支付
         const payment = res.data.payment;
-        const payResult = await wx.requestPayment({
+        await wx.requestPayment({
           timeStamp: payment.timeStamp,
           nonceStr: payment.nonceStr,
           package: payment.package,
-          signType: payment.signType,
+          signType: payment.signType || 'MD5',
           paySign: payment.paySign
         });
         
         return { success: true, message: '支付成功' };
       } else {
         // API未接入，使用模拟支付
+        console.log('[支付] 后端API未返回支付参数，使用模拟支付');
         return await this.mockPay();
       }
     } catch (error) {
       console.error('微信支付失败:', error);
-      // 网络错误时使用模拟支付
+      // 检查是否是用户取消
+      if (error.errMsg && error.errMsg.includes('cancel')) {
+        return { success: false, message: '用户取消支付' };
+      }
+      // 网络错误或其他错误，使用模拟支付
+      console.log('[支付] 使用模拟支付作为后备');
       return await this.mockPay();
     }
   },

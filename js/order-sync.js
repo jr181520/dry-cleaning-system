@@ -210,6 +210,25 @@ const OrderSyncManager = {
     
     // 格式化服务器订单为前端格式
     formatOrderFromServer(serverOrder) {
+        // 计算订单总金额 - 优先从amounts.total获取
+        let orderTotal = 0;
+        if (serverOrder.amounts?.total) {
+            orderTotal = serverOrder.amounts.total;
+        } else if (serverOrder.fees?.total) {
+            orderTotal = serverOrder.fees.total;
+        } else if (serverOrder.totalPrice) {
+            orderTotal = serverOrder.totalPrice;
+        } else if (serverOrder.total) {
+            orderTotal = serverOrder.total;
+        } else if (serverOrder.amount) {
+            orderTotal = serverOrder.amount;
+        } else if (serverOrder.items && serverOrder.items.length > 0) {
+            // 如果没有总金额字段，则从items计算
+            orderTotal = serverOrder.items.reduce((sum, item) => {
+                return sum + (item.subtotal || item.price * (item.quantity || 1) || 0);
+            }, 0);
+        }
+        
         return {
             orderId: serverOrder.orderNo || serverOrder._id,
             id: serverOrder.orderNo || serverOrder._id,
@@ -235,7 +254,11 @@ const OrderSyncManager = {
             storeId: serverOrder.storeId,
             storeName: serverOrder.store?.name || serverOrder.storeName || '',
             storeAddress: serverOrder.store?.address || serverOrder.storeAddress || '',
-            total: serverOrder.total || serverOrder.amount || 0,
+            // 金额字段 - 确保所有可能的字段名都被设置
+            amounts: serverOrder.amounts || null,
+            total: orderTotal,
+            totalPrice: orderTotal,
+            amount: orderTotal,
             status: this.normalizeStatus(serverOrder.status),
             paymentStatus: serverOrder.paymentStatus || serverOrder.payStatus || 'pending',
             createdAt: serverOrder.createdAt || serverOrder.createTime,

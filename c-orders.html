@@ -596,8 +596,42 @@
                     if (localIndex === -1) {
                         // 本地没有，添加API订单
                         orders.push(apiOrder);
+                    } else {
+                        // 本地已有订单，检查是否需要更新fees字段和items数据
+                        const localOrder = orders[localIndex];
+                        // 如果本地订单缺少fees字段或fees.total为0，但API订单有，则更新
+                        const apiHasAmounts = apiOrder.fees?.total > 0 || apiOrder.amounts?.total > 0;
+                        const localHasAmounts = localOrder.fees?.total > 0 || localOrder.amounts?.total > 0;
+                        
+                        if (!localHasAmounts && apiHasAmounts) {
+                            // 本地没有金额但API有，更新金额
+                            orders[localIndex] = { 
+                                ...localOrder, 
+                                fees: apiOrder.fees || localOrder.fees,
+                                amounts: apiOrder.amounts || localOrder.amounts,
+                                total: apiOrder.fees?.total || apiOrder.amounts?.total || localOrder.total || 0,
+                                amount: apiOrder.fees?.total || apiOrder.amounts?.total || localOrder.amount || 0,
+                                items: apiOrder.items || localOrder.items,
+                                services: apiOrder.services || localOrder.services
+                            };
+                            console.log('[c-orders] 更新订单金额:', apiOrder.orderId, 'fees.total:', apiOrder.fees?.total || apiOrder.amounts?.total);
+                        } else if (apiHasAmounts) {
+                            // API和本地都有金额，保留较大的那个
+                            const apiTotal = apiOrder.fees?.total || apiOrder.amounts?.total || 0;
+                            const localTotal = localOrder.fees?.total || localOrder.amounts?.total || 0;
+                            if (apiTotal > localTotal) {
+                                orders[localIndex] = { 
+                                    ...localOrder, 
+                                    fees: apiOrder.fees || localOrder.fees,
+                                    amounts: apiOrder.amounts || localOrder.amounts,
+                                    total: apiTotal,
+                                    amount: apiTotal,
+                                    items: apiOrder.items || localOrder.items,
+                                    services: apiOrder.services || localOrder.services
+                                };
+                            }
+                        }
                     }
-                    // 如果本地已有，优先保留本地订单（因为本地可能有最新状态如cancelled或modifiedAt）
                 });
             }
             

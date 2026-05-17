@@ -17,7 +17,7 @@
       </view>
       <view class="info-row">
         <text class="row-label">服务门店</text>
-        <text class="row-value">{{orderData.store.name}}</text>
+        <text class="row-value">{{orderData.store ? orderData.store.name : '系统自动分配'}}</text>
       </view>
       <view class="info-row">
         <text class="row-label">预约时间</text>
@@ -30,6 +30,26 @@
       <view class="info-row total">
         <text class="row-label">支付金额</text>
         <text class="row-value">¥{{orderData.fees.totalAmount}}</text>
+      </view>
+    </view>
+  </view>
+  
+  <!-- 分享推广区域 -->
+  <view class="share-section">
+    <view class="share-card">
+      <view class="share-header">
+        <text class="share-title">分享给好友帮忙支付</text>
+        <text class="share-desc">生成小程序码，好友扫码即可帮您支付</text>
+      </view>
+      <view class="share-actions">
+        <view class="share-btn" bindtap="onShareOrder">
+          <text class="btn-icon">📱</text>
+          <text class="btn-text">生成分享码</text>
+        </view>
+        <button class="share-btn-wechat" open-type="share" plain="true">
+          <text class="btn-icon">💬</text>
+          <text class="btn-text">转发给好友</text>
+        </button>
       </view>
     </view>
   </view>
@@ -144,6 +164,48 @@
     </view>
     <view class="btn-secondary" bindtap="onBackHome">
       <text class="btn-text">返回首页</text>
+    </view>
+  </view>
+
+  <!-- 分享弹窗 -->
+  <view class="share-modal {{showShareModal ? 'show' : ''}}" catchtap="closeShareModal">
+    <view class="share-modal-content" catchtap=" ">
+      <view class="modal-header">
+        <text class="modal-title">分享订单码</text>
+        <view class="modal-close" bindtap="closeShareModal">
+          <text class="close-icon">×</text>
+        </view>
+      </view>
+      <view class="modal-body">
+        <view class="qr-container">
+          <image class="qr-image" src="{{shareQRImage}}" mode="aspectFit" wx:if="{{shareQRImage}}"></image>
+          <view class="qr-loading" wx:if="{{!shareQRImage && shareLoading}}">
+            <view class="loading-spinner"></view>
+            <text class="loading-text">正在生成...</text>
+          </view>
+          <view class="qr-placeholder" wx:if="{{!shareQRImage && !shareLoading}}">
+            <text class="placeholder-icon">📱</text>
+            <text class="placeholder-text">点击下方按钮生成分享码</text>
+          </view>
+        </view>
+        <view class="qr-tips">
+          <text class="tip-text">让好友扫码即可帮您支付</text>
+        </view>
+      </view>
+      <view class="modal-footer">
+        <button class="modal-btn save" bindtap="onSaveQR" wx:if="{{shareQRImage}}">
+          <text class="btn-icon">💾</text>
+          <text class="btn-text">保存到相册</text>
+        </button>
+        <button class="modal-btn reload" bindtap="loadShareQR" wx:if="{{!shareQRImage && !shareLoading}}">
+          <text class="btn-icon">🔄</text>
+          <text class="btn-text">重新生成</text>
+        </button>
+        <button class="modal-btn preview" bindtap="onPreviewQR" wx:if="{{shareQRImage}}">
+          <text class="btn-icon">🔍</text>
+          <text class="btn-text">预览大图</text>
+        </button>
+      </view>
     </view>
   </view>
 </view>

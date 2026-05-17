@@ -26,6 +26,13 @@ const lightBindingSchema = new mongoose.Schema({
     default: 'ALL' // 默认全部灯条
   },
   
+  // 物品索引（支持一个订单绑定多个灯条，每个物品一个）
+  itemIndex: {
+    type: Number,
+    default: null,
+    index: true
+  },
+  
   // 灯条状态: active-激活, completed-已完成, cancelled-已取消
   status: {
     type: String,
@@ -77,6 +84,7 @@ const lightBindingSchema = new mongoose.Schema({
 // 索引优化查询
 lightBindingSchema.index({ storeId: 1, status: 1 });
 lightBindingSchema.index({ activatedAt: -1 });
+lightBindingSchema.index({ orderId: 1, itemIndex: 1, status: 1 }); // 复合索引支持订单+物品查询
 
 // 实例方法：完成绑定
 lightBindingSchema.methods.complete = function() {
@@ -100,6 +108,16 @@ lightBindingSchema.statics.getActiveByStore = function(storeId) {
 // 静态方法：根据订单获取绑定
 lightBindingSchema.statics.getByOrder = function(orderId) {
   return this.findOne({ orderId });
+};
+
+// 静态方法：根据订单和物品索引获取绑定
+lightBindingSchema.statics.getByOrderAndItem = function(orderId, itemIndex) {
+  return this.findOne({ orderId, itemIndex, status: 'active' });
+};
+
+// 静态方法：获取订单的所有活跃绑定
+lightBindingSchema.statics.getAllActiveByOrder = function(orderId) {
+  return this.find({ orderId, status: 'active' }).sort({ itemIndex: 1 });
 };
 
 module.exports = mongoose.model('LightBinding', lightBindingSchema);

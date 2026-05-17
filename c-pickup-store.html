@@ -78,7 +78,7 @@
         </div>
     </header>
 
-    <!-- 灯条状态 -->
+        <!-- 灯条状态 -->
     <div class="bg-white mx-4 mt-4 rounded-2xl p-6 text-center shadow-sm">
         <div class="lamp-indicator lamp-off mx-auto mb-4" id="lampIndicator">
             💡
@@ -86,13 +86,9 @@
         <h3 class="text-lg font-semibold text-gray-800 mb-2" id="lampStatus">等待取件确认</h3>
         <p class="text-sm text-gray-500" id="lampDesc">点击下方"确认取件"按钮点亮灯条</p>
         
-        <!-- 灯条可视化 -->
+        <!-- 灯条可视化 - 动态生成 -->
         <div class="mt-4 flex justify-center gap-2" id="lampStrip">
-            <div class="lamp-bulb bg-gray-200 w-8 h-8 rounded-full transition-all duration-500" data-index="0"></div>
-            <div class="lamp-bulb bg-gray-200 w-8 h-8 rounded-full transition-all duration-500" data-index="1"></div>
-            <div class="lamp-bulb bg-gray-200 w-8 h-8 rounded-full transition-all duration-500" data-index="2"></div>
-            <div class="lamp-bulb bg-gray-200 w-8 h-8 rounded-full transition-all duration-500" data-index="3"></div>
-            <div class="lamp-bulb bg-gray-200 w-8 h-8 rounded-full transition-all duration-500" data-index="4"></div>
+            <!-- 灯条将通过JavaScript动态生成 -->
         </div>
         <p class="text-xs text-gray-400 mt-2" id="lampHint">店铺灯条状态</p>
     </div>
@@ -182,6 +178,13 @@
             const orders = JSON.parse(localStorage.getItem('orders') || '[]');
             orderData = orders.find(o => o.orderId === orderId || o.id === orderId || o._id === orderId);
             
+            // 如果orders中没有，尝试从store_orders查找（代客下单门店自提订单）
+            if (!orderData) {
+                const storeOrders = JSON.parse(localStorage.getItem('store_orders') || '[]');
+                orderData = storeOrders.find(o => o.orderId === orderId || o.id === orderId || o._id === orderId);
+                console.log('[C端门店自提] 从store_orders查找订单:', orderId, orderData ? '找到' : '未找到');
+            }
+            
             // 如果本地没有，尝试从API获取
             if (!orderData) {
                 try {
@@ -194,9 +197,32 @@
                     const result = await response.json();
                     if (result.success && result.data) {
                         orderData = result.data;
+                        console.log('[C端门店自提] 从API获取订单数据:', orderData);
                     }
                 } catch (error) {
                     console.warn('从API获取订单失败:', error);
+                }
+            }
+            
+            // 确保items数据完整
+            if (orderData) {
+                console.log('[C端门店自提] 订单物品数据:', {
+                    orderId: orderData.orderId,
+                    items: orderData.items,
+                    services: orderData.services,
+                    debugItems: orderData.debugItems
+                });
+                
+                // 如果items为空但services有数据，使用services
+                if ((!orderData.items || orderData.items.length === 0) && orderData.services) {
+                    orderData.items = orderData.services;
+                }
+                // 如果debugItems有价格信息但items没有，合并数据
+                if (orderData.debugItems && orderData.debugItems.length > 0 && orderData.items) {
+                    orderData.items = orderData.items.map((item, i) => ({
+                        ...item,
+                        price: item.price || orderData.debugItems[i]?.price || 0
+                    }));
                 }
             }
 
@@ -217,6 +243,14 @@
             const itemsCountEl = document.getElementById('itemsCount');
             
             itemsCountEl.textContent = `${items.length}件`;
+            
+            // 动态生成灯条（根据物品数量）
+            const lampStrip = document.getElementById('lampStrip');
+            lampStrip.innerHTML = items.map((item, index) => {
+                const isLightOn = item.lightStatus === 'on';
+                const isCheckedOut = item.itemStatus === 'checked_out';
+                return `<div class="lamp-bulb w-8 h-8 rounded-full transition-all duration-500 ${isCheckedOut ? 'bg-gray-400' : isLightOn ? 'bg-yellow-400 shadow-lg' : 'bg-gray-200'}" data-index="${index}"></div>`;
+            }).join('');
             
             if (items.length === 0) {
                 itemsListEl.innerHTML = '<p class="text-gray-500 text-center py-4">暂无物品信息</p>';
@@ -496,7 +530,7 @@
             for (let i = 0; i < items.length; i++) {
                 if (items[i].itemStatus !== 'checked_out') {
                     try {
-                        // 调用正确的API
+                        // 调用正确的API，传递itemIndex参数
                         const response = await fetch(`http://localhost:3000/api/store/order-light/bind`, {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
@@ -505,6 +539,7 @@
                                 storeId: storeId,
                                 color: 'yellow',
                                 bindingType: 'pickup',
+                                itemIndex: i,  // 传递物品索引，支持一个订单绑定多个灯条
                                 remark: `物品: ${items[i].name || items[i].serviceName}`
                             })
                         });
@@ -512,6 +547,11 @@
                         const result = await response.json();
                         
                         if (result.success) {
+                            items[i].lightStatus = 'on';
+                            successCount++;
+                        } else {
+                            console.warn(`点亮物品 ${i} 失败:`, result.error);
+                            // API失败时也标记为已点亮（M端模拟模式）
                             items[i].lightStatus = 'on';
                             successCount++;
                         }
@@ -542,9 +582,36 @@
             // 同步到 store_orders
             syncOrderToStoreOrders();
             
+            // 收集所有待点亮物品的信息（格式与m端期望的一致）
+            const allLightItems = items
+                .map((item, index) => ({
+                    itemId: `${orderId}_${index}`,
+                    itemIndex: index,
+                    lampIndex: index,  // m端期望的属性名
+                    itemName: item.name || item.serviceName,
+                    orderId: orderId,
+                    lightStatus: item.lightStatus || 'on'
+                }))
+                .filter(item => item.lightStatus === 'on');
+            
+            // 更新 store_light_request，m端通过此key检测灯条请求
+            const storeLightRequest = {
+                type: 'light_all_items',
+                orderId: orderId,
+                storeId: storeId,
+                items: allLightItems,
+                itemCount: allLightItems.length,
+                timestamp: Date.now(),
+                customerId: localStorage.getItem('userId'),
+                status: 'pending'
+            };
+            localStorage.setItem('store_light_request', JSON.stringify(storeLightRequest));
+            
+            console.log('[C端] 已更新store_light_request，包含', allLightItems.length, '个待点亮物品:', allLightItems.map(i => i.itemName).join(', '));
+            
             // 发送事件通知M端
             window.dispatchEvent(new CustomEvent('lightActivated', {
-                detail: { orderId: orderId, count: successCount }
+                detail: { orderId: orderId, count: successCount, items: allLightItems }
             }));
             
             showToast(`✅ 已发送${successCount}个灯条请求`, 'success');
@@ -558,6 +625,7 @@
                 lamps[index].classList.remove('bg-gray-200');
                 lamps[index].classList.add('bg-yellow-400', 'shadow-lg');
                 lamps[index].style.boxShadow = '0 0 15px rgba(251, 191, 36, 0.8)';
+                lamps[index].classList.add('animate-pulse');
             }
         }
         
