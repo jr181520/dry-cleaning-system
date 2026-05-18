@@ -432,6 +432,93 @@ Page({
     wx.navigateTo({ url: '/pages/order/payment/index' });
   },
 
+  // 取消订单
+  async onCancelOrder() {
+    const { orderId, order } = this.data;
+    
+    // 仅允许取消待支付或已支付的订单
+    if (!['pending', 'paid'].includes(order?.status)) {
+      wx.showToast({ title: '当前状态无法取消', icon: 'none' });
+      return;
+    }
+    
+    wx.showModal({
+      title: '确认取消订单',
+      content: '确定要取消该订单吗？取消后将无法恢复。',
+      confirmText: '确认取消',
+      cancelText: '返回',
+      success: async (res) => {
+        if (res.confirm) {
+          wx.showLoading({ title: '正在取消...' });
+          
+          try {
+            const result = await app.request(`/cleaning/orders/${orderId}/cancel`, {}, 'POST');
+            
+            wx.hideLoading();
+            
+            if (result.success) {
+              wx.showToast({ title: '订单已取消', icon: 'success' });
+              // 刷新订单详情
+              this.loadOrderDetail();
+            } else {
+              throw new Error(result.error || '取消失败');
+            }
+          } catch (error) {
+            wx.hideLoading();
+            console.error('[取消订单] 失败:', error);
+            wx.showToast({ title: error.message || '取消失败', icon: 'none' });
+          }
+        }
+      }
+    });
+  },
+
+  // 再次下单
+  onReorder() {
+    const { order } = this.data;
+    
+    if (!order) {
+      wx.showToast({ title: '订单信息不存在', icon: 'none' });
+      return;
+    }
+    
+    // 将订单中的服务项目保存到全局，供下单页面使用
+    if (order.items && order.items.length > 0) {
+      app.globalData.selectedServices = order.items.map(item => ({
+        id: item.itemId || item.id || item.serviceType,
+        name: item.name || item.serviceName || item.serviceType,
+        price: item.price || 0,
+        quantity: item.quantity || 1,
+        serviceType: item.serviceType || item.id
+      }));
+      
+      app.globalData.serviceTotalPrice = order.amounts?.subtotal || order.totalAmount || 0;
+      
+      // 如果有门店信息，也保存下来
+      if (order.storeId || order.store) {
+        app.globalData.selectedStore = {
+          id: order.storeId || order.store?.storeId,
+          storeId: order.storeId || order.store?.storeId,
+          name: order.storeName || order.store?.name || '干洗店',
+          address: order.storeAddress || order.store?.address || '',
+          phone: order.storePhone || order.store?.phone || ''
+        };
+      }
+      
+      wx.showToast({ title: '已添加服务项目', icon: 'success' });
+      
+      // 跳转到门店选择页面
+      wx.navigateTo({
+        url: '/pages/order/stores/index'
+      });
+    } else {
+      // 没有服务项目，跳转到服务选择页面
+      wx.navigateTo({
+        url: '/pages/order/create/index'
+      });
+    }
+  },
+
   // 返回首页
   onGoHome() {
     wx.switchTab({ url: '/pages/index/index' });

@@ -58,28 +58,71 @@ Page({
     this.setData({ loading: true });
     
     try {
-      const result = await app.request('/orders/list', {
-        status: this.data.currentTab,
+      // 调用后端API获取订单列表
+      const result = await app.request('/cleaning/orders', {
+        status: this.data.currentTab === 'all' ? '' : this.data.currentTab,
         page: refresh ? 1 : this.data.page,
         pageSize: this.data.pageSize
       });
       
-      if (result.success) {
+      if (result.success && result.data) {
+        // 转换订单数据格式
+        const orders = result.data.map(order => ({
+          id: order.orderId || order.id,
+          orderId: order.orderId || order.id,
+          orderNo: order.orderNo || order.orderId || order.id,
+          storeName: order.storeName || order.store?.name || '干洗店',
+          storeId: order.storeId || order.store?.storeId || '',
+          status: order.status || 'pending',
+          statusText: this.getStatusText(order.status),
+          items: order.items || [],
+          totalCount: order.items ? order.items.reduce((sum, item) => sum + (item.quantity || 1), 0) : 0,
+          totalPrice: order.amounts?.total || order.totalAmount || order.totalPrice || 0,
+          createdAt: order.createdAt || order.createTime || new Date().toISOString(),
+          pickupCode: order.pickupCode || '',
+          deliveryType: order.delivery?.type || order.deliveryType || 'pickup'
+        }));
+        
         this.setData({
-          orders: refresh ? result.orders : [...this.data.orders, ...result.orders],
-          hasMore: result.orders.length >= this.data.pageSize,
+          orders: refresh ? orders : [...this.data.orders, ...orders],
+          hasMore: orders.length >= this.data.pageSize,
           page: refresh ? 1 : this.data.page + 1
         });
+        
+        console.log('[订单列表] 从API加载成功:', orders.length, '个订单');
+      } else {
+        console.warn('[订单列表] API返回空数据');
+        this.loadMockOrders();
       }
     } catch (error) {
-      console.error('加载订单失败', error);
-      // 使用本地模拟数据
-      this.setData({
-        orders: this.getMockOrders()
-      });
+      console.error('[订单列表] 加载失败:', error);
+      this.loadMockOrders();
     }
     
     this.setData({ loading: false });
+  },
+  
+  // 获取状态文本
+  getStatusText(status) {
+    const statusMap = {
+      'pending': '待支付',
+      'paid': '已支付',
+      'delivering': '配送中',
+      'received': '已入库',
+      'processing': '处理中',
+      'ready': '待取件',
+      'delivering_back': '配送中',
+      'completed': '已完成',
+      'cancelled': '已取消'
+    };
+    return statusMap[status] || status || '未知';
+  },
+  
+  // 加载模拟订单数据（后备方案）
+  loadMockOrders() {
+    this.setData({
+      orders: this.getMockOrders()
+    });
   },
 
   // 获取模拟订单数据

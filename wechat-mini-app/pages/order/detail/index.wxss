@@ -593,17 +593,30 @@
   padding-bottom: calc(20rpx + env(safe-area-inset-bottom));
   box-shadow: 0 -4rpx 24rpx rgba(0,0,0,0.1);
   display: flex;
-  justify-content: flex-end;
-  gap: 24rpx;
+  justify-content: space-between;
+  align-items: center;
   z-index: 100;
 }
 
+.bottom-bar-left,
+.bottom-bar-right {
+  display: flex;
+  gap: 16rpx;
+}
+
+.bottom-bar-right {
+  justify-content: flex-end;
+}
+
 .btn-action {
-  padding: 20rpx 48rpx;
+  padding: 16rpx 32rpx;
   border-radius: 44rpx;
   border: none;
   font-weight: 600;
-  font-size: 28rpx;
+  font-size: 26rpx;
+  line-height: 1.4;
+  margin: 0;
+  min-height: 64rpx;
 }
 
 .btn-primary {
@@ -613,11 +626,21 @@
 
 .btn-outline {
   background: white;
-  border: 4rpx solid #667eea;
+  border: 2rpx solid #667eea;
   color: #667eea;
 }
 
 .btn-success {
   background: linear-gradient(135deg, #4caf50 0%, #2e7d32 100%);
   color: white;
+}
+
+.btn-danger {
+  border-color: #f44336 !important;
+  color: #f44336 !important;
+}
+
+.btn-warning {
+  border-color: #ff9800 !important;
+  color: #ff9800 !important;
 }

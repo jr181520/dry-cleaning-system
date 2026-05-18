@@ -218,34 +218,56 @@
 
   <!-- 底部操作栏 -->
   <view class="bottom-bar">
-    <button class="btn-action btn-outline" bindtap="onCallStore" wx:if="{{order.storePhone}}">
-      联系门店
-    </button>
+    <!-- 左侧按钮 -->
+    <view class="bottom-bar-left">
+      <button class="btn-action btn-outline" bindtap="onCallStore" wx:if="{{order.storePhone}}">
+        联系门店
+      </button>
+      
+      <!-- 待支付/已支付状态显示取消按钮 -->
+      <button class="btn-action btn-danger btn-outline" 
+              bindtap="onCancelOrder" 
+              wx:if="{{order.status === 'pending' || order.status === 'paid'}}">
+        取消订单
+      </button>
+      
+      <!-- 已完成/已取消状态显示再次下单按钮 -->
+      <button class="btn-action btn-warning btn-outline" 
+              bindtap="onReorder" 
+              wx:if="{{order.status === 'completed' || order.status === 'cancelled'}}">
+        再次下单
+      </button>
+    </view>
     
-    <!-- 待取件状态的主操作按钮 -->
-    <button class="btn-action btn-success" 
-            bindtap="onHandleMainAction" 
-            wx:if="{{order.status === 'ready'}}">
-      {{selectedPickupMethod === 'home_delivery' ? '确认配送' : '确认取件'}}
-    </button>
-    
-    <!-- 其他状态的主操作按钮 -->
-    <button class="btn-action btn-success" 
-            bindtap="onPay" 
-            wx:elif="{{order.status === 'pending'}}">
-      去支付
-    </button>
-    
-    <button class="btn-action btn-outline" 
-            bindtap="onRemind" 
-            wx:elif="{{order.status === 'processing' || order.status === 'received'}}">
-      催单
-    </button>
-    
-    <button class="btn-action btn-primary" 
-            bindtap="onRate" 
-            wx:elif="{{order.status === 'completed'}}">
-      去评价
-    </button>
+    <!-- 右侧主操作按钮 -->
+    <view class="bottom-bar-right">
+      <!-- 待取件状态的主操作按钮 -->
+      <button class="btn-action btn-success" 
+              bindtap="onHandleMainAction" 
+              wx:if="{{order.status === 'ready'}}">
+        {{selectedPickupMethod === 'home_delivery' ? '确认配送' : '确认取件'}}
+      </button>
+      
+      <!-- 待支付状态 -->
+      <button class="btn-action btn-success" 
+              bindtap="onPay" 
+              wx:elif="{{order.status === 'pending'}}">
+        去支付
+      </button>
+      
+      <!-- 处理中/已入库状态 -->
+      <button class="btn-action btn-outline" 
+              bindtap="onRemind" 
+              wx:elif="{{order.status === 'processing' || order.status === 'received'}}">
+        催单
+      </button>
+      
+      <!-- 已完成状态 -->
+      <button class="btn-action btn-primary" 
+              bindtap="onRate" 
+              wx:elif="{{order.status === 'completed'}}">
+        去评价
+      </button>
+    </view>
   </view>
 </view>

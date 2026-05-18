@@ -592,4 +592,100 @@ router.get('/items', async (req, res) => {
   }
 });
 
+// ============================================
+// 门店接口（小程序用）
+// ============================================
+
+const Store = require('../store/models/Store');
+
+/**
+ * 获取门店列表（小程序用）
+ * GET /api/cleaning/stores
+ */
+router.get('/stores', async (req, res) => {
+  try {
+    const stores = await Store.find({ 
+      status: { $ne: 'deleted' } 
+    })
+    .select('storeId name address phone hours status')
+    .sort({ createdAt: -1 })
+    .limit(50);
+    
+    const storeList = stores.map(store => ({
+      storeId: store.storeId,
+      id: store.storeId,
+      name: store.name,
+      storeName: store.name,
+      address: store.address || '',
+      location: store.address || '',
+      phone: store.phone || '',
+      contactPhone: store.phone || '',
+      hours: store.hours || '09:00-21:00',
+      businessHours: store.hours || '09:00-21:00',
+      status: store.status === 'active' ? 'online' : 'offline',
+      isOnline: store.status === 'active',
+      rating: 4.5,
+      hasPromotion: false,
+      isRecommended: false,
+      serviceCount: 0,
+      minPrice: 20,
+      startingPrice: 20,
+      distance: 0,
+      deliveryFee: 10
+    }));
+    
+    res.json({ 
+      success: true, 
+      data: storeList,
+      message: '获取成功' 
+    });
+  } catch (error) {
+    console.error('[门店列表] 获取失败:', error);
+    // 如果数据库出错，返回默认门店
+    res.json({ 
+      success: true, 
+      data: [
+        {
+          storeId: 'ST001',
+          id: 'ST001',
+          name: '干洗店旗舰店',
+          storeName: '干洗店旗舰店',
+          address: '某某市某某区某某街道123号',
+          phone: '400-888-8888',
+          hours: '08:00-22:00',
+          status: 'online',
+          isOnline: true,
+          rating: 4.8,
+          hasPromotion: true,
+          isRecommended: true,
+          promotionDesc: '全场8折',
+          serviceCount: 12,
+          minPrice: 25,
+          distance: 1.2,
+          deliveryFee: 8
+        },
+        {
+          storeId: 'ST002',
+          id: 'ST002',
+          name: '干洗店中心店',
+          storeName: '干洗店中心店',
+          address: '某某市某某区某某街道456号',
+          phone: '400-888-8889',
+          hours: '09:00-21:00',
+          status: 'online',
+          isOnline: true,
+          rating: 4.6,
+          hasPromotion: false,
+          isRecommended: true,
+          serviceCount: 10,
+          minPrice: 20,
+          distance: 2.5,
+          deliveryFee: 6
+        }
+      ],
+      message: '使用默认数据' 
+    });
+  }
+});
+
 module.exports = router;

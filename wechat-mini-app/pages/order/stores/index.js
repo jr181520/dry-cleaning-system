@@ -78,10 +78,57 @@ Page({
   },
 
   // 加载门店数据
-  loadStores() {
+  async loadStores() {
+    try {
+      // 从后端API获取门店列表
+      const result = await app.request('/cleaning/stores');
+      
+      if (result.success && result.data && result.data.length > 0) {
+        // 转换门店数据格式
+        const stores = result.data.map(store => ({
+          id: store.storeId || store.id,
+          name: store.name || store.storeName,
+          address: store.address || store.location || '',
+          distance: store.distance ? `${store.distance}km` : '未知',
+          distanceValue: parseFloat(store.distance) || 0,
+          phone: store.phone || store.contactPhone || '',
+          hours: store.hours || store.businessHours || '09:00-21:00',
+          rating: store.rating || 4.5,
+          serviceCount: store.serviceCount || 0,
+          minPrice: store.minPrice || store.startingPrice || 0,
+          isPromotion: store.hasPromotion || false,
+          isRecommended: store.isRecommended || false,
+          isOnline: store.status !== 'closed' && store.status !== 'offline',
+          promotionDesc: store.promotionDesc || '',
+          baseDeliveryFee: store.deliveryFee || 8,
+          storeId: store.storeId || store.id
+        }));
+        
+        this.setData({
+          stores: stores,
+          originalStores: stores
+        });
+        
+        console.log('[门店列表] 从API加载成功:', stores.length, '家门店');
+      } else {
+        console.warn('[门店列表] API返回空数据，使用默认门店');
+        this.loadDefaultStores();
+      }
+    } catch (error) {
+      console.error('[门店列表] 加载失败:', error);
+      // 使用默认门店列表
+      this.loadDefaultStores();
+    }
+    
+    // 默认按距离排序
+    this.sortStores('distance');
+  },
+  
+  // 加载默认门店列表（API失败时的后备）
+  loadDefaultStores() {
     const stores = [
       {
-        id: 1,
+        id: 'ST001',
         name: '干洗店旗舰店',
         address: '某某市某某区某某街道123号',
         distance: '1.2km',
@@ -98,7 +145,7 @@ Page({
         baseDeliveryFee: 8
       },
       {
-        id: 2,
+        id: 'ST002',
         name: '干洗店中心店',
         address: '某某市某某区某某街道456号',
         distance: '2.5km',
@@ -115,7 +162,7 @@ Page({
         baseDeliveryFee: 6
       },
       {
-        id: 3,
+        id: 'ST003',
         name: '干洗店东门店',
         address: '某某市某某区某某街道789号',
         distance: '3.1km',
@@ -130,23 +177,6 @@ Page({
         isOnline: true,
         promotionDesc: '新店开业优惠',
         baseDeliveryFee: 10
-      },
-      {
-        id: 4,
-        name: '干洗店西城店',
-        address: '某某市某某区西城街道111号',
-        distance: '4.5km',
-        distanceValue: 4.5,
-        phone: '400-888-8891',
-        hours: '08:30-21:30',
-        rating: 4.7,
-        serviceCount: 11,
-        minPrice: 22,
-        isPromotion: false,
-        isRecommended: false,
-        isOnline: false,
-        promotionDesc: '',
-        baseDeliveryFee: 5
       }
     ];
     
@@ -154,9 +184,6 @@ Page({
       stores: stores,
       originalStores: stores
     });
-    
-    // 默认按距离排序
-    this.sortStores('distance');
   },
 
   // 加载用户地址
@@ -172,47 +199,65 @@ Page({
     }
   },
 
-  // 查询配送费用（模拟调用聚合跑腿API）
+  // 查询配送服务商
   async queryDeliveryFee() {
     try {
-      // 模拟聚合跑腿API返回多个配送服务商的报价
-      const providers = [
-        {
-          id: 'meituan',
-          name: '美团跑腿',
-          logo: '🛵',
-          estimatedTime: '25-35分钟',
-          fee: 10,
-          rating: 4.8,
-          discount: 2  // 优惠金额
-        },
-        {
-          id: 'ele',
-          name: '饿了么蜂鸟',
-          logo: '🦅',
-          estimatedTime: '30-40分钟',
-          fee: 12,
-          rating: 4.6,
-          discount: 0
-        },
-        {
-          id: 'dada',
-          name: '达达配送',
-          logo: '🚚',
-          estimatedTime: '35-45分钟',
-          fee: 8,
-          rating: 4.5,
-          discount: 1
-        }
-      ];
+      // 尝试从后端API获取配送服务商
+      const result = await app.request('/delivery/providers');
       
-      this.setData({
-        deliveryProviders: providers,
-        selectedDeliveryProvider: providers[0] // 默认选择第一个
-      });
+      if (result.success && result.data && result.data.length > 0) {
+        const providers = result.data.map(p => ({
+          id: p.id || p.providerId,
+          name: p.name || p.providerName,
+          logo: app.delivery.getProviderIcon(p.id || p.providerId),
+          estimatedTime: p.estimatedTime || '30-40分钟',
+          fee: p.fee || p.price || 10,
+          rating: p.rating || 4.5,
+          discount: p.discount || p.coupon || 0
+        }));
+        
+        this.setData({
+          deliveryProviders: providers,
+          selectedDeliveryProvider: providers[0]
+        });
+        
+        console.log('[配送服务商] 从API加载成功:', providers.length, '个服务商');
+      } else {
+        this.loadDefaultDeliveryProviders();
+      }
     } catch (error) {
-      console.error('查询配送费用失败', error);
+      console.error('[配送服务商] 加载失败:', error);
+      this.loadDefaultDeliveryProviders();
     }
+  },
+  
+  // 加载默认配送服务商（后备方案）
+  loadDefaultDeliveryProviders() {
+    const providers = [
+      {
+        id: 'meituan',
+        name: '美团跑腿',
+        logo: '🛵',
+        estimatedTime: '25-35分钟',
+        fee: 10,
+        rating: 4.8,
+        discount: 2
+      },
+      {
+        id: 'dada',
+        name: '达达配送',
+        logo: '🚚',
+        estimatedTime: '35-45分钟',
+        fee: 8,
+        rating: 4.5,
+        discount: 1
+      }
+    ];
+    
+    this.setData({
+      deliveryProviders: providers,
+      selectedDeliveryProvider: providers[0]
+    });
   },
 
   // 选择排序方式
@@ -294,7 +339,7 @@ Page({
   // 选择门店
   onSelectStore(e) {
     const storeId = e.currentTarget.dataset.id;
-    const store = this.data.stores.find(s => s.id === storeId);
+    const store = this.data.stores.find(s => s.id === storeId || s.storeId === storeId);
     
     if (!store) {
       app.showToast('门店信息不存在', 'none');
@@ -306,10 +351,15 @@ Page({
       return;
     }
     
-    // 保存选中的门店到全局
-    app.globalData.selectedStore = store;
+    // 保存选中的门店到全局（确保storeId正确）
+    app.globalData.selectedStore = {
+      ...store,
+      storeId: store.storeId || store.id  // 统一使用storeId
+    };
     app.globalData.selectedServices = this.data.serviceDetails;
     app.globalData.serviceTotalPrice = this.data.serviceTotalPrice;
+    
+    console.log('[选择门店] 已保存:', app.globalData.selectedStore);
     
     // 跳转到配送方式选择页面
     wx.navigateTo({

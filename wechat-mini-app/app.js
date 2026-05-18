@@ -240,11 +240,12 @@ App({
   
   // 封装请求方法
   request(url, data = {}, method = 'GET') {
-    // 模拟API响应
-    const mockResponse = this.getMockResponse(url, data, method);
-    if (mockResponse) {
-      return Promise.resolve(mockResponse);
-    }
+    // 仅在开发测试时使用模拟数据，生产环境应从后端获取
+    // 暂时禁用模拟数据，强制调用真实API
+    // const mockResponse = this.getMockResponse(url, data, method);
+    // if (mockResponse) {
+    //   return Promise.resolve(mockResponse);
+    // }
     
     return new Promise((resolve, reject) => {
       wx.request({
@@ -263,13 +264,9 @@ App({
           }
         },
         fail: err => {
-          // API请求失败时，使用模拟数据
-          const fallbackMock = this.getMockResponse(url, data, method);
-          if (fallbackMock) {
-            resolve(fallbackMock);
-          } else {
-            reject(err);
-          }
+          console.error('[API请求失败]', url, err);
+          // API请求失败时返回错误
+          reject({ success: false, error: '网络请求失败' });
         }
       });
     });
