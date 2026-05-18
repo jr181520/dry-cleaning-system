@@ -178,21 +178,35 @@ Page({
     app.showLoading('正在处理...');
     
     try {
+      // 第一步：创建真实订单
+      console.log('[支付] 开始创建订单...');
+      const orderResult = await this.createOrder();
+      
+      if (!orderResult.success) {
+        throw new Error(orderResult.error || '创建订单失败');
+      }
+      
+      // 更新本地订单ID
+      const realOrderId = orderResult.data?.orderNo || orderResult.data?.orderId || this.data.orderId;
+      this.setData({ orderId: realOrderId });
+      console.log('[支付] 订单创建成功:', realOrderId);
+      
+      // 第二步：调用支付接口
       let result;
       
       // 根据支付方式调用不同接口
       switch (this.data.selectedPaymentMethod) {
         case 'wechat':
-          result = await this.wechatPay();
+          result = await this.wechatPay(realOrderId);
           break;
         case 'balance':
-          result = await this.balancePay();
+          result = await this.balancePay(realOrderId);
           break;
         case 'alipay':
-          result = await this.alipayPay();
+          result = await this.alipayPay(realOrderId);
           break;
         case 'unionpay':
-          result = await this.unionpayPay();
+          result = await this.unionpayPay(realOrderId);
           break;
         default:
           throw new Error('未知的支付方式');
@@ -206,7 +220,7 @@ Page({
         // 保存订单到历史
         const orderData = {
           ...this.data.orderData,
-          orderId: this.data.orderId,
+          orderId: realOrderId,
           paymentMethod: this.data.selectedPaymentMethod,
           paymentMethodName: this.getPaymentMethodName(),
           status: 'pending',
@@ -221,7 +235,7 @@ Page({
         // 跳转支付成功页面
         setTimeout(() => {
           wx.redirectTo({
-            url: `/pages/order/success/index?orderId=${this.data.orderId}&amount=${this.data.orderData.fees.totalAmount}&storeId=${this.data.orderData.store?.id || ''}`
+            url: `/pages/order/success/index?orderId=${realOrderId}&amount=${this.data.orderData.fees.totalAmount}&storeId=${this.data.orderData.store?.id || ''}`
           });
         }, 1500);
       } else {
@@ -232,6 +246,69 @@ Page({
       app.hideLoading();
       app.showToast(error.message || '支付失败，请重试', 'none');
       this.setData({ isPaying: false });
+    }
+  },
+  
+  // 创建真实订单
+  async createOrder() {
+    try {
+      const userInfo = app.globalData.userInfo;
+      const orderData = this.data.orderData;
+      
+      // 准备订单数据
+      const orderPayload = {
+        userId: userInfo?.openid || userInfo?.id || 'guest_' + Date.now(),
+        storeId: orderData.store?.storeId || orderData.store?.id || 'ST001',
+        items: orderData.services.map(service => ({
+          name: service.name,
+          price: service.price,
+          quantity: 1,
+          serviceType: 'dry_clean'
+        })),
+        deliveryMethod: orderData.deliveryMethod,
+        selectedProvider: orderData.provider?.id || null,
+        delivery: {
+          type: orderData.deliveryMethod === 'courier' ? 'delivery' : 'pickup',
+          address: orderData.userAddress || '',
+          contactName: orderData.contactName || '',
+          contactPhone: orderData.userPhone || '',
+          fee: orderData.fees.deliveryFee || 0
+        },
+        amounts: {
+          subtotal: orderData.fees.originalPrice || 0,
+          discount: orderData.fees.discount || 0,
+          deliveryFee: orderData.fees.deliveryFee || 0,
+          total: orderData.fees.totalAmount || 0
+        },
+        pickupTime: orderData.time?.text || '',
+        notes: ''
+      };
+      
+      console.log('[创建订单] 提交数据:', JSON.stringify(orderPayload, null, 2));
+      
+      // 调用后端API创建订单
+      const result = await app.request('/cleaning/orders', orderPayload, 'POST');
+      
+      if (result.success && result.data) {
+        console.log('[创建订单] 后端返回:', result.data);
+        return {
+          success: true,
+          data: result.data,
+          orderId: result.data.orderNo || result.data._id || result.data.id
+        };
+      } else {
+        console.error('[创建订单] API返回失败:', result.error);
+        return {
+          success: false,
+          error: result.error || '创建订单失败'
+        };
+      }
+    } catch (error) {
+      console.error('[创建订单] 请求失败:', error);
+      return {
+        success: false,
+        error: error.message || '网络请求失败'
+      };
     }
   },
   
@@ -247,21 +324,15 @@ Page({
   },
   
   // 微信支付
-  async wechatPay() {
+  async wechatPay(orderId) {
     try {
       // 优先调用后端API获取支付参数
       const res = await app.request('/payment/wechat/unified', {
-        method: 'POST',
-        data: {
-          orderId: this.data.orderId,
-          totalAmount: this.data.orderData.fees.totalAmount * 100, // 转为分
-          description: '干洗服务订单-' + this.data.orderId,
-          attach: JSON.stringify({
-            openid: app.globalData.userInfo?.openid || '',
-            storeId: this.data.orderData.store?.id || ''
-          })
-        }
-      });
+        orderId: orderId || this.data.orderId,
+        amount: this.data.orderData.fees.totalAmount * 100, // 转为分
+        openid: app.globalData.userInfo?.openid || '',
+        subject: '干洗服务订单-' + (orderId || this.data.orderId)
+      }, 'POST');
       
       if (res.success && res.data && res.data.payment) {
         // 小程序调起微信支付
@@ -293,16 +364,16 @@ Page({
   },
   
   // 余额支付
-  async balancePay() {
+  async balancePay(orderId) {
     try {
-      const res = await app.request('/payment/balance/pay', {
-        method: 'POST',
-        data: {
-          orderId: this.data.orderId,
-          openid: app.globalData.userInfo.openid,
-          amount: this.data.orderData.fees.totalAmount
-        }
-      });
+      // 余额支付：调用统一的支付接口
+      const res = await app.request('/payment/create', {
+        orderId: orderId || this.data.orderId,
+        amount: this.data.orderData.fees.totalAmount,
+        subject: '干洗服务订单-' + (orderId || this.data.orderId),
+        paymentMethod: 'balance',
+        userId: app.globalData.userInfo?.openid || app.globalData.userInfo?.id
+      }, 'POST');
       
       if (res.success) {
         return { success: true, message: '余额支付成功' };
@@ -317,16 +388,14 @@ Page({
   },
   
   // 支付宝支付
-  async alipayPay() {
+  async alipayPay(orderId) {
     try {
-      const res = await app.request('/payment/alipay/create', {
-        method: 'POST',
-        data: {
-          orderId: this.data.orderId,
-          totalAmount: this.data.orderData.fees.totalAmount,
-          subject: '干洗服务订单-' + this.data.orderId
-        }
-      });
+      const res = await app.request('/payment/create', {
+        orderId: orderId || this.data.orderId,
+        amount: this.data.orderData.fees.totalAmount,
+        subject: '干洗服务订单-' + (orderId || this.data.orderId),
+        paymentMethod: 'alipay'
+      }, 'POST');
       
       if (res.success && res.data && res.data.payUrl) {
         // 显示支付宝跳转提示
@@ -354,16 +423,14 @@ Page({
   },
   
   // 银行卡/银联支付
-  async unionpayPay() {
+  async unionpayPay(orderId) {
     try {
-      const res = await app.request('/payment/unionpay/create', {
-        method: 'POST',
-        data: {
-          orderId: this.data.orderId,
-          totalAmount: this.data.orderData.fees.totalAmount,
-          subject: '干洗服务订单-' + this.data.orderId
-        }
-      });
+      const res = await app.request('/payment/create', {
+        orderId: orderId || this.data.orderId,
+        amount: this.data.orderData.fees.totalAmount,
+        subject: '干洗服务订单-' + (orderId || this.data.orderId),
+        paymentMethod: 'unionpay'
+      }, 'POST');
       
       if (res.success && res.data && res.data.payUrl) {
         // 显示银联跳转提示

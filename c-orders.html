@@ -450,7 +450,7 @@
             loadOrders();
         }
 
-        // 从后端加载订单列表
+                // 从后端加载订单列表
         async function loadOrdersFromAPI() {
             try {
                 // 优先使用统一同步模块的数据
@@ -463,11 +463,12 @@
                     }
                 }
                 
-                // 获取userId（优先使用localStorage中保存的用户ID）
-                const userId = localStorage.getItem('userId');
+                // 获取用户ID（优先使用openid，兼容guest模式）
+                const openid = localStorage.getItem('userOpenid');
+                const userId = openid || localStorage.getItem('userId');
                 const token = localStorage.getItem('userToken') || localStorage.getItem('authToken') || '';
                 
-                console.log('[c-orders] 加载订单', { userId, hasToken: !!token });
+                console.log('[c-orders] 加载订单', { userId, openid, hasToken: !!token, idType: openid ? 'openid' : 'guest' });
                 
                 // 构建API URL，包含userId参数
                 let apiUrl = 'http://localhost:3000/api/cleaning/orders';

@@ -24,13 +24,17 @@ router.use(moduleGuard('cleaning'));
 router.post('/orders', async (req, res) => {
   try {
     console.log('[创建订单] 收到请求:', JSON.stringify(req.body).substring(0, 500));
+    
+    // 统一用户标识：优先使用openid，其次使用userId
+    const userId = req.body.openid || req.body.userId || req.user?.id || 'guest_' + Date.now();
+    
     const result = await orderService.createOrder({
       ...req.body,
-      // 优先使用前端传来的 userId（支持游客模式），否则使用登录用户ID
-      userId: req.body.userId || req.user?.id || 'guest_' + Date.now(),
+      userId: userId, // 统一使用userId存储
       orderType: 'cleaning'
     });
-    console.log('[创建订单] 成功:', result.orderNo);
+    
+    console.log('[创建订单] 成功:', result.orderNo, '用户ID:', userId);
     res.json({ success: true, data: result });
   } catch (error) {
     console.error('[创建订单] 失败:', error.message, error.stack);
@@ -44,17 +48,23 @@ router.post('/orders', async (req, res) => {
  */
 router.get('/orders', async (req, res) => {
   try {
-    const { page, pageSize, status, storeId } = req.query;
+    const { page, pageSize, status, storeId, userId, openid } = req.query;
+    
+    // 支持 userId 或 openid 查询
+    const queryUserId = userId || openid || req.user?.id;
+    
     const result = await orderService.getOrders({
-      userId: req.query.userId || req.user?.id,
-      roles: req.user?.roles,
+      userId: queryUserId,
+      roles: req.user?.roles || ['customer'], // 默认作为客户查询
       page: parseInt(page) || 1,
       pageSize: parseInt(pageSize) || 20,
       status,
       storeId
     });
+    
     res.json({ success: true, data: result });
   } catch (error) {
+    console.error('[订单列表] 查询失败:', error);
     res.status(400).json({ success: false, error: error.message });
   }
 });
@@ -569,6 +579,98 @@ router.get('/stores/:storeId/services', async (req, res) => {
   }
 });
 
+/**
+ * 获取服务列表（小程序用）
+ * GET /api/cleaning/services
+ */
+router.get('/services', async (req, res) => {
+  try {
+    // 返回标准干洗服务列表
+    const services = [
+      {
+        id: 1,
+        icon: '👔',
+        name: '西装干洗',
+        price: 88,
+        desc: '含熨烫，3-5天取件',
+        category: '正装',
+        serviceType: 'dry_clean'
+      },
+      {
+        id: 2,
+        icon: '👕',
+        name: '衬衫清洗',
+        price: 25,
+        desc: '含熨烫，2-3天取件',
+        category: '日常装',
+        serviceType: 'wash_iron'
+      },
+      {
+        id: 3,
+        icon: '🧥',
+        name: '羽绒服清洗',
+        price: 68,
+        desc: '专业清洗，5-7天取件',
+        category: '冬季装',
+        serviceType: 'down_clean'
+      },
+      {
+        id: 4,
+        icon: '👖',
+        name: '裤子清洗',
+        price: 35,
+        desc: '含熨烫，2-3天取件',
+        category: '日常装',
+        serviceType: 'wash_iron'
+      },
+      {
+        id: 5,
+        icon: '👗',
+        name: '连衣裙清洗',
+        price: 58,
+        desc: '专业护理，3-5天取件',
+        category: '礼服',
+        serviceType: 'dry_clean'
+      },
+      {
+        id: 6,
+        icon: '👟',
+        name: '鞋子清洗',
+        price: 45,
+        desc: '深度清洁，3-5天取件',
+        category: '配件',
+        serviceType: 'shoe_clean'
+      },
+      {
+        id: 7,
+        icon: '🧣',
+        name: '围巾/帽子',
+        price: 20,
+        desc: '轻柔清洗，2-3天取件',
+        category: '配件',
+        serviceType: 'accessory_clean'
+      },
+      {
+        id: 8,
+        icon: '🛏️',
+        name: '床上用品',
+        price: 98,
+        desc: '大件清洗，5-7天取件',
+        category: '家纺',
+        serviceType: 'bedding_clean'
+      }
+    ];
+    
+    res.json({ 
+      success: true, 
+      data: services,
+      message: '获取成功' 
+    });
+  } catch (error) {
+    res.status(400).json({ success: false, error: error.message });
+  }
+});
+
 // ============================================
 // 物品管理
 // ============================================
@@ -596,7 +698,7 @@ router.get('/items', async (req, res) => {
 // 门店接口（小程序用）
 // ============================================
 
-const Store = require('../store/models/Store');
+const storeService = require('./services/storeService');
 
 /**
  * 获取门店列表（小程序用）
@@ -604,24 +706,20 @@ const Store = require('../store/models/Store');
  */
 router.get('/stores', async (req, res) => {
   try {
-    const stores = await Store.find({ 
-      status: { $ne: 'deleted' } 
-    })
-    .select('storeId name address phone hours status')
-    .sort({ createdAt: -1 })
-    .limit(50);
+    const result = await storeService.getStores({ page: 1, pageSize: 50 });
+    const stores = result.list || [];
     
     const storeList = stores.map(store => ({
-      storeId: store.storeId,
-      id: store.storeId,
+      storeId: store.storeNo,
+      id: store.storeNo,
       name: store.name,
       storeName: store.name,
       address: store.address || '',
       location: store.address || '',
       phone: store.phone || '',
       contactPhone: store.phone || '',
-      hours: store.hours || '09:00-21:00',
-      businessHours: store.hours || '09:00-21:00',
+      hours: store.businessHours || '09:00-21:00',
+      businessHours: store.businessHours || '09:00-21:00',
       status: store.status === 'active' ? 'online' : 'offline',
       isOnline: store.status === 'active',
       rating: 4.5,

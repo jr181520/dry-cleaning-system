@@ -201,10 +201,10 @@ App({
     currentOrder: null,    // 当前订单（用于支付页面）
     orders: [],           // 订单列表
     // API配置
-    apiBaseUrl: 'http://localhost:3000/api',
+    apiBaseUrl: 'http://192.168.1.8:3000/api',
     // 聚合配送API配置
     deliveryApi: {
-      baseUrl: 'http://localhost:3001/api',
+      baseUrl: 'http://192.168.1.8:3001/api',
       providers: ['meituan', 'dada', 'shunfeng']
     },
     // 模块配置（动态菜单）
@@ -217,39 +217,40 @@ App({
     wx.login({
       success: res => {
         if (res.code) {
-          console.log('登录成功，code:', res.code);
-          // 发送 code 到后端获取 openid
-          this.request('/auth/login', {
+          console.log('微信登录成功，code:', res.code);
+          // 发送 code 到后端获取 openid 并登录
+          this.request('/auth/wxmini-login', {
             code: res.code
           }, 'POST').then(data => {
             if (data.openid) {
               this.globalData.userInfo = {
                 openid: data.openid,
-                sessionKey: data.session_key
+                sessionKey: data.session_key,
+                ...data.user
               };
               this.globalData.token = data.token;
+              this.globalData.isLoggedIn = true;
+              console.log('登录完成，openid:', data.openid);
             }
+          }).catch(err => {
+            console.error('登录失败:', err);
           });
         }
       },
       fail: err => {
-        console.error('登录失败', err);
+        console.error('wx.login失败', err);
       }
     });
   },
   
   // 封装请求方法
   request(url, data = {}, method = 'GET') {
-    // 仅在开发测试时使用模拟数据，生产环境应从后端获取
-    // 暂时禁用模拟数据，强制调用真实API
-    // const mockResponse = this.getMockResponse(url, data, method);
-    // if (mockResponse) {
-    //   return Promise.resolve(mockResponse);
-    // }
+    const fullUrl = this.globalData.apiBaseUrl + url;
+    console.log('[API请求]', method, fullUrl, data);
     
     return new Promise((resolve, reject) => {
       wx.request({
-        url: this.globalData.apiBaseUrl + url,
+        url: fullUrl,
         data: data,
         method: method,
         header: {
@@ -257,6 +258,7 @@ App({
           'Authorization': this.globalData.token ? `Bearer ${this.globalData.token}` : ''
         },
         success: res => {
+          console.log('[API响应]', url, 'status:', res.statusCode, 'data:', JSON.stringify(res.data).substring(0, 200));
           if (res.statusCode === 200) {
             resolve(res.data);
           } else {
@@ -265,7 +267,6 @@ App({
         },
         fail: err => {
           console.error('[API请求失败]', url, err);
-          // API请求失败时返回错误
           reject({ success: false, error: '网络请求失败' });
         }
       });

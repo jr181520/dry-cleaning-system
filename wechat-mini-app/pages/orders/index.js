@@ -58,20 +58,31 @@ Page({
     this.setData({ loading: true });
     
     try {
-      // 调用后端API获取订单列表
+      // 获取用户信息（优先使用openid或userId）
+      const userInfo = app.globalData.userInfo;
+      const userId = userInfo?.openid || userInfo?.id || userInfo?.userId || '';
+      
+      console.log('[订单列表] 用户ID:', userId, '用户信息:', userInfo);
+      
+      // 调用后端API获取订单列表，传递userId参数
       const result = await app.request('/cleaning/orders', {
+        userId: userId,  // 关键：传递userId以获取该用户的订单
         status: this.data.currentTab === 'all' ? '' : this.data.currentTab,
         page: refresh ? 1 : this.data.page,
         pageSize: this.data.pageSize
-      });
+      }, 'GET');
       
       if (result.success && result.data) {
+        // API返回格式: {success: true, data: {list: [...]}} 或 {success: true, data: [...]}
+        // 兼容处理：result.data 可能是数组或 {list: [...]} 对象
+        const orderList = Array.isArray(result.data) ? result.data : (result.data.list || []);
+        
         // 转换订单数据格式
-        const orders = result.data.map(order => ({
-          id: order.orderId || order.id,
-          orderId: order.orderId || order.id,
+        const orders = orderList.map(order => ({
+          id: order._id || order.orderId || order.id,
+          orderId: order._id || order.orderId || order.id,
           orderNo: order.orderNo || order.orderId || order.id,
-          storeName: order.storeName || order.store?.name || '干洗店',
+          storeName: order.storeName || order.store?.name || order.storeId || '干洗店',
           storeId: order.storeId || order.store?.storeId || '',
           status: order.status || 'pending',
           statusText: this.getStatusText(order.status),
@@ -83,20 +94,35 @@ Page({
           deliveryType: order.delivery?.type || order.deliveryType || 'pickup'
         }));
         
-        this.setData({
-          orders: refresh ? orders : [...this.data.orders, ...orders],
-          hasMore: orders.length >= this.data.pageSize,
-          page: refresh ? 1 : this.data.page + 1
-        });
-        
-        console.log('[订单列表] 从API加载成功:', orders.length, '个订单');
+        // 只有在有真实订单时才更新，避免覆盖已有数据
+        if (orders.length > 0) {
+          this.setData({
+            orders: refresh ? orders : [...this.data.orders, ...orders],
+            hasMore: orders.length >= this.data.pageSize,
+            page: refresh ? 1 : this.data.page + 1
+          });
+          console.log('[订单列表] 从API加载成功:', orders.length, '个订单');
+        } else {
+          console.log('[订单列表] API返回空订单列表');
+          // API返回空列表时，不加载模拟数据
+          this.setData({
+            orders: refresh ? [] : this.data.orders,
+            hasMore: false
+          });
+        }
       } else {
-        console.warn('[订单列表] API返回空数据');
-        this.loadMockOrders();
+        console.warn('[订单列表] API返回失败或空数据');
+        // API返回失败时，只有在没有现有订单时才加载模拟数据
+        if (this.data.orders.length === 0) {
+          this.loadMockOrders();
+        }
       }
     } catch (error) {
       console.error('[订单列表] 加载失败:', error);
-      this.loadMockOrders();
+      // 只有在没有现有订单时才加载模拟数据
+      if (this.data.orders.length === 0) {
+        this.loadMockOrders();
+      }
     }
     
     this.setData({ loading: false });

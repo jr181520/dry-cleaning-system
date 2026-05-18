@@ -1284,16 +1284,21 @@
             
             const fees = calculateFees();
             
-            // 获取或生成用户ID
-            let userId = localStorage.getItem('userId');
+            // 获取用户ID（优先使用openid，兼容旧guest模式）
+            let userId = localStorage.getItem('userOpenid') || localStorage.getItem('userId');
             if (!userId) {
                 userId = 'guest_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
                 localStorage.setItem('userId', userId);
             }
             
+            // 记录用户标识类型
+            const userIdType = localStorage.getItem('userOpenid') ? 'openid' : 'guest';
+            console.log(`[下单] 使用${userIdType}作为用户ID:`, userId);
+            
             // 准备订单数据
             const orderDataForAPI = {
                 userId: userId,
+                openid: localStorage.getItem('userOpenid') || userId, // 统一传递openid
                 storeId: orderData.selectedStore ? orderData.selectedStore.id : null,
                 items: orderData.selectedServices.map(s => ({
                     name: s.name,

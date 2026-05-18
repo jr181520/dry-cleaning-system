@@ -129,9 +129,162 @@ router.post('/wechat', async (req, res) => {
     const { openid, nickname, headimgurl, sex } = req.body;
     if (!openid) throw new Error('openid 不能为空');
     
-    const result = await authService.wechatLogin(openid, { nickname, headimgurl, sex });
+    const result = await authService.wechatLogin(openid, { 
+      nickname, 
+      headimgurl, 
+      sex,
+      platform: 'wechat_web' // 标记为网页端
+    });
     res.json({ success: true, data: result });
   } catch (error) {
+    res.status(401).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * 微信网页授权 - 生成授权URL
+ * GET /api/auth/wechat/authorize
+ */
+router.get('/wechat/authorize', async (req, res) => {
+  try {
+    const appId = process.env.WX_WEB_APP_ID || process.env.WX_MINI_APP_ID;
+    const redirectUri = process.env.WX_WEB_REDIRECT_URI || `${req.protocol}://${req.get('host')}/api/auth/wechat/callback`;
+    const state = req.query.state || 'web_login';
+    
+    if (!appId) {
+      throw new Error('未配置微信网页授权参数');
+    }
+    
+    // 微信授权地址
+    const authorizeUrl = `https://open.weixin.qq.com/connect/qrconnect?appid=${appId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=snsapi_login&state=${state}#wechat_redirect`;
+    
+    res.json({ 
+      success: true, 
+      data: { 
+        authorizeUrl,
+        appId 
+      } 
+    });
+  } catch (error) {
+    res.status(400).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * 微信网页授权 - 回调处理
+ * GET /api/auth/wechat/callback
+ */
+router.get('/wechat/callback', async (req, res) => {
+  try {
+    const { code, state } = req.query;
+    
+    if (!code) {
+      return res.redirect('/?error=微信授权失败');
+    }
+    
+    // 用code换取openid
+    const appId = process.env.WX_WEB_APP_ID || process.env.WX_MINI_APP_ID;
+    const appSecret = process.env.WX_WEB_APP_SECRET || process.env.WX_MINI_APP_SECRET;
+    
+    if (!appId || !appSecret) {
+      return res.redirect('/?error=服务器未配置微信参数');
+    }
+    
+    // 调用微信API获取access_token和openid
+    const wxApiUrl = `https://api.weixin.qq.com/sns/oauth2/access_token?appid=${appId}&secret=${appSecret}&code=${code}&grant_type=authorization_code`;
+    
+    const wxResponse = await fetch(wxApiUrl);
+    const wxData = await wxResponse.json();
+    
+    if (wxData.errcode) {
+      console.error('[微信授权回调] 微信API错误:', wxData);
+      return res.redirect(`/?error=微信API错误:${wxData.errmsg}`);
+    }
+    
+    const openid = wxData.openid;
+    const accessToken = wxData.access_token;
+    
+    // 获取用户信息（可选）
+    let userData = {};
+    try {
+      const userInfoUrl = `https://api.weixin.qq.com/sns/userinfo?access_token=${accessToken}&openid=${openid}`;
+      const userInfoResponse = await fetch(userInfoUrl);
+      const userInfo = await userInfoResponse.json();
+      
+      if (!userInfo.errcode) {
+        userData = {
+          nickname: userInfo.nickname,
+          headimgurl: userInfo.headimgurl,
+          sex: userInfo.sex,
+          platform: 'wechat_web'
+        };
+      }
+    } catch (e) {
+      console.log('[微信授权回调] 获取用户信息失败:', e.message);
+    }
+    
+    // 执行登录/注册
+    const result = await authService.wechatLogin(openid, userData);
+    
+    // 将openid和token通过URL参数返回（前端处理）
+    // 注意：这里使用URL重定向到前端页面，前端解析参数并保存登录状态
+    const redirectUrl = `/?wechat_login=1&openid=${openid}&token=${result.token}`;
+    res.redirect(redirectUrl);
+    
+  } catch (error) {
+    console.error('[微信授权回调] 处理失败:', error);
+    res.redirect(`/?error=${encodeURIComponent(error.message)}`);
+  }
+});
+
+/**
+ * 微信小程序登录（通过 code 换取 openid）
+ * POST /api/auth/wxmini-login
+ */
+router.post('/wxmini-login', async (req, res) => {
+  try {
+    const { code, nickname, avatarUrl, gender } = req.body;
+    if (!code) throw new Error('code 不能为空');
+    
+    // 调用微信 API 用 code 换取 openid
+    const appId = process.env.WX_MINI_APP_ID;
+    const appSecret = process.env.WX_MINI_APP_SECRET;
+    
+    console.log('[微信登录] WX_MINI_APP_ID =', appId, 'WX_MINI_APP_SECRET =', appSecret ? '***' : '未设置');
+    
+    if (!appId || !appSecret) {
+      throw new Error('微信小程序配置缺失，请检查 .env 文件');
+    }
+    
+    const wxApiUrl = `https://api.weixin.qq.com/sns/jscode2session?appid=${appId}&secret=${appSecret}&js_code=${code}&grant_type=authorization_code`;
+    
+    const wxResponse = await fetch(wxApiUrl);
+    const wxData = await wxResponse.json();
+    
+    if (wxData.errcode) {
+      console.error('[微信登录] 微信API错误:', wxData);
+      throw new Error(`微信登录失败: ${wxData.errmsg}`);
+    }
+    
+    const { openid, session_key } = wxData;
+    
+    // 用 openid 登录或注册
+    const result = await authService.wechatLogin(openid, { 
+      nickname: nickname || '微信用户',
+      headimgurl: avatarUrl,
+      sex: gender
+    });
+    
+    res.json({ 
+      success: true, 
+      data: {
+        ...result,
+        openid,
+        session_key
+      }
+    });
+  } catch (error) {
+    console.error('[微信小程序登录] 错误:', error);
     res.status(401).json({ success: false, error: error.message });
   }
 });

@@ -9,8 +9,9 @@ const { v4: uuidv4 } = require('uuid');
 // 用户 Schema
 const userSchema = new mongoose.Schema({
   userNo: { type: String, unique: true, index: true },
-  phone: { type: String, unique: true, required: true, index: true },
+  phone: { type: String, sparse: true, index: true }, // 移除unique约束，允许为空
   password: String,
+  openid: { type: String, sparse: true, index: true }, // 微信openid，用于跨平台用户识别
   name: String,
   avatar: String,
   gender: { type: String, enum: ['male', 'female', 'unknown'], default: 'unknown' },
@@ -39,6 +40,7 @@ const userSchema = new mongoose.Schema({
 userSchema.index({ roles: 1 });
 userSchema.index({ storeId: 1 });
 userSchema.index({ status: 1 });
+userSchema.index({ openid: 1 }); // 微信openid索引
 
 // 密码中间件
 userSchema.pre('save', async function(next) {
@@ -112,24 +114,58 @@ class AuthService {
   }
 
   /**
-   * 微信登录
+   * 微信登录（支持网页端和小程序）
    */
   async wechatLogin(openid, userData = {}) {
-    let user = await User.findOne({ phone: openid, createdFrom: 'wechat' });
+    console.log('[wechatLogin] 开始执行, openid:', openid, '平台:', userData.platform || 'unknown');
+    
+    if (!openid) {
+      throw new Error('openid不能为空');
+    }
+    
+    // 优先通过openid查找用户
+    let user = await User.findOne({ openid: openid });
+    console.log('[wechatLogin] 通过openid查找用户:', user ? '找到' : '未找到');
+    
+    // 如果没找到，尝试通过phone查找（兼容旧数据）
+    if (!user) {
+      user = await User.findOne({ phone: openid, createdFrom: 'wechat' });
+      console.log('[wechatLogin] 通过phone查找旧用户:', user ? '找到' : '未找到');
+      
+      // 如果找到旧用户，迁移openid
+      if (user) {
+        user.openid = openid;
+        await user.save();
+        console.log('[wechatLogin] 旧用户openid迁移成功');
+      }
+    }
     
     if (!user) {
       // 新用户自动注册
       const userNo = 'U' + Date.now() + String(Math.floor(Math.random() * 1000)).padStart(3, '0');
+      console.log('[wechatLogin] 创建新用户, userNo:', userNo);
+      
       user = await User.create({
         userNo,
-        phone: openid,
+        phone: userData.phone || '', // phone可选，不强制
+        openid: openid, // 存储openid
         password: '', // 微信登录无需密码
-        name: userData.nickname || '微信用户',
-        avatar: userData.headimgurl,
+        name: userData.nickname || userData.name || '微信用户',
+        avatar: userData.headimgurl || userData.avatar || '',
         gender: userData.sex === 1 ? 'male' : (userData.sex === 2 ? 'female' : 'unknown'),
         roles: ['customer'],
-        createdFrom: 'wechat'
+        createdFrom: userData.platform || 'wechat' // 标记创建平台
       });
+      
+      console.log('[wechatLogin] 用户创建成功, userId:', user._id);
+    } else {
+      // 更新用户信息
+      if (userData.nickname || userData.name) {
+        user.name = userData.nickname || userData.name;
+      }
+      if (userData.headimgurl || userData.avatar) {
+        user.avatar = userData.headimgurl || userData.avatar;
+      }
     }
 
     // 更新登录信息
@@ -138,11 +174,16 @@ class AuthService {
     await user.save();
 
     const token = this.generateToken(user._id);
+    console.log('[wechatLogin] 生成token:', token ? '成功' : '失败');
     
-    return {
+    const result = {
       user: this.sanitizeUser(user),
-      token
+      token,
+      openid: user.openid // 返回openid用于标识用户
     };
+    console.log('[wechatLogin] 返回结果:', JSON.stringify(result).substring(0, 200));
+    
+    return result;
   }
 
   /**
@@ -284,6 +325,10 @@ class AuthService {
   sanitizeUser(user) {
     const obj = user.toObject ? user.toObject() : { ...user };
     delete obj.password;
+    // 确保返回openid用于跨平台用户识别
+    if (obj.openid) {
+      obj.openid = obj.openid;
+    }
     return obj;
   }
 }

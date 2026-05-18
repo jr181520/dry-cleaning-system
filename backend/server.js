@@ -3,13 +3,18 @@
  * 模块化架构
  */
 
-// 加载环境变量
-require('dotenv').config();
+// 加载环境变量（指定 .env 文件位置）
+const path = require('path');
+require('dotenv').config({ 
+  path: path.resolve(__dirname, '.env') 
+});
+
+// 调试：打印环境变量
+console.log('[dotenv] WX_MINI_APP_ID:', process.env.WX_MINI_APP_ID ? '已设置' : '未设置');
 
 const express = require('express');
 const cors = require('cors');
 const bodyParser = require('body-parser');
-const path = require('path');
 const { initDatabase, closeDatabase } = require('./config');
 
 // 导入各模块路由
@@ -232,7 +237,7 @@ app.post('/api/payment/callback', async (req, res) => {
 // 会员余额查询 - GET /api/balance/:userId
 app.get('/api/balance/:userId', async (req, res) => {
   try {
-    const result = await balance.getBalance(req.params.userId);
+    const result = await balance.getUserBalance(req.params.userId);
     res.json(result);
   } catch (error) {
     res.json({ success: false, error: error.message });
@@ -243,9 +248,49 @@ app.get('/api/balance/:userId', async (req, res) => {
 app.post('/api/balance/recharge', async (req, res) => {
   try {
     const { userId, amount, method } = req.body;
-    const result = await balance.recharge({ userId, amount, method });
+    const result = await balance.addBalance(userId, amount, method);
     res.json(result);
   } catch (error) {
+    res.json({ success: false, error: error.message });
+  }
+});
+
+// ============================================
+// 微信小程序订单接口
+// ============================================
+
+// 待取件订单 - GET /api/orders/pending
+const orderService = require('./modules/cleaning/services/orderService');
+app.get('/api/orders/pending', async (req, res) => {
+  try {
+    const { userId } = req.query;
+    const result = await orderService.getPendingPickupOrders(userId);
+    res.json({ success: true, data: result });
+  } catch (error) {
+    console.error('[订单] 获取待取件订单失败:', error);
+    res.json({ success: false, error: error.message });
+  }
+});
+
+// 微信支付统一下单 - POST /api/payment/wechat/unified
+app.post('/api/payment/wechat/unified', async (req, res) => {
+  try {
+    const { orderId, amount, openid, subject } = req.body;
+    const wechatPay = require('./api/payment-server/wechat-pay');
+    const result = await wechatPay.createOrder({
+      orderId,
+      amount,
+      description: subject || '干洗服务',
+      openid,
+      tradeType: 'JSAPI'
+    });
+    if (result.success && result.data?.prepayId) {
+      const payParams = wechatPay.generateAppPayParams(result.data.prepayId);
+      result.data.payParams = payParams;
+    }
+    res.json(result);
+  } catch (error) {
+    console.error('[微信支付] 创建订单失败:', error);
     res.json({ success: false, error: error.message });
   }
 });
