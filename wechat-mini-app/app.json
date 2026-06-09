@@ -9,6 +9,7 @@
     "pages/order/create/index",
     "pages/order/stores/index",
     "pages/order/delivery/index",
+    "pages/delivery/tracking/index",
     "pages/order/payment/index",
     "pages/order/success/index",
     "pages/services/list/index",

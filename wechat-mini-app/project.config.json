@@ -3,7 +3,7 @@
   "projectname": "dry-cleaning-pickup",
   "description": "干洗店取件微信小程序",
   "setting": {
-    "urlCheck": true,
+    "urlCheck": false,
     "es6": true,
     "enhance": true,
     "postcss": true,

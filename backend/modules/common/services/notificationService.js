@@ -63,6 +63,11 @@ const TEMPLATES = {
       title: '配送中',
       body: '您的衣物正在配送中，预计{estimatedTime}送达',
       channels: ['wechat', 'push']
+    },
+    order_cancelled: {
+      title: '订单已取消',
+      body: '您的清洗订单{orderNo}已取消，如有疑问请联系客服',
+      channels: ['wechat', 'sms']
     }
   },
   

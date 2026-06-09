@@ -245,6 +245,66 @@ class AuthService {
   }
 
   /**
+   * 通过账号（手机号/工号）查找门店员工
+   */
+  async findStaffByAccount(account) {
+    // 先通过手机号查找
+    let user = await User.findOne({ 
+      phone: account, 
+      roles: { $in: ['store_staff', 'store_owner'] },
+      status: 'active'
+    });
+    
+    // 再通过工号查找
+    if (!user) {
+      user = await User.findOne({ 
+        userNo: account, 
+        roles: { $in: ['store_staff', 'store_owner'] },
+        status: 'active'
+      });
+    }
+    
+    return user;
+  }
+
+  /**
+   * 验证员工密码
+   */
+  async verifyStaffPassword(user, password) {
+    if (!user.password) return false;
+    return bcrypt.compare(password, user.password);
+  }
+
+  /**
+   * 绑定微信openid到员工账户
+   */
+  async bindWechatToStaff(openid, staffUser) {
+    // 检查是否已有该openid的顾客账户
+    const existingCustomer = await User.findOne({ openid: openid });
+    
+    if (existingCustomer && existingCustomer._id.toString() !== staffUser._id.toString()) {
+      // 合并：将员工角色添加到顾客账户
+      if (!existingCustomer.roles.includes('store_staff') && !existingCustomer.roles.includes('store_owner')) {
+        existingCustomer.roles = [...existingCustomer.roles, ...(staffUser.roles.filter(r => r !== 'customer'))];
+      }
+      existingCustomer.storeId = staffUser.storeId;
+      if (!existingCustomer.openid) existingCustomer.openid = openid;
+      await existingCustomer.save();
+      
+      // 更新staffUser的openid引用
+      staffUser.openid = openid;
+      await staffUser.save();
+      return;
+    }
+    
+    // 直接绑定openid
+    if (!staffUser.openid) {
+      staffUser.openid = openid;
+      await staffUser.save();
+    }
+  }
+
+  /**
    * 获取门店员工列表
    */
   async getStoreStaff(storeId) {

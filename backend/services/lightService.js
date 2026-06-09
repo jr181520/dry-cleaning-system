@@ -40,20 +40,22 @@ class LightService {
           keepalive: MQTT_CONFIG.keepalive,
           reconnectPeriod: MQTT_CONFIG.reconnectPeriod,
           connectTimeout: MQTT_CONFIG.connectTimeout,
-          username: 'admin',  // 后端客户端使用 admin 账号
+          username: 'admin',
           password: 'admin123'
         });
+
+        let resolved = false;
 
         mqttClient.on('connect', () => {
           console.log('[MQTT] ✅ 成功连接到 Broker');
           this.setupSubscriptions();
-          resolve(true);
+          if (!resolved) { resolved = true; resolve(true); }
         });
 
         mqttClient.on('error', (error) => {
           console.error('[MQTT] ❌ 连接错误:', error.message);
-          console.error('[MQTT] 错误代码:', error.code);
-          reject(error);
+          // 首次连接失败才reject，后续重连错误不reject
+          if (!resolved) { resolved = true; reject(error); }
         });
 
         mqttClient.on('message', (topic, message) => {
@@ -62,6 +64,10 @@ class LightService {
 
         mqttClient.on('offline', () => {
           console.log('[MQTT] 连接离线');
+        });
+
+        mqttClient.on('reconnect', () => {
+          console.log('[MQTT] 正在尝试重连...');
         });
       } catch (error) {
         reject(error);
@@ -197,6 +203,31 @@ class LightService {
   isConnected() {
     return mqttClient && mqttClient.connected;
   }
+
+  /**
+   * 确保MQTT连接正常，如果未连接则尝试重连
+   * 由后端定期调用（每30秒），保证EMQX后启动也能恢复连接
+   */
+  ensureConnected() {
+    if (this.isConnected()) return;
+    console.log('[MQTT] 检测到连接断开，尝试重新连接...');
+    // 如果旧client存在但已断开，先清理
+    if (mqttClient) {
+      try { mqttClient.end(true); } catch (e) { /* ignore */ }
+      mqttClient = null;
+    }
+    this.connect().catch(err => {
+      console.log('[MQTT] 重连失败:', err.message, '，将在30秒后重试');
+    });
+  }
 }
+
+// 定期检查MQTT连接健康状态（每30秒）
+setInterval(() => {
+  const instance = module.exports;
+  if (instance && typeof instance.ensureConnected === 'function') {
+    instance.ensureConnected();
+  }
+}, 30000);
 
 module.exports = new LightService();

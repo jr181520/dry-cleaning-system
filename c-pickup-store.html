@@ -672,18 +672,10 @@
                 showToast('取件成功！订单已完成', 'success');
                 
             } catch (error) {
-                console.warn('API调用失败:', error);
-                // 即使API失败也更新本地状态
-                const orders = JSON.parse(localStorage.getItem('orders') || '[]');
-                const idx = orders.findIndex(o => o.orderId === orderId || o.id === orderId || o._id === orderId);
-                if (idx > -1) {
-                    orders[idx].status = 'completed';
-                    orders[idx].pickupConfirmed = true;
-                    orders[idx].completedAt = new Date().toISOString();
-                    localStorage.setItem('orders', JSON.stringify(orders));
-                }
-                showLampOn();
-                showToast('取件成功！订单已完成', 'success');
+                console.error('API调用失败:', error);
+                alert('取件确认失败，请稍后重试：' + (error.message || '网络错误'));
+                btn.disabled = false;
+                btn.innerHTML = '✅ 确认已取件';
             }
         }
 

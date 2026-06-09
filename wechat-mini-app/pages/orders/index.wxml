@@ -1,22 +1,30 @@
 <view class="container">
-  <!-- 订单状态Tab -->
-  <view class="order-tabs">
-    <view class="tab-item {{currentTab === 'all' ? 'active' : ''}}" bindtap="onSwitchTab" data-tab="all">
-      <text>全部</text>
+  <!-- 订单状态Tab（横向滚动） -->
+  <scroll-view class="order-tabs" scroll-x="true" enhanced="true" show-scrollbar="{{false}}">
+    <view class="tabs-wrapper">
+      <view class="tab-item {{currentTab === 'all' ? 'active' : ''}}" bindtap="onSwitchTab" data-tab="all">
+        <text>全部</text>
+      </view>
+      <view class="tab-item {{currentTab === 'pending' ? 'active' : ''}}" bindtap="onSwitchTab" data-tab="pending">
+        <text>待支付</text>
+      </view>
+      <view class="tab-item {{currentTab === 'paid' ? 'active' : ''}}" bindtap="onSwitchTab" data-tab="paid">
+        <text>已支付</text>
+      </view>
+      <view class="tab-item {{currentTab === 'received' ? 'active' : ''}}" bindtap="onSwitchTab" data-tab="received">
+        <text>已入库</text>
+      </view>
+      <view class="tab-item {{currentTab === 'processing' ? 'active' : ''}}" bindtap="onSwitchTab" data-tab="processing">
+        <text>处理中</text>
+      </view>
+      <view class="tab-item {{currentTab === 'ready' ? 'active' : ''}}" bindtap="onSwitchTab" data-tab="ready">
+        <text>待取件</text>
+      </view>
+      <view class="tab-item {{currentTab === 'completed' ? 'active' : ''}}" bindtap="onSwitchTab" data-tab="completed">
+        <text>已完成</text>
+      </view>
     </view>
-    <view class="tab-item {{currentTab === 'pending' ? 'active' : ''}}" bindtap="onSwitchTab" data-tab="pending">
-      <text>待处理</text>
-    </view>
-    <view class="tab-item {{currentTab === 'processing' ? 'active' : ''}}" bindtap="onSwitchTab" data-tab="processing">
-      <text>处理中</text>
-    </view>
-    <view class="tab-item {{currentTab === 'ready' ? 'active' : ''}}" bindtap="onSwitchTab" data-tab="ready">
-      <text>待取件</text>
-    </view>
-    <view class="tab-item {{currentTab === 'completed' ? 'active' : ''}}" bindtap="onSwitchTab" data-tab="completed">
-      <text>已完成</text>
-    </view>
-  </view>
+  </scroll-view>
 
   <!-- 订单列表 -->
   <view class="order-list" wx:if="{{orders.length > 0}}">
@@ -50,8 +58,12 @@
           <text>{{item.createdAt}}</text>
         </view>
         <view class="order-actions">
-          <button class="action-btn primary" wx:if="{{item.status === 'ready'}}" catchtap="onPickup" data-id="{{item.id}}">
-            立即取件
+          <!-- 待取件状态：门店自提 + 跑腿配送 -->
+          <button class="action-btn store-pickup-btn" wx:if="{{item.status === 'ready'}}" catchtap="onStorePickup" data-id="{{item.id}}">
+            🏪 门店自提
+          </button>
+          <button class="action-btn courier-btn" wx:if="{{item.status === 'ready'}}" catchtap="onCourierDelivery" data-id="{{item.id}}">
+            🚚 跑腿配送
           </button>
           <button class="action-btn" wx:if="{{item.status === 'completed'}}" catchtap="onRate" data-id="{{item.id}}">
             评价

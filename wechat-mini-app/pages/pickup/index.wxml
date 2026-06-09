@@ -1,6 +1,109 @@
 <view class="container">
-  <!-- 扫码提示区域 -->
-  <view class="scan-header">
+
+  <!-- ============================================ -->
+  <!-- 订单物品列表（门店自提入口 / 扫码验证后展示） -->
+  <!-- ============================================ -->
+  <view class="order-pickup-section" wx:if="{{pickupResult && pickupResult.status === 'success' && pickupResult.order && pickupResult.order.items && pickupResult.order.items.length > 0}}">
+    
+    <!-- 订单信息卡片 -->
+    <view class="order-info-card">
+      <view class="order-info-header">
+        <view class="order-no-row">
+          <text class="order-no-label">订单号</text>
+          <text class="order-no-value">{{pickupResult.order.orderNo}}</text>
+        </view>
+        <view class="order-customer-row">
+          <text class="customer-name">{{pickupResult.order.customerName}}</text>
+          <text class="customer-phone">{{pickupResult.order.customerPhone}}</text>
+        </view>
+        <view class="order-meta-row">
+          <text class="item-count-badge">{{pickupResult.order.itemCount}}件物品</text>
+          <text class="store-badge">{{pickupResult.order.location}}</text>
+          <text class="code-badge" wx:if="{{pickupResult.order.code}}">取件码: {{pickupResult.order.code}}</text>
+        </view>
+      </view>
+    </view>
+
+    <!-- 关键操作提示 -->
+    <view class="flow-guide-card">
+      <view class="flow-icon">💡</view>
+      <view class="flow-content">
+        <text class="flow-title">取件流程</text>
+        <view class="flow-steps">
+          <text class="flow-step">1. 点击"亮灯取件"或"一键点亮所有灯条"</text>
+          <text class="flow-step">2. 店员根据灯条提示寻灯拣货</text>
+          <text class="flow-step">3. 店员在M端操作出库</text>
+          <text class="flow-step">4. 全部出库后订单自动完成</text>
+        </view>
+      </view>
+    </view>
+
+    <!-- 一键点亮所有灯条按钮 -->
+    <view class="light-all-section">
+      <button class="light-all-btn {{allLit ? 'disabled' : ''}}" bindtap="onLightAllItems" disabled="{{allLit || allCheckedOut}}">
+        <text wx:if="{{allCheckedOut}}">✅ 所有物品已出库</text>
+        <text wx:elif="{{allLit}}">🟢 所有灯条已点亮</text>
+        <text wx:else>💡 一键点亮所有灯条 ({{pendingLightCount}}件)</text>
+      </button>
+    </view>
+
+    <!-- 物品列表 -->
+    <view class="items-section">
+      <view class="section-title-bar">
+        <text class="section-title">物品明细</text>
+        <text class="section-count">{{pickupResult.order.itemCount}}件</text>
+      </view>
+      
+      <view class="items-list">
+        <view class="item-card {{item.checkedOut ? 'checked-out' : ''}} {{item.lightOn ? 'light-on' : ''}}" wx:for="{{pickupResult.order.items}}" wx:key="index" wx:for-index="idx">
+          <view class="item-left">
+            <view class="item-index {{item.checkedOut ? 'done' : (item.lightOn ? 'lit' : '')}}">
+              <text wx:if="{{item.checkedOut}}">✓</text>
+              <text wx:else>{{idx + 1}}</text>
+            </view>
+            <view class="item-info">
+              <text class="item-name {{item.checkedOut ? 'line-through' : ''}}">{{item.name || ('物品' + (idx + 1))}}</text>
+              <text class="item-price" wx:if="{{item.price}}">¥{{item.price}} × {{item.quantity || 1}}</text>
+            </view>
+          </view>
+          <view class="item-right">
+            <!-- 已出库 -->
+            <text class="item-status done" wx:if="{{item.checkedOut}}">✓ 已出库</text>
+            <!-- 灯已亮，等待店员 -->
+            <text class="item-status waiting" wx:elif="{{item.lightOn}}">⏳ 等待店员...</text>
+            <!-- 点亮灯条按钮 -->
+            <button class="item-light-btn" wx:else bindtap="onLightItem" data-index="{{idx}}">💡 亮灯取件</button>
+          </view>
+        </view>
+      </view>
+    </view>
+
+    <!-- 灯条状态面板 -->
+    <view class="light-status-panel" wx:if="{{activeLightItems.length > 0}}">
+      <view class="section-title-bar">
+        <text class="section-title">🟢 已激活灯条</text>
+        <text class="section-count">{{activeLightItems.length}}个</text>
+      </view>
+      <view class="light-status-list">
+        <view class="light-status-item" wx:for="{{activeLightItems}}" wx:key="index">
+          <view class="light-dot pulsing"></view>
+          <text class="light-item-name">{{item.name || ('物品' + (item.index + 1))}}</text>
+          <text class="light-item-status">{{item.checkedOut ? '已出库' : '等待店员...'}}</text>
+        </view>
+      </view>
+    </view>
+
+    <!-- 底部操作 -->
+    <view class="bottom-actions">
+      <button class="back-btn" bindtap="onCancel">返回</button>
+      <button class="refresh-btn" bindtap="onRefreshStatus">🔄 刷新状态</button>
+    </view>
+  </view>
+
+  <!-- ============================================ -->
+  <!-- 扫码取件区域（walk-in 模式） -->
+  <!-- ============================================ -->
+  <view class="scan-header" wx:if="{{!pickupResult || pickupResult.status !== 'success'}}">
     <view class="scan-icon">
       <text class="iconfont icon-scan"></text>
     </view>
@@ -8,59 +111,22 @@
     <text class="scan-desc">将取件码对准扫描框即可完成取件</text>
   </view>
 
-  <!-- 扫码结果展示 -->
-  <view class="pickup-result" wx:if="{{pickupResult}}">
-    <view class="result-card {{pickupResult.status === 'success' ? 'success' : 'error'}}">
+  <!-- 取件验证结果（错误状态） -->
+  <view class="pickup-result" wx:if="{{pickupResult && pickupResult.status === 'error'}}">
+    <view class="result-card error">
       <view class="result-icon">
-        <text wx:if="{{pickupResult.status === 'success'}}" class="iconfont icon-check-circle"></text>
-        <text wx:else class="iconfont icon-close-circle"></text>
+        <text class="iconfont icon-close-circle"></text>
       </view>
       <text class="result-title">{{pickupResult.title}}</text>
       <text class="result-message">{{pickupResult.message}}</text>
-      
-      <!-- 订单详情 -->
-      <view class="order-detail" wx:if="{{pickupResult.order}}">
-        <view class="detail-row">
-          <text class="detail-label">订单编号</text>
-          <text class="detail-value">{{pickupResult.order.id}}</text>
-        </view>
-        <view class="detail-row">
-          <text class="detail-label">客户姓名</text>
-          <text class="detail-value">{{pickupResult.order.customerName}}</text>
-        </view>
-        <view class="detail-row">
-          <text class="detail-label">联系电话</text>
-          <text class="detail-value">{{pickupResult.order.customerPhone}}</text>
-        </view>
-        <view class="detail-row">
-          <text class="detail-label">物品数量</text>
-          <text class="detail-value">{{pickupResult.order.itemCount}}件</text>
-        </view>
-        <view class="detail-row">
-          <text class="detail-label">取件位置</text>
-          <text class="detail-value highlight">{{pickupResult.order.location}}</text>
-        </view>
-      </view>
-
-      <!-- 灯光提示 -->
-      <view class="light-indicator" wx:if="{{pickupResult.status === 'success'}}">
-        <view class="light-icon pulsing"></view>
-        <text>灯条已激活，请根据位置提示取件</text>
-      </view>
-
-      <!-- 操作按钮 -->
-      <view class="result-actions" wx:if="{{pickupResult.status === 'success'}}">
-        <button class="btn btn-primary" bindtap="onConfirmPickup">确认取件</button>
-        <button class="btn btn-outline" bindtap="onCancel">取消</button>
-      </view>
-      <view class="result-actions" wx:else>
+      <view class="result-actions">
         <button class="btn btn-primary" bindtap="onRetry">重新扫码</button>
       </view>
     </view>
   </view>
 
-  <!-- 输入取件码 -->
-  <view class="manual-input" wx:if="{{!pickupResult}}">
+  <!-- 手动输入区 -->
+  <view class="manual-input" wx:if="{{!pickupResult || pickupResult.status === 'error'}}">
     <view class="input-section">
       <text class="input-label">手动输入取件码</text>
       <input 
@@ -69,7 +135,7 @@
         placeholder="请输入取件码" 
         value="{{manualCode}}"
         bindinput="onManualInput"
-        maxlength="20"
+        maxlength="30"
       />
     </view>
 
@@ -89,27 +155,30 @@
     </button>
   </view>
 
+  <!-- ============================================ -->
   <!-- 待取件列表 -->
+  <!-- ============================================ -->
   <view class="pending-orders" wx:if="{{pendingOrders.length > 0}}">
     <view class="section-header">
       <text class="section-title">待取件</text>
-      <text class="section-more" bindtap="onBatchPickup" wx:if="{{pendingOrders.length > 1}}">一键全部取出</text>
     </view>
     <view class="order-list">
       <view class="order-item" wx:for="{{pendingOrders}}" wx:key="id">
         <view class="order-info">
-          <text class="order-code">取件码: {{item.code}}</text>
+          <text class="order-code">订单号: {{item.orderNo}}</text>
           <text class="order-name">客户: {{item.customerName}}</text>
-          <text class="order-items">物品: {{item.items.length}}件</text>
+          <text class="order-items">物品: {{item.itemCount}}件</text>
         </view>
         <view class="order-actions">
-          <button class="btn btn-sm btn-primary" bindtap="onQuickPickup" data-code="{{item.code}}">立即取件</button>
+          <button class="btn btn-sm btn-primary" bindtap="onQuickPickup" data-id="{{item.id}}" data-code="{{item.code}}">立即取件</button>
         </view>
       </view>
     </view>
   </view>
 
+  <!-- ============================================ -->
   <!-- 最近取件记录 -->
+  <!-- ============================================ -->
   <view class="recent-records" wx:if="{{recentRecords.length > 0}}">
     <view class="section-header">
       <text class="section-title">最近取件</text>
@@ -128,4 +197,5 @@
       </view>
     </view>
   </view>
+
 </view>

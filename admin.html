@@ -10,6 +10,11 @@
     <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
     <!-- SheetJS for Excel parsing -->
     <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+    <!-- MQTT.js for real-time events（异步加载，失败不影响页面） -->
+    <script src="https://unpkg.com/mqtt@5.3.0/dist/mqtt.min.js" async onload="window.__mqttLoaded=true" onerror="console.warn('[MQTT] mqtt.js 加载失败，实时事件将使用轮询模式')"></script>
+    <!-- API Config & Order Event Client -->
+    <script src="js/api-config.js"></script>
+    <script src="js/order-event-client.js"></script>
     <script>
         tailwind.config = {
             theme: {
@@ -3398,6 +3403,28 @@
                 renderPickupOrdersList();
                 loadFundManagementData();
             });
+
+            // 启动订单实时事件监听（MQTT WebSocket）
+            if (typeof OrderEventClient !== 'undefined') {
+                OrderEventClient.start({
+                    mode: 'admin',
+                    onOrderUpdate: (event) => {
+                        console.log('[Admin实时] 收到订单更新:', event.event, event.orderNo);
+                        // 刷新订单列表和仪表盘
+                        if (typeof renderPickupOrdersList === 'function') renderPickupOrdersList();
+                        if (typeof loadFundManagementData === 'function') loadFundManagementData();
+                        // 显示通知
+                        if (event.event === 'order_created') {
+                            if (typeof showToast === 'function') showToast('新订单', `订单 ${event.orderNo} 已创建`, 'info');
+                        } else if (event.event === 'order_paid') {
+                            if (typeof showToast === 'function') showToast('支付成功', `订单 ${event.orderNo} 已支付 ¥${event.totalAmount}`, 'success');
+                        }
+                    },
+                    onConnect: () => {
+                        console.log('[Admin实时] MQTT 已连接，实时同步已开启');
+                    }
+                });
+            }
             
             console.log('所有初始化完成');
         });
@@ -4627,10 +4654,15 @@
         window.openOrderDetail = function(orderId) {
             console.log('[订单详情] 尝试打开订单:', orderId);
             
+            // 从所有可能的来源查找订单（包括从服务器API加载的admin_orders）
             const storeOrders = JSON.parse(localStorage.getItem('store_orders') || '[]');
             const cOrders = JSON.parse(localStorage.getItem('orders') || '[]');
+            const adminOrders = JSON.parse(localStorage.getItem('admin_orders') || '[]');
+            const allOrders = JSON.parse(localStorage.getItem('all_orders') || '[]');
             
-            const order = [...storeOrders, ...cOrders].find(o => o.orderId === orderId);
+            const order = [...adminOrders, ...allOrders, ...storeOrders, ...cOrders].find(o => 
+                o.orderId === orderId || o.id === orderId || o._id === orderId || o.orderNo === orderId
+            );
             
             if (!order) {
                 console.error('[订单详情] 未找到订单:', orderId);

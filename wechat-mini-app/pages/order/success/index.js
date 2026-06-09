@@ -48,18 +48,22 @@ Page({
     try {
       // 调用后端API生成小程序码
       const res = await app.request('/mini-qr/generate', {
-        method: 'POST',
-        data: {
-          type: 'order_pay',
-          orderId: orderId,
-          storeId: orderData?.store?.id || '',
-          amount: orderData?.fees?.totalAmount || 0
-        }
-      });
+        type: 'order_pay',
+        orderId: orderId,
+        storeId: orderData?.store?.id || '',
+        amount: orderData?.fees?.totalAmount || 0
+      }, 'POST');
       
       if (res.success && res.data) {
+        // 开发模式返回SVG，正式模式返回PNG
+        let imageSrc;
+        if (res.data.isDevMode && res.data.contentType === 'image/svg+xml') {
+          imageSrc = `data:image/svg+xml;base64,${res.data.imageData}`;
+        } else {
+          imageSrc = `data:${res.data.contentType || 'image/png'};base64,${res.data.imageData}`;
+        }
         this.setData({
-          shareQRImage: `data:${res.data.contentType};base64,${res.data.imageData}`
+          shareQRImage: imageSrc
         });
       } else {
         console.log('[分享码] API返回失败，使用占位图');

@@ -62,15 +62,18 @@ Page({
       const userInfo = app.globalData.userInfo;
       const userId = userInfo?.openid || userInfo?.id || userInfo?.userId || '';
       
-      console.log('[订单列表] 用户ID:', userId, '用户信息:', userInfo);
+      console.log('[订单列表] 用户ID:', userId);
       
-      // 调用后端API获取订单列表，传递userId参数
-      const result = await app.request('/cleaning/orders', {
-        userId: userId,  // 关键：传递userId以获取该用户的订单
+      // 构建请求参数
+      const params = {
+        userId: userId,
         status: this.data.currentTab === 'all' ? '' : this.data.currentTab,
         page: refresh ? 1 : this.data.page,
         pageSize: this.data.pageSize
-      }, 'GET');
+      };
+      
+      // 调用后端API获取订单列表
+      const result = await app.request('/cleaning/orders', params, 'GET');
       
       if (result.success && result.data) {
         // API返回格式: {success: true, data: {list: [...]}} 或 {success: true, data: [...]}
@@ -133,13 +136,18 @@ Page({
     const statusMap = {
       'pending': '待支付',
       'paid': '已支付',
-      'delivering': '配送中',
+      'delivering': '取件配送中',
       'received': '已入库',
+      'cleaning': '清洗中',
+      'cleaned': '清洗完成',
       'processing': '处理中',
       'ready': '待取件',
-      'delivering_back': '配送中',
+      'delivering_back': '送回中',
       'completed': '已完成',
-      'cancelled': '已取消'
+      'cancelled': '已取消',
+      // C端/M端操作产生的中间态
+      'awaiting_pickup_scan': '等待扫码取件',
+      'awaiting_store_outbound': '等待出库'
     };
     return statusMap[status] || status || '未知';
   },
@@ -198,16 +206,26 @@ Page({
   // 查看订单详情
   onViewOrder(e) {
     const orderId = e.currentTarget.dataset.id;
+    console.log('[订单列表] 查看订单详情, orderId:', orderId);
     wx.navigateTo({
-      url: `/pages/orders/detail?id=${orderId}`
+      url: `/pages/order/detail/index?id=${orderId}`
     });
   },
 
-  // 立即取件
-  onPickup(e) {
+  // 门店自提 - 进入灯条管理窗口（pickup页是tabBar页，需用switchTab + globalData传参）
+  onStorePickup(e) {
+    const orderId = e.currentTarget.dataset.id;
+    app.globalData.pendingPickupOrderId = orderId;
+    wx.switchTab({
+      url: '/pages/pickup/index'
+    });
+  },
+
+  // 跑腿配送 - 进入配送跟踪窗口
+  onCourierDelivery(e) {
     const orderId = e.currentTarget.dataset.id;
     wx.navigateTo({
-      url: `/pages/pickup/index?orderId=${orderId}`
+      url: `/pages/delivery/tracking/index?orderId=${orderId}`
     });
   },
 
@@ -231,8 +249,10 @@ Page({
     }
   },
 
-  // 立即下单
+  // 立即下单 - 跳转到服务选择页面
   onCreateOrder() {
-    app.showToast('下单功能开发中', 'none');
+    wx.navigateTo({
+      url: '/pages/order/create/index'
+    });
   }
 });

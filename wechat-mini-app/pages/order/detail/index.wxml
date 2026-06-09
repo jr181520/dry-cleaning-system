@@ -36,6 +36,34 @@
     </view>
   </view>
 
+  <!-- 已入库专属卡片 -->
+  <view class="warehouse-section" wx:if="{{order.status === 'received'}}">
+    <view class="warehouse-header">
+      <view class="warehouse-icon">📦</view>
+      <view class="warehouse-title-section">
+        <view class="warehouse-title">衣物已入库</view>
+        <view class="warehouse-subtitle">门店已收件，等待处理中</view>
+      </view>
+    </view>
+    <view class="warehouse-info">
+      <view class="warehouse-info-row" wx:if="{{order.cleaning && order.cleaning.storeReceivedAt}}">
+        <text class="warehouse-label">📅 入库时间</text>
+        <text class="warehouse-value">{{formatTime(order.cleaning.storeReceivedAt)}}</text>
+      </view>
+      <view class="warehouse-info-row" wx:if="{{order.storeName}}">
+        <text class="warehouse-label">🏪 服务网点</text>
+        <text class="warehouse-value">{{order.storeName}}</text>
+      </view>
+      <view class="warehouse-info-row" wx:if="{{order.contactName}}">
+        <text class="warehouse-label">👤 联系人</text>
+        <text class="warehouse-value">{{order.contactName}}</text>
+      </view>
+    </view>
+    <view class="warehouse-status-badge">
+      <text>⏳ 等待门店分配处理</text>
+    </view>
+  </view>
+
   <!-- 配送员信息 -->
   <view class="driver-card" wx:if="{{order.delivery && (order.status === 'delivering' || order.status === 'delivering_back')}}">
     <view class="driver-avatar">
@@ -150,7 +178,7 @@
         </view>
         <view class="item-info">
           <view class="item-name">{{item.name}}</view>
-          <view class="item-desc">状态: {{item.status}}</view>
+          <view class="item-desc">状态: {{item.statusText}}</view>
         </view>
       </view>
     </view>
@@ -216,58 +244,214 @@
     </view>
   </view>
 
-  <!-- 底部操作栏 -->
-  <view class="bottom-bar">
-    <!-- 左侧按钮 -->
+  <!-- 待支付状态：内嵌支付面板 -->
+  <view class="pay-panel" wx:if="{{order.status === 'pending'}}">
+    <!-- 遮罩 -->
+    <view class="pay-panel-mask" bindtap="onClosePayPanel" wx:if="{{showPayPanel}}"></view>
+    
+    <!-- 支付面板内容 -->
+    <view class="pay-panel-inner">
+      <!-- 金额展示 -->
+      <view class="pay-amount-section">
+        <text class="pay-amount-label">应付金额</text>
+        <view class="pay-amount-row">
+          <text class="pay-amount-symbol">¥</text>
+          <text class="pay-amount-value">{{order.amounts.total || 0}}</text>
+        </view>
+      </view>
+      
+      <!-- 支付方式快捷选择 -->
+      <view class="pay-methods-quick">
+        <view class="pay-method-item {{selectedPayMethod === 'wechat' ? 'selected' : ''}}" 
+              data-method="wechat" bindtap="onSelectPayMethod">
+          <view class="pay-method-icon wechat-icon">💬</view>
+          <text class="pay-method-name">微信支付</text>
+          <view class="pay-method-check" wx:if="{{selectedPayMethod === 'wechat'}}">✓</view>
+        </view>
+        <view class="pay-method-item {{selectedPayMethod === 'balance' ? 'selected' : ''}}" 
+              data-method="balance" bindtap="onSelectPayMethod">
+          <view class="pay-method-icon balance-icon">💰</view>
+          <text class="pay-method-name">余额支付</text>
+          <view class="pay-method-check" wx:if="{{selectedPayMethod === 'balance'}}">✓</view>
+        </view>
+      </view>
+      
+      <!-- 更多支付方式（展开） -->
+      <view class="pay-methods-more" wx:if="{{showPayPanel}}">
+        <view class="pay-method-item {{selectedPayMethod === 'alipay' ? 'selected' : ''}}" 
+              data-method="alipay" bindtap="onSelectPayMethod">
+          <view class="pay-method-icon alipay-icon">💙</view>
+          <text class="pay-method-name">支付宝</text>
+          <view class="pay-method-check" wx:if="{{selectedPayMethod === 'alipay'}}">✓</view>
+        </view>
+        <view class="pay-method-item {{selectedPayMethod === 'unionpay' ? 'selected' : ''}}" 
+              data-method="unionpay" bindtap="onSelectPayMethod">
+          <view class="pay-method-icon unionpay-icon">💳</view>
+          <text class="pay-method-name">银行卡</text>
+          <view class="pay-method-check" wx:if="{{selectedPayMethod === 'unionpay'}}">✓</view>
+        </view>
+      </view>
+      
+      <!-- 展开/收起更多方式 -->
+      <view class="pay-toggle-more" bindtap="onTogglePayPanel">
+        <text>{{showPayPanel ? '收起' : '更多支付方式'}}</text>
+        <text class="toggle-arrow {{showPayPanel ? 'up' : 'down'}}">▼</text>
+      </view>
+      
+      <!-- 支付按钮 -->
+      <button class="pay-confirm-btn {{isPaying ? 'paying' : ''}}" bindtap="onConfirmPay">
+        {{isPaying ? '支付中...' : '确认支付 ¥' + (order.amounts.total || 0)}}
+      </button>
+    </view>
+  </view>
+
+  <!-- 非待支付状态的底部操作栏 -->
+  <view class="bottom-bar" wx:if="{{order.status !== 'pending'}}">
     <view class="bottom-bar-left">
       <button class="btn-action btn-outline" bindtap="onCallStore" wx:if="{{order.storePhone}}">
         联系门店
       </button>
-      
-      <!-- 待支付/已支付状态显示取消按钮 -->
       <button class="btn-action btn-danger btn-outline" 
               bindtap="onCancelOrder" 
-              wx:if="{{order.status === 'pending' || order.status === 'paid'}}">
+              wx:if="{{order.status === 'paid'}}">
         取消订单
       </button>
-      
-      <!-- 已完成/已取消状态显示再次下单按钮 -->
       <button class="btn-action btn-warning btn-outline" 
               bindtap="onReorder" 
               wx:if="{{order.status === 'completed' || order.status === 'cancelled'}}">
         再次下单
       </button>
     </view>
-    
-    <!-- 右侧主操作按钮 -->
     <view class="bottom-bar-right">
-      <!-- 待取件状态的主操作按钮 -->
+      <!-- 可取件状态 & 门店自提 → 扫码取件 -->
+      <button class="btn-action btn-scan" 
+              bindtap="onScanPickup" 
+              wx:if="{{showPickupMethod && selectedPickupMethod === 'store_pickup'}}">
+        📱 扫码取件
+      </button>
+      <!-- 可取件状态 & 配送到家 → 确认配送 -->
       <button class="btn-action btn-success" 
               bindtap="onHandleMainAction" 
-              wx:if="{{order.status === 'ready'}}">
-        {{selectedPickupMethod === 'home_delivery' ? '确认配送' : '确认取件'}}
+              wx:if="{{showPickupMethod && selectedPickupMethod === 'home_delivery'}}">
+        确认配送
       </button>
-      
-      <!-- 待支付状态 -->
-      <button class="btn-action btn-success" 
-              bindtap="onPay" 
-              wx:elif="{{order.status === 'pending'}}">
-        去支付
-      </button>
-      
-      <!-- 处理中/已入库状态 -->
-      <button class="btn-action btn-outline" 
-              bindtap="onRemind" 
-              wx:elif="{{order.status === 'processing' || order.status === 'received'}}">
+      <button class="btn-action btn-outline"
+              bindtap="onRemind"
+              wx:if="{{order.status === 'processing' || order.status === 'received' || order.status === 'cleaning' || order.status === 'cleaned'}}">
         催单
       </button>
-      
-      <!-- 已完成状态 -->
       <button class="btn-action btn-primary" 
               bindtap="onRate" 
-              wx:elif="{{order.status === 'completed'}}">
+              wx:if="{{order.status === 'completed'}}">
         去评价
       </button>
+    </view>
+  </view>
+
+  <!-- ============================================ -->
+  <!-- 灯条管理窗口（底部弹出面板） -->
+  <!-- ============================================ -->
+  <view class="light-panel-mask {{showLightPanel ? 'show' : ''}}" bindtap="onCloseLightPanel"></view>
+  <view class="light-panel {{showLightPanel ? 'show' : ''}}">
+    <!-- 顶部拖拽条 -->
+    <view class="light-panel-handle">
+      <view class="handle-bar"></view>
+    </view>
+
+    <!-- 标题栏 -->
+    <view class="light-panel-header">
+      <view class="light-panel-title">
+        <text>💡 扫码取件</text>
+        <text class="light-panel-subtitle">点亮衣架灯条，快速定位物品</text>
+      </view>
+      <view class="light-panel-close" bindtap="onCloseLightPanel">
+        <text>✕</text>
+      </view>
+    </view>
+
+    <!-- 流程提示 -->
+    <view class="light-flow-guide">
+      <view class="flow-step-item">
+        <view class="flow-step-num">1</view>
+        <text>点亮灯条</text>
+      </view>
+      <view class="flow-step-arrow">→</view>
+      <view class="flow-step-item">
+        <view class="flow-step-num">2</view>
+        <text>店员寻灯拣货</text>
+      </view>
+      <view class="flow-step-arrow">→</view>
+      <view class="flow-step-item">
+        <view class="flow-step-num">3</view>
+        <text>M端操作出库</text>
+      </view>
+      <view class="flow-step-arrow">→</view>
+      <view class="flow-step-item">
+        <view class="flow-step-num">4</view>
+        <text>取件完成</text>
+      </view>
+    </view>
+
+    <!-- 一键点亮所有灯条 -->
+    <view class="light-all-section">
+      <button class="light-all-btn {{allCheckedOut ? 'completed' : (allLit ? 'all-lit' : '')}}" 
+              bindtap="onLightUpAll" 
+              disabled="{{allLit || allCheckedOut}}">
+        <text wx:if="{{allCheckedOut}}">✅ 所有物品已出库</text>
+        <text wx:elif="{{allLit}}">🟢 所有灯条已点亮</text>
+        <text wx:else>💡 一键点亮所有灯条 ({{pendingLightCount}}件)</text>
+      </button>
+    </view>
+
+    <!-- 物品列表 -->
+    <scroll-view class="light-items-scroll" scroll-y enhanced show-scrollbar="{{false}}">
+      <view class="light-item-card {{item.checkedOut ? 'checked-out' : ''}} {{item.lightOn ? 'light-on' : ''}}" 
+            wx:for="{{lightItems}}" 
+            wx:key="index" 
+            wx:for-index="idx">
+        <view class="light-item-left">
+          <view class="light-item-index {{item.checkedOut ? 'done' : (item.lightOn ? 'lit' : '')}}">
+            <text wx:if="{{item.checkedOut}}">✓</text>
+            <text wx:else>{{idx + 1}}</text>
+          </view>
+          <view class="light-item-info">
+            <text class="light-item-name {{item.checkedOut ? 'done-text' : ''}}">{{item.name}}</text>
+            <text class="light-item-price" wx:if="{{item.price}}">¥{{item.price}} × {{item.quantity || 1}}</text>
+          </view>
+        </view>
+        <view class="light-item-right">
+          <!-- 已出库 -->
+          <text class="light-item-status done" wx:if="{{item.checkedOut}}">✓ 已出库</text>
+          <!-- 灯已亮 -->
+          <text class="light-item-status waiting" wx:elif="{{item.lightOn}}">
+            <view class="light-pulse-dot"></view>
+            等待店员...
+          </text>
+          <!-- 点亮按钮 -->
+          <button class="light-item-btn" wx:else bindtap="onLightUpItem" data-index="{{idx}}">
+            💡 亮灯取件
+          </button>
+        </view>
+      </view>
+    </scroll-view>
+
+    <!-- 已激活灯条面板 -->
+    <view class="light-active-panel" wx:if="{{activeLightItems.length > 0}}">
+      <view class="light-active-title">
+        <text>🟢 已激活灯条 ({{activeLightItems.length}}个)</text>
+        <text class="light-active-hint">店员正在处理...</text>
+      </view>
+      <view class="light-active-list">
+        <view class="light-active-item" wx:for="{{activeLightItems}}" wx:key="index">
+          <view class="pulsing-dot"></view>
+          <text>{{item.name}}</text>
+        </view>
+      </view>
+    </view>
+
+    <!-- 底部按钮 -->
+    <view class="light-panel-bottom">
+      <button class="light-cancel-btn" bindtap="onCloseLightPanel">关闭</button>
     </view>
   </view>
 </view>

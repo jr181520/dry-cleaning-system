@@ -13,8 +13,8 @@ const OrderSyncManager = {
     config: {
         // API基础地址 - 根据环境自动选择
         get apiBaseUrl() {
-            // 检查当前页面使用的端口
-            const currentPort = window.location.port;
+            // 检查当前页面使用的端口，默认3000（后端API端口）
+            const currentPort = window.location.port || '3000';
             return `http://localhost:${currentPort}/api`;
         },
         
@@ -105,8 +105,8 @@ const OrderSyncManager = {
                 const storeUser = JSON.parse(localStorage.getItem('storeUser') || '{}');
                 const myStoreId = currentStore.storeId || storeUser.storeId || 'ST002';
                 
-                // M端使用 /cleaning/orders?storeId=xxx 或获取所有订单后本地过滤
-                endpoint = '/cleaning/orders';
+                // M端使用门店订单API（直接按storeId过滤，无需客户端再过滤）
+                endpoint = `/cleaning/store/${myStoreId}/orders`;
                 const storeToken = localStorage.getItem('storeToken') || localStorage.getItem('authToken');
                 authHeader = storeToken ? `Bearer ${storeToken}` : '';
                 
@@ -272,11 +272,22 @@ const OrderSyncManager = {
         const statusMap = {
             'pending': 'pending',
             'paid': 'paid',
+            'received': 'received',
+            'cleaning': 'cleaning',
+            'cleaned': 'cleaned',
+            'ready': 'ready',
+            'delivering': 'delivering',
+            'delivering_back': 'delivering_back',
             'completed': 'completed',
             'cancelled': 'cancelled',
             'created': 'pending',
             'processing': 'processing',
-            'finished': 'completed'
+            'finished': 'completed',
+            'courier_waiting': 'ready',
+            'courier_picked_up': 'delivering',
+            'courier_delivering': 'delivering',
+            'customer_received': 'completed',
+            'customer_picked_up': 'completed'
         };
         return statusMap[status?.toLowerCase()] || status || 'pending';
     },

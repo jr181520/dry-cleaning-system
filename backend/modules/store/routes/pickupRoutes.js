@@ -503,6 +503,104 @@ router.post('/delivery/:deliveryId/complete', async (req, res) => {
 });
 
 // ============================================
+// 验证取件码
+// POST /api/store/pickup/verify
+// ============================================
+
+/**
+ * 验证取件码
+ * POST /api/store/pickup/verify
+ */
+router.post('/verify', async (req, res) => {
+  try {
+    const { code, orderId } = req.body;
+    const db = mongoose.connection.db;
+    
+    let order = null;
+    
+    // 优先用 orderId 查找
+    if (orderId) {
+      order = await db.collection('orders').findOne({ 
+        $or: [
+          { _id: mongoose.Types.ObjectId.isValid(orderId) ? new mongoose.Types.ObjectId(orderId) : null },
+          { id: orderId },
+          { orderNo: orderId }
+        ].filter(c => c._id !== null || c.id !== null)
+      });
+      // 如果 ObjectId 无效，只按 id 和 orderNo 查
+      if (!order) {
+        order = await db.collection('orders').findOne({ 
+          $or: [{ id: orderId }, { orderNo: orderId }]
+        });
+      }
+    }
+    
+    // 用取件码查找
+    if (!order && code) {
+      order = await db.collection('orders').findOne({ 
+        $or: [
+          { pickupCode: code },
+          { orderNo: code },
+          { id: code }
+        ]
+      });
+    }
+    
+    if (!order) {
+      return res.json({
+        success: false,
+        message: '未找到匹配的订单，请检查取件码是否正确'
+      });
+    }
+    
+    // 检查订单状态
+    const validStatuses = ['ready', 'in_progress', 'cleaned', 'paid'];
+    if (!validStatuses.includes(order.status)) {
+      return res.json({
+        success: false,
+        message: `订单当前状态为"${order.status}"，无法取件`
+      });
+    }
+    
+    // 查询灯条绑定状态
+    const binding = await LightBinding.findOne({ 
+      orderId: order.orderNo, 
+      status: 'active' 
+    });
+    
+    // 构建响应
+    const itemCount = order.items ? order.items.reduce((sum, item) => sum + (item.quantity || 1), 0) : 0;
+    
+    res.json({
+      success: true,
+      message: binding ? '取件码验证成功，灯条已激活' : '取件码验证成功',
+      data: {
+        _id: order._id,
+        id: order._id || order.id,
+        orderNo: order.orderNo,
+        storeId: order.storeId,
+        status: order.status,
+        items: order.items || [],
+        itemCount,
+        totalAmount: order.amounts?.total || 0,
+        contactName: order.contactName || '客户',
+        contactPhone: order.contactPhone || '',
+        pickupCode: order.pickupCode || order.orderNo,
+        lightBinding: binding ? {
+          bindingId: binding._id,
+          lightId: binding.lightId,
+          color: binding.color
+        } : null
+      }
+    });
+    
+  } catch (error) {
+    console.error('[取件] 验证取件码失败:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// ============================================
 // 店员确认取货（通用）
 // 不管哪种取件方式，都需要店员手动确认取货
 // ============================================

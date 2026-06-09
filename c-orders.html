@@ -1296,8 +1296,30 @@
                 return;
             }
             
-            if (confirm('确定要删除该订单记录吗？\n此操作不可恢复。')) {
-                // 从所有存储位置删除订单
+            if (confirm('确定要删除该订单记录吗？\n此操作将从所有设备上移除该记录。')) {
+                // 1. 先调用后端API进行软删除（关键：同步到小程序和其他端）
+                let serverDeleted = false;
+                try {
+                    const token = localStorage.getItem('userToken') || '';
+                    const response = await fetch(`http://localhost:3000/api/cleaning/orders/${orderId}/delete`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': token ? `Bearer ${token}` : ''
+                        }
+                    });
+                    const result = await response.json();
+                    if (result.success) {
+                        serverDeleted = true;
+                        console.log('[删除] 后端删除成功:', orderId);
+                    } else {
+                        console.warn('[删除] 后端删除返回失败:', result.error);
+                    }
+                } catch (error) {
+                    console.warn('[删除] 后端API调用失败，仅执行本地删除:', error.message);
+                }
+                
+                // 2. 从所有存储位置删除订单（本地清理）
                 const updatedOrders = orders.filter(o => 
                     o.orderId !== orderId && o.orderNo !== orderId && o.id !== orderId && o._id !== orderId
                 );
@@ -1307,7 +1329,7 @@
                 localStorage.setItem('orders', JSON.stringify(updatedOrders));
                 localStorage.setItem('store_orders', JSON.stringify(updatedStoreOrders));
                 
-                // 将删除的订单ID记录到本地，避免API重新加载
+                // 3. 将删除的订单ID记录到本地（兜底，防止同步模块重新拉回）
                 let deletedOrderIds = JSON.parse(localStorage.getItem('deleted_order_ids') || '[]');
                 const idsToTrack = [orderId, order.orderId, order.orderNo].filter(Boolean);
                 idsToTrack.forEach(id => {
@@ -1317,11 +1339,11 @@
                 });
                 localStorage.setItem('deleted_order_ids', JSON.stringify(deletedOrderIds));
                 
-                // 刷新订单列表
+                // 4. 刷新订单列表
                 loadOrders();
                 showToast('订单记录已删除', 'success');
                 
-                console.log('[删除] 订单已成功删除:', orderId);
+                console.log('[删除] 订单已成功删除:', orderId, serverDeleted ? '(已同步到服务器)' : '(仅本地)');
             }
         }
 
@@ -1386,7 +1408,9 @@
                         console.log('取件已确认:', result.data);
                     }
                 } catch (error) {
-                    console.warn('API调用失败，仅更新本地数据:', error);
+                    console.error('API调用失败:', error);
+                    alert('取件确认失败，请稍后重试：' + (error.message || '网络错误'));
+                    return;
                 }
                 
                 // 更新本地状态

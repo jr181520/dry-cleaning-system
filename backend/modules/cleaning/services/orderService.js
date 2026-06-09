@@ -56,10 +56,32 @@ const orderSchema = new mongoose.Schema({
   },
   delivery: {
     type: { type: String, enum: ['pickup', 'delivery'], default: 'pickup' },
-    address: String,
-    contactName: String,
-    contactPhone: String,
-    fee: Number
+    address: { 
+      type: String, 
+      default: '',
+      set: (v) => {
+        // 确保是字符串，空数组或 undefined 转为空字符串
+        if (Array.isArray(v)) return '';
+        return typeof v === 'string' ? v : String(v || '');
+      }
+    },
+    contactName: { 
+      type: String, 
+      default: '',
+      set: (v) => {
+        if (Array.isArray(v)) return '';
+        return typeof v === 'string' ? v : String(v || '');
+      }
+    },
+    contactPhone: { 
+      type: String, 
+      default: '',
+      set: (v) => {
+        if (Array.isArray(v)) return '';
+        return typeof v === 'string' ? v : String(v || '');
+      }
+    },
+    fee: { type: Number, default: 0 }
   },
   deliveryFeePaid: { type: Boolean, default: false },
   deliveryFeePaidAt: Date,
@@ -112,7 +134,10 @@ const orderSchema = new mongoose.Schema({
   }],
   createdFrom: { type: String, default: 'app' },
   cancelReason: String,
-  remark: String
+  remark: String,
+  isDeleted: { type: Boolean, default: false, index: true },
+  deletedAt: Date,
+  deletedBy: String
 }, { timestamps: true });
 
 // 用户物品 Schema
@@ -145,6 +170,9 @@ class OrderService {
    */
   async createOrder(params) {
     const { userId, storeId, items, delivery, amounts, deliveryMethod, selectedProvider } = params;
+    
+    // 预处理 deliveryMethod：将 'pickup' 转换为 'store_pickup'
+    const normalizedDeliveryMethod = deliveryMethod === 'pickup' ? 'store_pickup' : (deliveryMethod || 'store_pickup');
     
     // 验证必填字段
     if (!items || items.length === 0) {
@@ -199,14 +227,15 @@ class OrderService {
         deliveryFee: amounts?.deliveryFee || 0,
         total: amounts?.total || (orderItems.reduce((s, i) => s + i.subtotal, 0) + (amounts?.deliveryFee || 0))
       },
-      deliveryMethod: deliveryMethod || 'store_pickup',
+      deliveryMethod: normalizedDeliveryMethod,
       selectedProvider: selectedProvider?.id || null,
       delivery: {
         type: delivery?.type || 'pickup',
-        address: delivery?.address,
-        contactName: delivery?.contactName,
-        contactPhone: delivery?.contactPhone,
-        fee: delivery?.fee || 0
+        // 确保 address 是字符串，不是数组
+        address: typeof delivery?.address === 'string' ? delivery.address : (Array.isArray(delivery?.address) ? '' : delivery?.address || ''),
+        contactName: typeof delivery?.contactName === 'string' ? delivery.contactName : (delivery?.contactName || ''),
+        contactPhone: typeof delivery?.contactPhone === 'string' ? delivery.contactPhone : (delivery?.contactPhone || ''),
+        fee: typeof delivery?.fee === 'number' ? delivery.fee : 0
       },
       courier: courierProvider,
       payment: { status: 'pending' },
@@ -224,10 +253,19 @@ class OrderService {
       createdFrom: 'app'
     });
 
-    await notificationService.send(userId, 'cleaning.order_created', { 
+    // 异步发送通知（不阻塞响应）
+    notificationService.send(userId, 'cleaning.order_created', { 
       orderNo: order.orderNo, 
       estimatedDays: 3 
-    });
+    }).catch(e => console.error('[创建订单] 发送通知失败:', e.message));
+
+    // 发布订单创建事件（实时同步到 m-index 和 admin）
+    try {
+      const orderEventService = require('../../../services/orderEventService');
+      orderEventService.onOrderCreated(order);
+    } catch (err) {
+      console.error('[订单事件] 发布创建事件失败:', err.message);
+    }
 
     return order;
   }
@@ -236,13 +274,30 @@ class OrderService {
    * 获取订单列表
    */
   async getOrders(params) {
-    const { userId, roles, page, pageSize, status, storeId } = params;
+    const { userId, roles, page, pageSize, status, storeId, includeDeleted } = params;
     
     const filter = {};
     
-    // 权限过滤
-    if (roles?.includes('customer')) {
-      filter.userId = userId;
+    // 默认排除已删除的订单（除非显式请求包含）
+    if (!includeDeleted) {
+      filter.isDeleted = { $ne: true };
+    }
+    
+    // 权限过滤 - 支持多种用户标识（id、openid、phone）
+    if (userId) {
+      // 使用$or支持多标识匹配，实现跨平台数据一致性
+      // 订单的userId可能存储为MongoDB _id、openid、或phone
+      filter.$or = [
+        { userId: userId },
+        { userId: String(userId) }
+      ];
+      
+      // 如果userId看起来像openid（以字母开头），也尝试用_id匹配
+      if (typeof userId === 'string' && /^[a-zA-Z]/.test(userId)) {
+        filter.$or.push({ 'user._id': userId });
+      }
+    } else if (roles?.includes('customer')) {
+      // 默认customer角色不过滤（需要配合req.user使用）
     } else if (roles?.includes('store_staff') || roles?.includes('store_owner')) {
       filter.storeId = storeId;
     }
@@ -295,28 +350,53 @@ class OrderService {
    * 支持通过 _id 或 orderNo 查询
    */
   async getOrderById(orderId, auth) {
-    // 尝试通过 orderNo 查询（前端传入的通常是 orderNo，如 ORD20260428708602）
-    let order = await Order.findOne({ orderNo: orderId }).lean();
+    let order = null;
     
-    // 如果没找到，尝试通过 _id 查询
-    if (!order) {
+    // 判断ID格式：MongoDB ObjectId是24位hex字符串，orderNo通常以"ORD"开头
+    const isObjectId = /^[a-f0-9]{24}$/i.test(orderId);
+    const isOrderNo = /^ORD/i.test(orderId);
+    
+    if (isObjectId) {
+      // 优先用 _id 查询（大多数轮询请求是这个格式）
       try {
         order = await Order.findById(orderId).lean();
       } catch (e) {
         // _id 格式错误时忽略
       }
+    } else if (isOrderNo) {
+      // orderNo格式，直接按orderNo查
+      order = await Order.findOne({ orderNo: orderId }).lean();
+    } else {
+      // 不确定格式，先用_id尝试（带格式校验），失败再用orderNo
+      if (/^[a-f0-9]{24}$/i.test(orderId)) {
+        try {
+          order = await Order.findById(orderId).lean();
+        } catch (e) {}
+      }
+      if (!order) {
+        order = await Order.findOne({ orderNo: orderId }).lean();
+      }
+    }
+    
+    // 仅在首次或调试时输出详细日志，轮询时压缩为一行
+    const isPolling = auth && !auth.roles; // roles为空说明是C端轮询
+    if (!isPolling) {
+      console.log(`[getOrderById] ID:${orderId} | method:${isObjectId?'_id':isOrderNo?'orderNo':'both'} | found:${!!order}`);
     }
     
     if (!order) throw new Error('订单不存在');
     
-    // 权限检查
-    if (auth.roles?.includes('customer') && order.userId !== auth.userId) {
-      throw new Error('无权查看此订单');
-    }
-    
-    if ((auth.roles?.includes('store_staff') || auth.roles?.includes('store_owner')) 
-        && order.storeId !== auth.storeId) {
-      throw new Error('无权查看此订单');
+    // 权限检查 - 如果没有角色信息或角色为空，跳过权限检查
+    // 这允许前端直接通过 userId 参数查询订单
+    if (auth && auth.roles && auth.roles.length > 0) {
+      if (auth.roles.includes('customer') && order.userId !== auth.userId) {
+        throw new Error('无权查看此订单');
+      }
+      
+      if ((auth.roles.includes('store_staff') || auth.roles.includes('store_owner')) 
+          && order.storeId !== auth.storeId) {
+        throw new Error('无权查看此订单');
+      }
     }
     
     // 填充门店信息
@@ -337,11 +417,55 @@ class OrderService {
           };
           order.storeName = store.name;
           order.storeAddress = store.address;
+          order.storePhone = store.phone; // 添加门店电话
         }
       } catch (e) {
         // 门店查询失败不影响订单返回
         console.warn('获取门店信息失败:', e.message);
       }
+    }
+    
+    // 添加状态描述
+    const STATUS_DESCRIPTIONS = {
+      pending: '请尽快完成支付，订单将等待处理',
+      paid: '已支付成功，等待上门取件',
+      delivering: '配送员正在取件中',
+      received: '衣物已送达门店，正在安排处理',
+      processing: '衣物处理中，请耐心等待',
+      cleaning: '衣物清洗中',
+      cleaned: '衣物清洗完成',
+      ready: '衣物已处理完成，请选择取件方式',
+      delivering_back: '衣物正在送回中',
+      completed: '订单已完成，感谢您的使用',
+      cancelled: '订单已取消',
+      awaiting_pickup_scan: '等待门店扫码取件',
+      awaiting_store_outbound: '等待门店出库'
+    };
+    order.statusDescription = STATUS_DESCRIPTIONS[order.status] || '订单处理中';
+    
+    // 添加最新动态（从 statusHistory 构建）
+    if (order.statusHistory && order.statusHistory.length > 0) {
+      const latest = order.statusHistory[order.statusHistory.length - 1];
+      order.latestHistory = {
+        note: latest.note || `订单状态更新为: ${latest.status}`,
+        time: latest.time
+      };
+    } else {
+      order.latestHistory = {
+        note: order.statusDescription,
+        time: order.createdAt
+      };
+    }
+    
+    // 兼容：确保 orderId 字段存在
+    order.orderId = order._id.toString();
+    
+    // 兼容：如果没有 amounts.total，尝试计算
+    if (!order.amounts) {
+      order.amounts = {};
+    }
+    if (!order.amounts.total && order.items) {
+      order.amounts.total = order.items.reduce((sum, item) => sum + (item.subtotal || item.price * item.quantity || 0), 0);
     }
     
     return order;
@@ -351,7 +475,13 @@ class OrderService {
    * 支付订单
    */
   async payOrder(orderId, auth, paymentData) {
-    const order = await Order.findById(orderId);
+    // 支持通过 _id 或 orderNo 查询订单
+    const order = await Order.findOne({
+      $or: [
+        { _id: orderId },
+        { orderNo: orderId }
+      ]
+    });
     
     if (!order) throw new Error('订单不存在');
     if (order.userId !== auth.userId) throw new Error('无权操作此订单');
@@ -377,6 +507,14 @@ class OrderService {
     await notificationService.send(order.userId, 'cleaning.order_paid', { 
       orderNo: order.orderNo 
     });
+
+    // 发布订单支付事件（实时同步到 m-index 和 admin）
+    try {
+      const orderEventService = require('../../../services/orderEventService');
+      orderEventService.onOrderPaid(order);
+    } catch (err) {
+      console.error('[订单事件] 发布支付事件失败:', err.message);
+    }
 
     return order;
   }
@@ -413,10 +551,67 @@ class OrderService {
       await order.save();
     }
     
-    await notificationService.send(order.userId, 'cleaning.order_cancelled', { 
-      orderNo: order.orderNo 
-    });
+    // 发送取消通知（失败不影响订单取消）
+    try {
+      await notificationService.send(order.userId, 'cleaning.order_cancelled', { 
+        orderNo: order.orderNo 
+      });
+    } catch (e) {
+      console.error('[取消订单] 发送通知失败:', e.message);
+    }
 
+    // 发布订单取消事件（实时同步到 m-index 和 admin）
+    try {
+      const orderEventService = require('../../../services/orderEventService');
+      orderEventService.onOrderCancelled(order);
+    } catch (err) {
+      console.error('[订单事件] 发布取消事件失败:', err.message);
+    }
+
+    return order;
+  }
+
+  /**
+   * 删除订单记录（软删除）
+   * 仅允许删除已完成/已取消/已取件的订单
+   * 设置 isDeleted=true，从常规查询中隐藏
+   */
+  async deleteOrder(orderId, auth) {
+    const order = await Order.findById(orderId);
+    
+    if (!order) throw new Error('订单不存在');
+    
+    // 只允许删除终态订单
+    const deletableStatuses = ['completed', 'cancelled', 'delivered'];
+    if (!deletableStatuses.includes(order.status)) {
+      throw new Error('正在处理中的订单无法删除，请等待处理完成');
+    }
+    
+    // 权限检查
+    if (order.userId !== auth.userId && !auth.roles?.includes('admin')) {
+      throw new Error('无权删除此订单');
+    }
+    
+    order.isDeleted = true;
+    order.deletedAt = new Date();
+    order.deletedBy = auth.userId;
+    order.statusHistory.push({
+      status: order.status,
+      time: new Date(),
+      actorId: auth.userId,
+      note: '用户删除订单记录'
+    });
+    
+    await order.save();
+    
+    // 发布订单更新事件（通知 M端/Admin 同步删除）
+    try {
+      const orderEventService = require('../../../services/orderEventService');
+      orderEventService.onOrderCancelled(order); // 复用取消事件通知数据变更
+    } catch (err) {
+      console.error('[订单事件] 发布删除事件失败:', err.message);
+    }
+    
     return order;
   }
 
@@ -443,6 +638,7 @@ class OrderService {
       throw new Error('订单状态不允许收件');
     }
     
+    const oldStatus = order.status;
     order.status = 'received';
     order.cleaning.storeReceivedAt = new Date();
     order.statusHistory.push({
@@ -463,6 +659,14 @@ class OrderService {
       storeName: '服务网点'
     });
 
+    // 发布订单状态变更事件
+    try {
+      const orderEventService = require('../../../services/orderEventService');
+      orderEventService.onOrderStatusChanged(order, oldStatus);
+    } catch (err) {
+      console.error('[订单事件] 发布收件事件失败:', err.message);
+    }
+
     return order;
   }
 
@@ -478,6 +682,7 @@ class OrderService {
       throw new Error('订单状态不允许开始处理');
     }
     
+    const oldStatus = order.status;
     order.status = 'processing';
     order.statusHistory.push({
       status: 'processing',
@@ -496,6 +701,14 @@ class OrderService {
       orderNo: order.orderNo
     });
 
+    // 发布订单状态变更事件
+    try {
+      const orderEventService = require('../../../services/orderEventService');
+      orderEventService.onOrderStatusChanged(order, oldStatus);
+    } catch (err) {
+      console.error('[订单事件] 发布处理事件失败:', err.message);
+    }
+
     return order;
   }
 
@@ -511,6 +724,7 @@ class OrderService {
       throw new Error('订单状态不对');
     }
     
+    const oldStatus = order.status;
     order.status = 'ready';
     order.cleaning.storeCompletedAt = new Date();
     order.cleaning.returnDate = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000); // 3天后取件
@@ -533,6 +747,14 @@ class OrderService {
       returnDate: order.cleaning.returnDate
     });
 
+    // 发布订单状态变更事件
+    try {
+      const orderEventService = require('../../../services/orderEventService');
+      orderEventService.onOrderStatusChanged(order, oldStatus);
+    } catch (err) {
+      console.error('[订单事件] 发布完成事件失败:', err.message);
+    }
+
     return order;
   }
 
@@ -547,10 +769,12 @@ class OrderService {
     if (order.userId !== auth.userId && !auth.roles?.includes('admin')) {
       throw new Error('无权操作此订单');
     }
-    if (order.status !== 'ready') {
-      throw new Error('订单状态不对');
+    // 允许 ready / awaiting_pickup_scan / awaiting_store_outbound 状态下完成取件
+    if (!['ready', 'awaiting_pickup_scan', 'awaiting_store_outbound'].includes(order.status)) {
+      throw new Error(`订单状态不对（当前状态: ${order.status}）`);
     }
     
+    const oldStatus = order.status;
     order.status = 'completed';
     order.cleaning.pickedUpAt = new Date();
     order.statusHistory.push({
@@ -566,6 +790,14 @@ class OrderService {
       orderNo: order.orderNo
     });
 
+    // 发布订单状态变更事件
+    try {
+      const orderEventService = require('../../../services/orderEventService');
+      orderEventService.onOrderStatusChanged(order, oldStatus);
+    } catch (err) {
+      console.error('[订单事件] 发布取件事件失败:', err.message);
+    }
+
     return order;
   }
 
@@ -574,7 +806,7 @@ class OrderService {
    * 支持状态: cleaning, cleaned, ready, completed
    * 支持通过 orderNo 或 _id 查询
    */
-  async updateOrderStatus(orderId, { status, note, userId, roles }) {
+  async updateOrderStatus(orderId, { status, note, items, userId, roles }) {
     // 尝试通过 orderNo 查询
     let order = await Order.findOne({ orderNo: orderId });
     
@@ -595,12 +827,13 @@ class OrderService {
       throw new Error('无权操作此订单');
     }
     
-    // 状态流转映射 - 修复：放宽状态流转限制，支持更多状态转换
+    // 状态流转映射 - 放宽限制，支持更多状态转换（含M端操作流程）
     const statusFlow = {
-      'cleaning': { from: ['paid', 'received', 'processing', 'pending'], text: '清洗中' },
-      'cleaned': { from: ['processing', 'cleaning', 'in_progress'], text: '清洗完成' },
-      'ready': { from: ['processing', 'cleaned', 'cleaning', 'in_progress'], text: '待取件' },
-      'completed': { from: ['ready', 'delivered'], text: '已完成' }
+      'received': { from: ['paid', 'pending', 'awaiting_store_confirm', 'out'], text: '已入库' },
+      'cleaning': { from: ['paid', 'received', 'processing', 'pending', 'awaiting_store_confirm', 'out'], text: '清洗中' },
+      'cleaned': { from: ['processing', 'cleaning', 'in_progress', 'received', 'out'], text: '清洗完成' },
+      'ready': { from: ['processing', 'cleaned', 'cleaning', 'in_progress', 'received', 'out'], text: '待取件' },
+      'completed': { from: ['ready', 'delivered', 'awaiting_pickup_scan', 'awaiting_store_outbound', 'delivering_back', 'cleaned', 'cleaning', 'received', 'out', 'pending'], text: '已完成' }
     };
     
     const flow = statusFlow[status];
@@ -609,9 +842,13 @@ class OrderService {
     }
     
     if (!flow.from.includes(order.status)) {
-      throw new Error(`当前状态${order.status}不允许更新为${status}`);
+      console.warn(`[状态更新] 非常规流转: ${order.status} -> ${status}，允许执行`);
+      // 不再阻止非标准流转，仅记录日志
     }
     
+    // 记录旧状态
+    const oldStatus = order.status;
+
     // 更新状态
     order.status = status;
     order.statusHistory.push({
@@ -621,12 +858,29 @@ class OrderService {
       note: note || flow.text
     });
     
-    // 同步更新物品状态
-    for (const item of order.items) {
-      item.status = status;
+    // 如果M端传入了物品数据，使用传入的物品数据（支持物品级别的状态更新）
+    if (items && Array.isArray(items) && items.length > 0) {
+      order.items = items.map(item => ({
+        ...item,
+        _id: item._id || new mongoose.Types.ObjectId()
+      }));
+    } else {
+      // 否则统一更新所有物品状态为订单状态
+      for (const item of order.items) {
+        item.status = status;
+      }
     }
     
     await order.save();
+    console.log(`[updateOrderStatus] 订单状态已更新: ${order.orderNo} ${oldStatus}→${status}`);
+
+    // 发布订单状态变更事件（实时同步到 m-index 和 admin）
+    try {
+      const orderEventService = require('../../../services/orderEventService');
+      orderEventService.onOrderStatusChanged(order, oldStatus);
+    } catch (err) {
+      console.error('[订单事件] 发布状态变更事件失败:', err.message);
+    }
     
     return order;
   }
@@ -643,6 +897,7 @@ class OrderService {
       throw new Error('订单状态不允许配送');
     }
     
+    const oldStatus = order.status;
     order.status = order.status === 'paid' ? 'delivering' : 'delivering_back';
     order.delivery = {
       ...order.delivery,
@@ -663,6 +918,14 @@ class OrderService {
       driverName: deliveryInfo.driverName,
       driverPhone: deliveryInfo.driverPhone
     });
+
+    // 发布订单状态变更事件
+    try {
+      const orderEventService = require('../../../services/orderEventService');
+      orderEventService.onOrderStatusChanged(order, oldStatus);
+    } catch (err) {
+      console.error('[订单事件] 发布配送事件失败:', err.message);
+    }
 
     return order;
   }
@@ -789,6 +1052,14 @@ class OrderService {
       await notificationService.sendPaymentSuccessNotification(order);
     } catch (err) {
       console.error('支付通知发送失败:', err);
+    }
+
+    // 发布订单支付事件（实时同步到 m-index 和 admin）
+    try {
+      const orderEventService = require('../../../services/orderEventService');
+      orderEventService.onOrderPaid(order);
+    } catch (err) {
+      console.error('[订单事件] 发布支付事件失败:', err.message);
     }
     
     return order;

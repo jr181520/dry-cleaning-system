@@ -24,6 +24,9 @@ App({
     if (options.query && options.query.code) {
       this.globalData.pendingPickupCode = options.query.code;
     }
+    
+    // 每次回到前台时同步订单数据（实现跨平台数据同步）
+    this.syncOrders();
   },
   
   // 处理扫码进入
@@ -145,7 +148,6 @@ App({
   // 更新TabBar
   updateTabBar() {
     const modules = this.globalData.enabledModules || [];
-    const roles = this.globalData.userInfo?.roles || ['customer'];
     
     let tabList = [
       { pagePath: 'pages/index/index', text: '首页' },
@@ -156,9 +158,6 @@ App({
       tabList.push({ pagePath: 'pages/services/list/index', text: '服务' });
     }
     
-    if (roles.includes('store_staff') || roles.includes('store_owner')) {
-      tabList.push({ pagePath: 'pages/store/index', text: '管理' });
-    }
     
     tabList.push({ pagePath: 'pages/profile/index', text: '我的' });
     
@@ -201,10 +200,10 @@ App({
     currentOrder: null,    // 当前订单（用于支付页面）
     orders: [],           // 订单列表
     // API配置
-    apiBaseUrl: 'http://192.168.1.8:3000/api',
+    apiBaseUrl: 'http://192.168.10.7:3000/api',
     // 聚合配送API配置
     deliveryApi: {
-      baseUrl: 'http://192.168.1.8:3001/api',
+      baseUrl: 'http://192.168.10.7:3001/api',
       providers: ['meituan', 'dada', 'shunfeng']
     },
     // 模块配置（动态菜单）
@@ -214,33 +213,124 @@ App({
   
   // 登录
   login() {
+    // 先检查是否已有登录信息
+    const savedUserInfo = wx.getStorageSync('userInfo');
+    const savedToken = wx.getStorageSync('token');
+    
+    if (savedUserInfo && savedUserInfo.openid) {
+      this.globalData.userInfo = savedUserInfo;
+      this.globalData.token = savedToken;
+      this.globalData.isLoggedIn = true;
+      console.log('[登录] 从缓存恢复登录状态，openid:', savedUserInfo.openid);
+      return;
+    }
+    
     wx.login({
       success: res => {
         if (res.code) {
-          console.log('微信登录成功，code:', res.code);
+          console.log('[登录] 微信登录成功，code:', res.code);
           // 发送 code 到后端获取 openid 并登录
           this.request('/auth/wxmini-login', {
             code: res.code
           }, 'POST').then(data => {
             if (data.openid) {
-              this.globalData.userInfo = {
+              const userInfo = {
                 openid: data.openid,
                 sessionKey: data.session_key,
                 ...data.user
               };
+              this.globalData.userInfo = userInfo;
               this.globalData.token = data.token;
               this.globalData.isLoggedIn = true;
-              console.log('登录完成，openid:', data.openid);
+              
+              // 保存到本地存储
+              wx.setStorageSync('userInfo', userInfo);
+              wx.setStorageSync('token', data.token);
+              
+              console.log('[登录] 完成，openid:', data.openid);
+            } else {
+              console.warn('[登录] 后端未返回openid，使用模拟登录');
+              this.mockLogin();
             }
           }).catch(err => {
-            console.error('登录失败:', err);
+            console.error('[登录] 请求失败:', err);
+            // 使用模拟登录作为后备
+            this.mockLogin();
           });
         }
       },
       fail: err => {
-        console.error('wx.login失败', err);
+        console.error('[登录] wx.login失败:', err);
+        // 使用模拟登录作为后备
+        this.mockLogin();
       }
     });
+  },
+  
+  // 模拟登录（用于开发测试）
+  mockLogin() {
+    const mockOpenid = 'oMini_' + Date.now();
+    const mockUserInfo = {
+      openid: mockOpenid,
+      nickname: '测试用户',
+      sessionKey: 'mock_session',
+      ...wx.getStorageSync('userInfo') || {}
+    };
+    
+    this.globalData.userInfo = mockUserInfo;
+    this.globalData.token = 'mock_token_' + mockOpenid;
+    this.globalData.isLoggedIn = true;
+    
+    // 保存到本地存储
+    wx.setStorageSync('userInfo', mockUserInfo);
+    wx.setStorageSync('token', this.globalData.token);
+    
+    console.log('[登录] 模拟登录完成，openid:', mockOpenid);
+  },
+  
+  // 同步订单数据（从后端获取最新订单，支持跨平台数据一致性）
+  async syncOrders() {
+    if (!this.globalData.isLoggedIn) {
+      console.log('[同步] 未登录，跳过订单同步');
+      return;
+    }
+    
+    try {
+      const userInfo = this.globalData.userInfo || {};
+      const userId = userInfo.id || userInfo.openid || userInfo._id;
+      
+      if (!userId) {
+        console.log('[同步] 无用户标识，跳过同步');
+        return;
+      }
+      
+      console.log('[同步] 开始同步订单，userId:', userId);
+      
+      const data = await this.request(`/cleaning/orders?userId=${encodeURIComponent(userId)}`, {}, 'GET');
+      
+      if (data && data.list) {
+        this.globalData.orders = data.list;
+        console.log(`[同步] 获取到 ${data.list.length} 条订单`);
+        
+        // 通知当前页面刷新
+        if (this.syncCallback) {
+          this.syncCallback(data.list);
+        }
+      } else if (Array.isArray(data)) {
+        this.globalData.orders = data;
+        console.log(`[同步] 获取到 ${data.length} 条订单`);
+        if (this.syncCallback) {
+          this.syncCallback(data);
+        }
+      }
+    } catch (error) {
+      console.warn('[同步] 订单同步失败:', error.message || error);
+    }
+  },
+  
+  // 监听同步完成（供页面注册回调）
+  onOrdersSynced(callback) {
+    this.syncCallback = callback;
   },
   
   // 封装请求方法
@@ -253,21 +343,32 @@ App({
         url: fullUrl,
         data: data,
         method: method,
+        timeout: 15000, // 15秒超时
         header: {
           'content-type': 'application/json',
           'Authorization': this.globalData.token ? `Bearer ${this.globalData.token}` : ''
         },
         success: res => {
-          console.log('[API响应]', url, 'status:', res.statusCode, 'data:', JSON.stringify(res.data).substring(0, 200));
+          console.log('[API响应]', url, 'status:', res.statusCode, 'data:', JSON.stringify(res.data || {}).substring(0, 200));
           if (res.statusCode === 200) {
             resolve(res.data);
+          } else if (res.statusCode === 401) {
+            // Token过期，重新登录
+            console.warn('[API] Token过期，清除登录状态');
+            wx.removeStorageSync('userInfo');
+            wx.removeStorageSync('token');
+            reject({ success: false, error: '登录已过期，请重新打开小程序' });
           } else {
-            reject(res.data);
+            reject(res.data || { success: false, error: '请求失败' });
           }
         },
         fail: err => {
           console.error('[API请求失败]', url, err);
-          reject({ success: false, error: '网络请求失败' });
+          if (err.errMsg && err.errMsg.includes('timeout')) {
+            reject({ success: false, error: '请求超时，请检查网络' });
+          } else {
+            reject({ success: false, error: '网络请求失败' });
+          }
         }
       });
     });

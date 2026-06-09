@@ -225,6 +225,16 @@ checkbox .wx-checkbox-input {
   color: #1f2937;
 }
 
+.store-id-badge {
+  font-size: 20rpx;
+  color: #1e40af;
+  background: #eff6ff;
+  padding: 4rpx 12rpx;
+  border-radius: 8rpx;
+  font-weight: 600;
+  margin-left: 8rpx;
+}
+
 .store-status {
   display: flex;
   align-items: center;

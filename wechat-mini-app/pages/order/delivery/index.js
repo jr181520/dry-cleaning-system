@@ -50,18 +50,27 @@ Page({
   },
 
   onLoad() {
+    console.log('[配送页面] 全局数据检查:');
+    console.log('[配送页面] - selectedStore:', app.globalData.selectedStore);
+    console.log('[配送页面] - selectedServices:', app.globalData.selectedServices);
+    console.log('[配送页面] - serviceTotalPrice:', app.globalData.serviceTotalPrice);
+    
     // 获取全局数据
     const selectedStore = app.globalData.selectedStore;
     const selectedServices = app.globalData.selectedServices;
     const serviceTotalPrice = app.globalData.serviceTotalPrice;
     
     if (!selectedServices || selectedServices.length === 0) {
+      console.error('[配送页面] 错误: 服务数据为空!');
       app.showToast('请先选择服务', 'none');
       setTimeout(() => {
         wx.navigateBack();
       }, 1500);
       return;
     }
+    
+    console.log('[配送页面] 接收到的服务数据:', selectedServices);
+    console.log('[配送页面] 接收到的门店数据:', selectedStore);
     
     this.setData({
       selectedStore: selectedStore, // 可能是 null
@@ -151,10 +160,10 @@ Page({
         ? this.data.selectedStore.address 
         : '系统自动分配最近门店';
       
-      // 模拟调用聚合跑腿API
-      const result = await app.delivery.queryProviders({
+      // 调用配送服务商查询（使用聚合跑腿API）
+      const result = await app.queryProviders({
         pickupAddress: pickupAddress,
-        userAddress: this.data.userAddress
+        dropoffAddress: this.data.userAddress
       });
       
       if (result.success) {
@@ -316,11 +325,17 @@ Page({
     });
     
     // 保存订单数据到全局
+    // 将前端的 'pickup' 转换为后端期望的 'store_pickup'
+    const deliveryMethodMap = {
+      'pickup': 'store_pickup',
+      'courier': 'courier'
+    };
+    
     const orderData = {
       store: this.data.selectedStore, // 可能是 null（系统自动分配）
       storeAutoAssigned: !this.data.selectedStore, // 标记是否自动分配门店
       services: this.data.selectedServices,
-      deliveryMethod: this.data.selectedDeliveryMethod,
+      deliveryMethod: deliveryMethodMap[this.data.selectedDeliveryMethod] || 'store_pickup',
       provider: this.data.selectedProvider,
       time: {
         id: this.data.selectedTime,

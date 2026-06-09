@@ -276,7 +276,40 @@ app.get('/api/orders/pending', async (req, res) => {
 app.post('/api/payment/wechat/unified', async (req, res) => {
   try {
     const { orderId, amount, openid, subject } = req.body;
-    const wechatPay = require('./api/payment-server/wechat-pay');
+    
+    // 检查是否配置了微信支付
+    const config = require('../api/payment-server/config');
+    const isWechatPayConfigured = config.wechat.miniapp.mchId && config.wechat.miniapp.apiKey;
+    
+    // 如果未配置微信支付，使用模拟支付
+    if (!isWechatPayConfigured || process.env.USE_MOCK_PAYMENT === 'true') {
+      console.log('[模拟支付] 微信支付未配置，使用模拟支付');
+      
+      // 更新订单状态为已支付
+      try {
+        const orderService = require('./modules/cleaning/services/orderService');
+        const mockTransactionId = 'MOCK_' + Date.now();
+        await orderService.payOrder(orderId, { userId: openid }, {
+          method: 'mock_wechat',
+          transactionId: mockTransactionId
+        });
+        console.log('[模拟支付] 订单支付成功:', orderId);
+      } catch (e) {
+        console.error('[模拟支付] 更新订单状态失败:', e.message);
+      }
+      
+      return res.json({
+        success: true,
+        mock: true,
+        data: {
+          orderId,
+          mockPayment: true,
+          message: '模拟支付成功（开发环境）'
+        }
+      });
+    }
+    
+    const wechatPay = require('../api/payment-server/wechat-pay');
     const result = await wechatPay.createOrder({
       orderId,
       amount,
@@ -352,6 +385,17 @@ ${Object.entries(require('./config/modules').modules)
       `);
     });
     
+    // 注册 server error 事件处理器，防止端口冲突等异常直接崩溃进程
+    server.on('error', (err) => {
+      if (err.code === 'EADDRINUSE') {
+        console.error(`[启动] ❌ 端口 ${PORT} 已被占用，请先关闭占用该端口的进程`);
+        console.error(`[启动] 使用命令查看: netstat -ano | findstr :${PORT}`);
+      } else {
+        console.error('[启动] ❌ 服务器错误:', err.message);
+      }
+      process.exit(1);
+    });
+    
     // 优雅关闭
     const shutdown = async (signal) => {
       console.log(`\n[${signal}] 正在关闭服务...`);
@@ -364,6 +408,20 @@ ${Object.entries(require('./config/modules').modules)
     
     process.on('SIGTERM', () => shutdown('SIGTERM'));
     process.on('SIGINT', () => shutdown('SIGINT'));
+    
+    // 全局未捕获异常处理器，防止未预料的异常直接崩溃
+    process.on('uncaughtException', (err) => {
+      console.error('[进程] 未捕获异常:', err.message);
+      console.error(err.stack);
+      // 严重错误，优雅退出
+      try { server.close(); } catch (e) {}
+      process.exit(1);
+    });
+    
+    process.on('unhandledRejection', (reason, promise) => {
+      console.error('[进程] 未处理的Promise拒绝:', reason?.message || reason);
+      // 不退出进程，只记录日志，保持服务运行
+    });
     
   } catch (error) {
     console.error('[启动] 服务启动失败:', error);

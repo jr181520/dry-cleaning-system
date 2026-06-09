@@ -33,6 +33,9 @@ Page({
   },
 
   onLoad(options) {
+    console.log('[门店页面] 页面参数:', options);
+    console.log('[门店页面] 全局服务数据:', app.globalData.selectedServices);
+    
     // 获取传递的服务数据
     if (options.services) {
       try {
@@ -50,21 +53,16 @@ Page({
             serviceDetails: services,
             serviceTotalPrice: services.reduce((sum, s) => sum + (s.price || 0), 0)
           });
-          console.log('服务数据加载成功:', services);
+          console.log('[门店页面] 从URL加载服务成功:', services);
         }
       } catch (e) {
-        console.error('解析服务数据失败:', e);
+        console.error('[门店页面] 解析URL服务数据失败:', e);
         // 尝试从全局数据获取
-        const globalServices = app.globalData.selectedServices;
-        if (globalServices && globalServices.length > 0) {
-          this.setData({
-            selectedServices: globalServices.map(s => s.id),
-            serviceDetails: globalServices,
-            serviceTotalPrice: globalServices.reduce((sum, s) => sum + (s.price || 0), 0)
-          });
-          console.log('从全局数据恢复服务:', globalServices);
-        }
+        this.loadServicesFromGlobal();
       }
+    } else {
+      // 尝试从全局数据获取（主要方式）
+      this.loadServicesFromGlobal();
     }
     
     // 加载门店列表
@@ -75,6 +73,21 @@ Page({
     
     // 查询配送费用
     this.queryDeliveryFee();
+  },
+  
+  // 从全局数据加载服务
+  loadServicesFromGlobal() {
+    const globalServices = app.globalData.selectedServices;
+    if (globalServices && globalServices.length > 0) {
+      this.setData({
+        selectedServices: globalServices.map(s => s.id),
+        serviceDetails: globalServices,
+        serviceTotalPrice: globalServices.reduce((sum, s) => sum + (s.price || 0), 0)
+      });
+      console.log('[门店页面] 从全局数据恢复服务:', globalServices);
+    } else {
+      console.warn('[门店页面] 全局服务数据为空!');
+    }
   },
 
   // 加载门店数据
@@ -110,6 +123,7 @@ Page({
         });
         
         console.log('[门店列表] 从API加载成功:', stores.length, '家门店');
+        stores.forEach(s => console.log('[门店]', s.storeId, s.name, 'isOnline:', s.isOnline, 'status:', s.status));
       } else {
         console.warn('[门店列表] API返回空数据，使用默认门店');
         this.loadDefaultStores();
@@ -351,6 +365,17 @@ Page({
       return;
     }
     
+    // 检查服务数据
+    if (!this.data.serviceDetails || this.data.serviceDetails.length === 0) {
+      console.error('[选择门店] 错误: 服务数据为空!');
+      app.showToast('请先选择服务', 'none');
+      // 返回服务选择页面
+      setTimeout(() => {
+        wx.navigateBack();
+      }, 1500);
+      return;
+    }
+    
     // 保存选中的门店到全局（确保storeId正确）
     app.globalData.selectedStore = {
       ...store,
@@ -359,7 +384,9 @@ Page({
     app.globalData.selectedServices = this.data.serviceDetails;
     app.globalData.serviceTotalPrice = this.data.serviceTotalPrice;
     
-    console.log('[选择门店] 已保存:', app.globalData.selectedStore);
+    console.log('[选择门店] 已保存门店:', app.globalData.selectedStore);
+    console.log('[选择门店] 已保存服务:', app.globalData.selectedServices);
+    console.log('[选择门店] 已保存总价:', app.globalData.serviceTotalPrice);
     
     // 跳转到配送方式选择页面
     wx.navigateTo({
@@ -395,6 +422,13 @@ Page({
 
   // 暂不选择门店（跳过）
   onSkipStore() {
+    // 检查服务数据
+    if (!this.data.serviceDetails || this.data.serviceDetails.length === 0) {
+      console.error('[跳过门店] 错误: 服务数据为空!');
+      app.showToast('请先选择服务', 'none');
+      return;
+    }
+    
     wx.showModal({
       title: '确认跳过门店选择',
       content: '您可以选择暂不指定门店，系统将自动分配最近的门店为您服务。配送费用将根据您的位置自动计算。',
@@ -406,6 +440,8 @@ Page({
           app.globalData.selectedStore = null;
           app.globalData.selectedServices = this.data.serviceDetails;
           app.globalData.serviceTotalPrice = this.data.serviceTotalPrice;
+          
+          console.log('[跳过门店] 已保存服务:', app.globalData.selectedServices);
           
           // 跳转到配送方式选择页面
           wx.navigateTo({

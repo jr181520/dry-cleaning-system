@@ -822,6 +822,37 @@ class AdminService {
   /**
    * 获取门店待取件订单列表
    */
+  /**
+   * 获取门店所有订单（M端使用）
+   */
+  async getStoreOrders(storeId, params = {}) {
+    try {
+      const { page = 1, pageSize = 50, status } = params;
+      
+      const filter = { storeId };
+      if (status) filter.status = status;
+
+      const [orders, total] = await Promise.all([
+        this.Order.find(filter)
+          .sort({ createdAt: -1 })
+          .skip((page - 1) * pageSize)
+          .limit(pageSize),
+        this.Order.countDocuments(filter)
+      ]);
+
+      return {
+        success: true,
+        data: {
+          list: orders,
+          pagination: { page, pageSize, total, totalPages: Math.ceil(total / pageSize) }
+        }
+      };
+    } catch (error) {
+      console.error('[管理员] 获取门店订单失败:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
   async getStorePendingOrders(storeId) {
     try {
       const orders = await this.Order.find({

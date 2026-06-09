@@ -502,6 +502,26 @@ router.put('/settings', async (req, res) => {
 // 一键取货管理
 // ============================================
 
+// 获取门店所有订单（M端使用）
+router.get('/store/:storeId/orders', async (req, res) => {
+  try {
+    const { page, pageSize, status } = req.query;
+    const result = await adminService.getStoreOrders(req.params.storeId, {
+      page: parseInt(page) || 1,
+      pageSize: parseInt(pageSize) || 50,
+      status
+    });
+    res.json(result);
+  } catch (error) {
+    console.error('[管理员] 获取门店订单失败:', error);
+    res.status(500).json({
+      success: false,
+      error: 'server_error',
+      message: '获取门店订单失败'
+    });
+  }
+});
+
 // 获取门店待取件订单列表
 router.get('/store/:storeId/pending-orders', async (req, res) => {
   try {

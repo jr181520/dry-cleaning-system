@@ -72,18 +72,94 @@ Page({
       return;
     }
     
-    this.setData({
-      orderData: orderData
-    });
-    
-    // 生成订单号
-    this.generateOrderId();
-    
-    // 开始倒计时
-    this.startCountdown();
+    // 如果有订单ID，从后端验证订单状态
+    if (orderData.orderId) {
+      this.validateOrderFromBackend(orderData.orderId);
+    } else {
+      this.setData({
+        orderData: orderData
+      });
+      
+      // 生成订单号
+      this.generateOrderId();
+      
+      // 开始倒计时
+      this.startCountdown();
+    }
     
     // 加载用户余额信息
     this.loadUserBalance();
+  },
+  
+  // 从后端验证订单状态
+  async validateOrderFromBackend(orderId) {
+    try {
+      const result = await app.request(`/cleaning/orders/${orderId}`);
+      
+      if (!result.success || !result.data) {
+        app.showToast('订单不存在', 'none');
+        setTimeout(() => {
+          wx.navigateBack();
+        }, 1500);
+        return;
+      }
+      
+      const order = result.data;
+      
+      // 检查订单状态
+      if (order.status === 'cancelled') {
+        app.showToast('订单已取消', 'none');
+        setTimeout(() => {
+          wx.navigateBack();
+        }, 1500);
+        return;
+      }
+      
+      if (order.status !== 'pending') {
+        app.showToast(`订单状态不允许支付（${order.status}）`, 'none');
+        setTimeout(() => {
+          wx.navigateBack();
+        }, 1500);
+        return;
+      }
+      
+      // 更新订单数据
+      this.setData({
+        orderData: {
+          orderId: order._id,
+          store: {
+            id: order.storeId || '',
+            name: order.storeName || '',
+            address: order.storeAddress || ''
+          },
+          items: order.items || [],
+          services: order.items || [], // 兼容 createOrder 使用的 services 字段
+          fees: {
+            subtotal: order.amounts?.subtotal || 0,
+            discount: order.amounts?.discount || 0,
+            deliveryFee: order.amounts?.deliveryFee || 0,
+            total: order.amounts?.total || 0,
+            totalAmount: order.amounts?.total || 0
+          },
+          deliveryMethod: order.deliveryMethod || 'pickup',
+          delivery: order.delivery || {},
+          time: order.pickupTime || {},
+          status: order.status
+        }
+      });
+      
+      // 生成订单号
+      this.generateOrderId();
+      
+      // 开始倒计时
+      this.startCountdown();
+    } catch (error) {
+      console.error('[支付验证] 订单查询失败:', error);
+      app.showToast('订单验证失败', 'none');
+      setTimeout(() => {
+        wx.navigateBack();
+      }, 1500);
+    }
   },
 
   onUnload() {
@@ -214,6 +290,17 @@ Page({
       
       // 处理支付结果
       if (result.success) {
+        // 调用后端确认支付，更新数据库中的订单状态
+        try {
+          await app.request(`/cleaning/orders/${realOrderId}/pay`, {
+            method: this.data.selectedPaymentMethod,
+            transactionId: 'TXN' + Date.now()
+          }, 'POST');
+          console.log('[支付] 后端订单状态已更新为paid');
+        } catch (payErr) {
+          console.error('[支付] 后端状态更新失败:', payErr.message || payErr);
+        }
+
         app.hideLoading();
         app.showToast('支付成功', 'success');
         
@@ -223,7 +310,7 @@ Page({
           orderId: realOrderId,
           paymentMethod: this.data.selectedPaymentMethod,
           paymentMethodName: this.getPaymentMethodName(),
-          status: 'pending',
+          status: 'paid', // 支付成功后状态应为 paid
           createdAt: new Date().toISOString()
         };
         
@@ -255,9 +342,31 @@ Page({
       const userInfo = app.globalData.userInfo;
       const orderData = this.data.orderData;
       
+      // 检查必要数据
+      if (!userInfo) {
+        console.error('[创建订单] 用户未登录');
+        return {
+          success: false,
+          error: '用户未登录，请重新打开小程序'
+        };
+      }
+      
+      if (!orderData) {
+        console.error('[创建订单] 订单数据不存在');
+        return {
+          success: false,
+          error: '订单数据不存在，请重新下单'
+        };
+      }
+      
+      // 获取用户ID
+      const userId = userInfo?.openid || userInfo?.id || 'guest_' + Date.now();
+      console.log('[创建订单] 用户ID:', userId);
+      console.log('[创建订单] 订单数据:', JSON.stringify(orderData, null, 2));
+      
       // 准备订单数据
       const orderPayload = {
-        userId: userInfo?.openid || userInfo?.id || 'guest_' + Date.now(),
+        userId: userId,
         storeId: orderData.store?.storeId || orderData.store?.id || 'ST001',
         items: orderData.services.map(service => ({
           name: service.name,
@@ -290,7 +399,7 @@ Page({
       const result = await app.request('/cleaning/orders', orderPayload, 'POST');
       
       if (result.success && result.data) {
-        console.log('[创建订单] 后端返回:', result.data);
+        console.log('[创建订单] 成功，后端返回:', result.data);
         return {
           success: true,
           data: result.data,

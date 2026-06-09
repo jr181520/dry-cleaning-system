@@ -207,15 +207,20 @@
                 
                 if (result.success && result.data.authorizeUrl) {
                     // 跳转到微信授权页面
+                    showToast('即将跳转微信授权...', 'none');
                     window.location.href = result.data.authorizeUrl;
                 } else {
-                    // 如果没有配置微信参数，使用测试模式
-                    showToast('微信登录未配置，使用测试模式', 'none');
+                    // 如果没有配置微信参数或本地环境，使用测试模式
+                    console.log('微信授权未配置或本地环境，使用测试模式');
+                    showToast('开发环境使用测试模式', 'none');
                     await wechatTestLogin();
                 }
             } catch (error) {
                 console.error('获取授权URL失败:', error);
-                showToast('微信登录请求失败', 'error');
+                // 本地环境或配置错误时，自动使用测试模式
+                console.log('自动切换到测试模式');
+                showToast('开发环境使用测试模式', 'none');
+                await wechatTestLogin();
             }
         }
         

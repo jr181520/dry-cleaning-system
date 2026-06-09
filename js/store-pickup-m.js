@@ -338,9 +338,16 @@ const StorePickupManagerM = {
             return;
         }
         
-        // 更新订单状态
+        // 更新订单状态 (localStorage)
         order.status = 'completed';
         order.pickedUpAt = new Date().toISOString();
+        
+        // 同步更新所有物品状态
+        (order.items || []).forEach(item => {
+            item.status = 'customer_picked_up';
+            item.itemStatus = 'customer_picked_up';
+            item.pickedUpAt = new Date().toISOString();
+        });
         
         // 保存订单
         storeOrders[orderIndex] = order;
@@ -348,6 +355,42 @@ const StorePickupManagerM = {
         
         // 同步到C端
         StorePickupManager.syncPickupCompleteToStore(order);
+        
+        // 同步到后端API
+        const currentStore = JSON.parse(localStorage.getItem('currentStore') || '{}');
+        const storeId = currentStore.storeId || 'ST002';
+        
+        // 关闭灯条绑定
+        fetch('http://localhost:3000/api/store/order-light/unbind', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                orderId: orderId,
+                storeId: storeId,
+                reason: 'pickup_completed'
+            })
+        }).catch(err => console.warn('[灯条] 关闭绑定失败:', err));
+        
+        // 更新后端订单状态
+        fetch(`http://localhost:3000/api/cleaning/orders/${orderId}/status`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-cache' },
+            body: JSON.stringify({
+                status: 'completed',
+                items: order.items.map(item => ({
+                    ...item,
+                    status: 'customer_picked_up',
+                    pickedUpAt: new Date().toISOString()
+                })),
+                note: 'M端确认取件完成',
+                userId: 'store_staff'
+            })
+        }).then(res => res.json())
+          .then(result => {
+              if (result.success) {
+                  console.log('[M端] 后端订单已标记完成:', orderId);
+              }
+          }).catch(err => console.warn('[M端] 后端订单更新失败:', err));
         
         this.showNotification('取件已完成！', 'success');
         

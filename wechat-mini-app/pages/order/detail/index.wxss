@@ -2,7 +2,7 @@
 .order-detail-page {
   min-height: 100vh;
   background: #f5f5f5;
-  padding-bottom: 120rpx;
+  padding-bottom: 280rpx;
 }
 
 /* 扫码支付横幅 */
@@ -165,6 +165,84 @@
   display: flex;
   align-items: center;
   gap: 24rpx;
+}
+
+/* 已入库专属卡片 */
+.warehouse-section {
+  background: white;
+  border-radius: 24rpx;
+  padding: 32rpx;
+  margin: -30rpx 30rpx 30rpx;
+  box-shadow: 0 4rpx 24rpx rgba(124, 58, 237, 0.15);
+  border-left: 8rpx solid #7c3aed;
+}
+
+.warehouse-header {
+  display: flex;
+  align-items: center;
+  gap: 20rpx;
+  margin-bottom: 24rpx;
+  padding-bottom: 20rpx;
+  border-bottom: 1rpx solid #f0f0f0;
+}
+
+.warehouse-icon {
+  width: 80rpx;
+  height: 80rpx;
+  background: linear-gradient(135deg, #f3e8ff, #e9d5ff);
+  border-radius: 20rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 40rpx;
+}
+
+.warehouse-title-section {
+  flex: 1;
+}
+
+.warehouse-title {
+  font-size: 32rpx;
+  font-weight: 700;
+  color: #6d28d9;
+  margin-bottom: 6rpx;
+}
+
+.warehouse-subtitle {
+  font-size: 24rpx;
+  color: #9ca3af;
+}
+
+.warehouse-info {
+  margin-bottom: 20rpx;
+}
+
+.warehouse-info-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14rpx 0;
+}
+
+.warehouse-label {
+  font-size: 26rpx;
+  color: #6b7280;
+}
+
+.warehouse-value {
+  font-size: 26rpx;
+  color: #1f2937;
+  font-weight: 500;
+}
+
+.warehouse-status-badge {
+  text-align: center;
+  background: #fefce8;
+  border: 1rpx solid #fde68a;
+  border-radius: 12rpx;
+  padding: 16rpx;
+  font-size: 24rpx;
+  color: #a16207;
 }
 
 .driver-avatar {
@@ -643,4 +721,580 @@
 .btn-warning {
   border-color: #ff9800 !important;
   color: #ff9800 !important;
+}
+
+/* ===== 内嵌支付面板 ===== */
+.pay-panel {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 200;
+}
+
+.pay-panel-mask {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.4);
+  z-index: 199;
+}
+
+.pay-panel-inner {
+  background: #ffffff;
+  border-radius: 32rpx 32rpx 0 0;
+  padding: 40rpx 30rpx;
+  padding-bottom: calc(40rpx + env(safe-area-inset-bottom));
+  box-shadow: 0 -8rpx 40rpx rgba(0, 0, 0, 0.12);
+}
+
+.pay-amount-section {
+  text-align: center;
+  padding-bottom: 32rpx;
+  border-bottom: 1rpx solid #f0f0f0;
+  margin-bottom: 28rpx;
+}
+
+.pay-amount-label {
+  font-size: 26rpx;
+  color: #999;
+  display: block;
+  margin-bottom: 12rpx;
+}
+
+.pay-amount-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+}
+
+.pay-amount-symbol {
+  font-size: 36rpx;
+  font-weight: 700;
+  color: #e53935;
+  margin-right: 4rpx;
+}
+
+.pay-amount-value {
+  font-size: 64rpx;
+  font-weight: 800;
+  color: #e53935;
+  line-height: 1;
+}
+
+/* 支付方式快捷选择 */
+.pay-methods-quick {
+  display: flex;
+  gap: 20rpx;
+  margin-bottom: 20rpx;
+}
+
+.pay-method-item {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  padding: 24rpx 20rpx;
+  border: 2rpx solid #e8e8e8;
+  border-radius: 20rpx;
+  background: #fafafa;
+  transition: all 0.3s;
+  position: relative;
+}
+
+.pay-method-item.selected {
+  border-color: #4caf50;
+  background: #f1f8f1;
+}
+
+.pay-method-icon {
+  width: 56rpx;
+  height: 56rpx;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 28rpx;
+  margin-right: 16rpx;
+  flex-shrink: 0;
+}
+
+.wechat-icon { background: #e8f5e9; }
+.balance-icon { background: #fff3e0; }
+.alipay-icon { background: #e3f2fd; }
+.unionpay-icon { background: #fce4ec; }
+
+.pay-method-name {
+  font-size: 26rpx;
+  font-weight: 600;
+  color: #333;
+  flex: 1;
+}
+
+.pay-method-check {
+  width: 36rpx;
+  height: 36rpx;
+  background: #4caf50;
+  border-radius: 50%;
+  color: #fff;
+  font-size: 20rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+/* 更多支付方式 */
+.pay-methods-more {
+  display: flex;
+  gap: 20rpx;
+  margin-bottom: 20rpx;
+  animation: slideDown 0.3s ease;
+}
+
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-20rpx); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* 展开/收起 */
+.pay-toggle-more {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8rpx;
+  padding: 16rpx 0 28rpx;
+  font-size: 24rpx;
+  color: #999;
+}
+
+.toggle-arrow {
+  font-size: 20rpx;
+  transition: transform 0.3s;
+}
+
+.toggle-arrow.up {
+  transform: rotate(180deg);
+}
+
+/* 确认支付按钮 */
+.pay-confirm-btn {
+  width: 100%;
+  padding: 28rpx 0;
+  background: linear-gradient(135deg, #4caf50 0%, #2e7d32 100%);
+  color: #ffffff;
+  font-size: 32rpx;
+  font-weight: 700;
+  border-radius: 48rpx;
+  border: none;
+  text-align: center;
+  box-shadow: 0 8rpx 24rpx rgba(76, 175, 80, 0.35);
+  transition: all 0.3s;
+}
+
+.pay-confirm-btn.paying {
+  background: #e0e0e0;
+  box-shadow: none;
+  color: #999;
+}
+
+.pay-confirm-btn::after {
+  border: none;
+}
+
+/* ============================================ */
+/* 灯条管理窗口样式 */
+/* ============================================ */
+
+/* 遮罩 */
+.light-panel-mask {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 300;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s;
+}
+
+.light-panel-mask.show {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* 面板主体 */
+.light-panel {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  max-height: 85vh;
+  background: #fff;
+  border-radius: 32rpx 32rpx 0 0;
+  z-index: 301;
+  transform: translateY(100%);
+  transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+  display: flex;
+  flex-direction: column;
+  padding-bottom: calc(20rpx + env(safe-area-inset-bottom));
+}
+
+.light-panel.show {
+  transform: translateY(0);
+}
+
+/* 拖拽手柄 */
+.light-panel-handle {
+  display: flex;
+  justify-content: center;
+  padding: 16rpx 0 8rpx;
+}
+
+.handle-bar {
+  width: 80rpx;
+  height: 8rpx;
+  background: #e0e0e0;
+  border-radius: 4rpx;
+}
+
+/* 标题栏 */
+.light-panel-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: 20rpx 30rpx 16rpx;
+  border-bottom: 1rpx solid #f0f0f0;
+}
+
+.light-panel-title {
+  display: flex;
+  flex-direction: column;
+}
+
+.light-panel-title text:first-child {
+  font-size: 36rpx;
+  font-weight: 700;
+  color: #333;
+}
+
+.light-panel-subtitle {
+  font-size: 24rpx;
+  color: #999;
+  margin-top: 4rpx;
+}
+
+.light-panel-close {
+  width: 56rpx;
+  height: 56rpx;
+  background: #f5f5f5;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 28rpx;
+  color: #666;
+}
+
+/* 流程引导 */
+.light-flow-guide {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8rpx;
+  padding: 20rpx 24rpx;
+  margin: 16rpx 30rpx;
+  background: #f8f9ff;
+  border-radius: 16rpx;
+  flex-wrap: wrap;
+}
+
+.flow-step-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6rpx;
+  font-size: 20rpx;
+  color: #666;
+}
+
+.flow-step-num {
+  width: 40rpx;
+  height: 40rpx;
+  background: linear-gradient(135deg, #667eea, #764ba2);
+  color: #fff;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22rpx;
+  font-weight: 600;
+}
+
+.flow-step-arrow {
+  font-size: 24rpx;
+  color: #ccc;
+  margin-top: -16rpx;
+}
+
+/* 一键点亮按钮 */
+.light-all-section {
+  padding: 0 30rpx;
+  margin-bottom: 16rpx;
+}
+
+.light-all-btn {
+  width: 100%;
+  padding: 24rpx;
+  background: linear-gradient(135deg, #667eea, #764ba2);
+  color: #fff;
+  font-size: 30rpx;
+  font-weight: 600;
+  border-radius: 20rpx;
+  border: none;
+  box-shadow: 0 4rpx 16rpx rgba(102, 126, 234, 0.3);
+}
+
+.light-all-btn[disabled] {
+  opacity: 0.7;
+}
+
+.light-all-btn.all-lit {
+  background: linear-gradient(135deg, #4caf50, #2e7d32);
+  box-shadow: 0 4rpx 16rpx rgba(76, 175, 80, 0.3);
+}
+
+.light-all-btn.completed {
+  background: #e0e0e0;
+  color: #999;
+  box-shadow: none;
+}
+
+.light-all-btn::after {
+  border: none;
+}
+
+/* 物品列表滚动区 */
+.light-items-scroll {
+  flex: 1;
+  max-height: 480rpx;
+  padding: 0 30rpx;
+}
+
+/* 物品卡片 */
+.light-item-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 24rpx;
+  background: #f8f9fa;
+  border-radius: 16rpx;
+  margin-bottom: 16rpx;
+  border: 2rpx solid transparent;
+  transition: all 0.3s;
+}
+
+.light-item-card.light-on {
+  background: #f1f8f1;
+  border-color: #a5d6a7;
+}
+
+.light-item-card.checked-out {
+  background: #f5f5f5;
+  opacity: 0.7;
+}
+
+.light-item-left {
+  display: flex;
+  align-items: center;
+  gap: 20rpx;
+  flex: 1;
+}
+
+.light-item-index {
+  width: 56rpx;
+  height: 56rpx;
+  border-radius: 50%;
+  background: #e0e0e0;
+  color: #666;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 26rpx;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.light-item-index.lit {
+  background: linear-gradient(135deg, #4caf50, #2e7d32);
+  color: #fff;
+}
+
+.light-item-index.done {
+  background: #2196f3;
+  color: #fff;
+}
+
+.light-item-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.light-item-name {
+  font-size: 28rpx;
+  font-weight: 500;
+  color: #333;
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.light-item-name.done-text {
+  text-decoration: line-through;
+  color: #999;
+}
+
+.light-item-price {
+  font-size: 22rpx;
+  color: #999;
+  margin-top: 4rpx;
+}
+
+.light-item-right {
+  flex-shrink: 0;
+  margin-left: 16rpx;
+}
+
+.light-item-btn {
+  padding: 12rpx 24rpx;
+  background: linear-gradient(135deg, #4caf50, #2e7d32);
+  color: #fff;
+  font-size: 26rpx;
+  font-weight: 600;
+  border-radius: 36rpx;
+  border: none;
+  white-space: nowrap;
+}
+
+.light-item-btn::after {
+  border: none;
+}
+
+.light-item-status {
+  font-size: 24rpx;
+  display: flex;
+  align-items: center;
+  gap: 8rpx;
+}
+
+.light-item-status.done {
+  color: #2196f3;
+  font-weight: 600;
+}
+
+.light-item-status.waiting {
+  color: #ff9800;
+  font-size: 24rpx;
+}
+
+.light-pulse-dot {
+  width: 16rpx;
+  height: 16rpx;
+  background: #ff9800;
+  border-radius: 50%;
+  animation: lightPulse 1.2s infinite;
+}
+
+@keyframes lightPulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.4; transform: scale(1.4); }
+}
+
+/* 已激活灯条面板 */
+.light-active-panel {
+  margin: 16rpx 30rpx 0;
+  padding: 20rpx 24rpx;
+  background: #f0faf0;
+  border-radius: 16rpx;
+  border: 1rpx solid #c8e6c9;
+}
+
+.light-active-title {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12rpx;
+}
+
+.light-active-title text:first-child {
+  font-size: 26rpx;
+  font-weight: 600;
+  color: #2e7d32;
+}
+
+.light-active-hint {
+  font-size: 22rpx;
+  color: #999;
+}
+
+.light-active-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12rpx;
+}
+
+.light-active-item {
+  display: flex;
+  align-items: center;
+  gap: 8rpx;
+  padding: 8rpx 16rpx;
+  background: #fff;
+  border-radius: 20rpx;
+  font-size: 24rpx;
+  color: #333;
+  border: 1rpx solid #c8e6c9;
+}
+
+.pulsing-dot {
+  width: 16rpx;
+  height: 16rpx;
+  background: #4caf50;
+  border-radius: 50%;
+  animation: dotPulse 1.5s infinite;
+}
+
+@keyframes dotPulse {
+  0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(76, 175, 80, 0.4); }
+  50% { opacity: 0.6; box-shadow: 0 0 0 8rpx rgba(76, 175, 80, 0); }
+}
+
+/* 底部按钮 */
+.light-panel-bottom {
+  padding: 16rpx 30rpx 0;
+  border-top: 1rpx solid #f0f0f0;
+  margin-top: 16rpx;
+}
+
+.light-cancel-btn {
+  width: 100%;
+  padding: 24rpx;
+  background: #f5f5f5;
+  color: #666;
+  font-size: 30rpx;
+  border-radius: 20rpx;
+  border: none;
+}
+
+.light-cancel-btn::after {
+  border: none;
+}
+
+/* 扫码取件按钮样式 */
+.btn-scan {
+  background: linear-gradient(135deg, #667eea, #764ba2);
+  color: white;
 }

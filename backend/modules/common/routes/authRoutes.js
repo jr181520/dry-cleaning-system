@@ -144,28 +144,49 @@ router.post('/wechat', async (req, res) => {
 /**
  * 微信网页授权 - 生成授权URL
  * GET /api/auth/wechat/authorize
+ * 使用微信公众号网页授权方式
  */
 router.get('/wechat/authorize', async (req, res) => {
   try {
-    const appId = process.env.WX_WEB_APP_ID || process.env.WX_MINI_APP_ID;
-    const redirectUri = process.env.WX_WEB_REDIRECT_URI || `${req.protocol}://${req.get('host')}/api/auth/wechat/callback`;
-    const state = req.query.state || 'web_login';
+    // 使用微信公众号的AppID（可以是小程序AppID）
+    const appId = process.env.WX_MINI_APP_ID;
     
     if (!appId) {
-      throw new Error('未配置微信网页授权参数');
+      throw new Error('未配置微信AppID');
     }
     
-    // 微信授权地址
-    const authorizeUrl = `https://open.weixin.qq.com/connect/qrconnect?appid=${appId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=snsapi_login&state=${state}#wechat_redirect`;
+    // 授权后跳转的回调地址（必须是已备案的域名，且在微信公众号后台配置）
+    // 本地开发环境需要使用穿透工具
+    const host = req.get('host');
+    let redirectUri;
+    
+    if (host.includes('localhost')) {
+      // 本地开发环境使用测试模式
+      throw new Error('本地开发环境请使用测试模式');
+    } else {
+      // 生产环境使用实际域名
+      redirectUri = `${req.protocol}://${host}/api/auth/wechat/callback`;
+    }
+    
+    const state = req.query.state || 'web_login';
+    
+    // 微信公众号网页授权地址
+    // scope=snsapi_userinfo 表示弹出授权页面，获取用户基本信息
+    // scope=snsapi_base 静默授权，只能获取openid
+    const authorizeUrl = `https://open.weixin.qq.com/connect/oauth2/authorize?appid=${appId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=snsapi_userinfo&state=${state}#wechat_redirect`;
+    
+    console.log('[微信授权] 生成授权URL:', authorizeUrl);
     
     res.json({ 
       success: true, 
       data: { 
         authorizeUrl,
-        appId 
+        appId,
+        isWebAuthorize: true
       } 
     });
   } catch (error) {
+    console.error('[微信授权] 生成授权URL失败:', error);
     res.status(400).json({ success: false, error: error.message });
   }
 });
@@ -234,6 +255,108 @@ router.get('/wechat/callback', async (req, res) => {
   } catch (error) {
     console.error('[微信授权回调] 处理失败:', error);
     res.redirect(`/?error=${encodeURIComponent(error.message)}`);
+  }
+});
+
+/**
+ * 微信小程序商家登录（店员/店长通过账号密码登录切换为商家模式）
+ * POST /api/auth/staff-login
+ */
+router.post('/staff-login', async (req, res) => {
+  try {
+    const { account, password, openid } = req.body;
+    if (!account || !password) throw new Error('请输入账号和密码');
+    
+    // 查找门店员工账户（通过手机号或工号）
+    const user = await authService.findStaffByAccount(account);
+    if (!user) {
+      return res.status(401).json({ success: false, error: '账号不存在' });
+    }
+    
+    // 验证密码
+    const isValid = await authService.verifyStaffPassword(user, password);
+    if (!isValid) {
+      return res.status(401).json({ success: false, error: '密码错误' });
+    }
+    
+    // 如果提供了openid，绑定该微信用户到员工账户
+    if (openid) {
+      await authService.bindWechatToStaff(openid, user);
+    }
+    
+    // 生成带角色信息的token
+    const token = authService.generateToken(user._id);
+    
+    res.json({
+      success: true,
+      data: {
+        token,
+        user: authService.sanitizeUser(user),
+        openid: user.openid
+      }
+    });
+  } catch (error) {
+    console.error('[商家登录] 错误:', error);
+    res.status(401).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * 开发模式：快速商家登录（创建或获取测试员工账户）
+ * POST /api/auth/dev-staff-login
+ */
+router.post('/dev-staff-login', async (req, res) => {
+  try {
+    if (process.env.NODE_ENV === 'production') {
+      return res.status(403).json({ success: false, error: '生产环境不可用' });
+    }
+
+    const { storeId, openid } = req.body;
+    const targetStoreId = storeId || 'ST002';
+    
+    // 查找或创建该门店的测试店长账户
+    let user = await authService.findStaffByAccount('13800138001');
+    
+    if (!user) {
+      // 创建测试店长账户
+      const result = await authService.register('13800138001', 'admin123', {
+        name: '测试店长',
+        roles: ['store_owner'],
+        storeId: targetStoreId,
+        createdFrom: 'dev'
+      });
+      user = result.user;
+    } else {
+      // 确保角色和门店ID正确
+      const User = require('mongoose').models.User;
+      if (!user.roles.includes('store_owner')) {
+        user.roles = [...new Set([...user.roles, 'store_owner'])];
+      }
+      if (!user.storeId) {
+        user.storeId = targetStoreId;
+      }
+      await user.save();
+    }
+    
+    // 绑定openid
+    if (openid) {
+      await authService.bindWechatToStaff(openid, user);
+    }
+    
+    const token = authService.generateToken(user._id);
+    
+    res.json({
+      success: true,
+      data: {
+        token,
+        user: authService.sanitizeUser(user),
+        openid: user.openid
+      },
+      message: '开发模式商家登录成功'
+    });
+  } catch (error) {
+    console.error('[开发商家登录] 错误:', error);
+    res.status(500).json({ success: false, error: error.message });
   }
 });
 

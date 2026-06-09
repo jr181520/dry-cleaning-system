@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>小程序订单API诊断</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+</head>
+<body class="bg-gray-100 min-h-screen p-4">
+    <div class="max-w-2xl mx-auto">
+        <h1 class="text-2xl font-bold text-center mb-6">小程序订单API诊断</h1>
+        
+        <!-- API配置 -->
+        <div class="bg-white rounded-lg p-4 mb-4 shadow">
+            <h2 class="font-semibold mb-3">API配置</h2>
+            <div class="flex gap-2">
+                <input id="apiBase" type="text" value="http://localhost:3000/api" 
+                    class="flex-1 px-3 py-2 border rounded-lg">
+                <button onclick="runAllTests()" class="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600">
+                    运行测试
+                </button>
+            </div>
+            <p class="text-sm text-gray-500 mt-2">说明：这是小程序模拟器/真机调试时调用的API地址</p>
+        </div>
+        
+        <!-- 测试结果 -->
+        <div id="results" class="space-y-3">
+            <!-- 测试结果会动态添加到这里 -->
+        </div>
+    </div>
+
+    <script>
+        const apiBase = document.getElementById('apiBase').value;
+        
+        function addResult(title, status, details) {
+            const results = document.getElementById('results');
+            const result = document.createElement('div');
+            result.className = 'bg-white rounded-lg p-4 shadow';
+            
+            const statusIcon = status === 'success' 
+                ? '<i class="fa fa-check-circle text-green-500"></i>' 
+                : status === 'error' 
+                    ? '<i class="fa fa-times-circle text-red-500"></i>'
+                    : '<i class="fa fa-spinner fa-spin text-blue-500"></i>';
+            
+            const statusText = status === 'success' ? 'text-green-600' 
+                : status === 'error' ? 'text-red-600' : 'text-blue-600';
+            
+            result.innerHTML = `
+                <div class="flex items-center gap-2 mb-2">
+                    ${statusIcon}
+                    <span class="font-semibold ${statusText}">${title}</span>
+                </div>
+                <pre class="text-xs bg-gray-50 p-2 rounded overflow-x-auto">${JSON.stringify(details, null, 2)}</pre>
+            `;
+            
+            results.appendChild(result);
+        }
+        
+        function clearResults() {
+            document.getElementById('results').innerHTML = '';
+        }
+        
+        // 测试1: 健康检查
+        async function testHealthCheck() {
+            try {
+                const response = await fetch(`${apiBase}/health`);
+                const data = await response.json();
+                addResult('1. 后端服务健康检查', response.ok ? 'success' : 'error', {
+                    status: response.status,
+                    data: data
+                });
+                return response.ok;
+            } catch (error) {
+                addResult('1. 后端服务健康检查', 'error', {
+                    error: error.message,
+                    hint: '请确保后端服务已启动 (npm run dev 或 pm2 start)'
+                });
+                return false;
+            }
+        }
+        
+        // 测试2: 创建测试用户
+        let testUserId = null;
+        let testToken = null;
+        
+        async function testCreateUser() {
+            try {
+                const response = await fetch(`${apiBase}/auth/wechat`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        openid: 'oMiniTest_' + Date.now(),
+                        nickname: '小程序测试用户',
+                        sex: 1,
+                        platform: 'wechat_mini_test'
+                    })
+                });
+                const data = await response.json();
+                
+                if (data.success && data.data) {
+                    testUserId = data.data.openid || data.data.user?._id;
+                    testToken = data.data.token;
+                    addResult('2. 创建测试用户', 'success', {
+                        userId: testUserId,
+                        token: testToken ? testToken.substring(0, 20) + '...' : null,
+                        fullResponse: data
+                    });
+                    return true;
+                } else {
+                    addResult('2. 创建测试用户', 'error', { error: data.error || '创建失败', fullResponse: data });
+                    return false;
+                }
+            } catch (error) {
+                addResult('2. 创建测试用户', 'error', { error: error.message });
+                return false;
+            }
+        }
+        
+        // 测试3: 创建测试订单
+        async function testCreateOrder() {
+            if (!testUserId) {
+                addResult('3. 创建测试订单', 'error', { error: '没有有效的用户ID，跳过测试' });
+                return null;
+            }
+            
+            try {
+                const orderData = {
+                    userId: testUserId,
+                    storeId: 'ST001',
+                    items: [
+                        { name: '西装干洗', price: 88, quantity: 1, serviceType: 'dry_clean' },
+                        { name: '衬衫清洗', price: 25, quantity: 1, serviceType: 'dry_clean' }
+                    ],
+                    deliveryMethod: 'pickup',
+                    delivery: {
+                        type: 'pickup',
+                        contactName: '测试用户',
+                        contactPhone: '13800001001'
+                    },
+                    amounts: {
+                        subtotal: 113,
+                        discount: 0,
+                        deliveryFee: 0,
+                        total: 113
+                    }
+                };
+                
+                const response = await fetch(`${apiBase}/cleaning/orders`, {
+                    method: 'POST',
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${testToken}`
+                    },
+                    body: JSON.stringify(orderData)
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    addResult('3. 创建测试订单', 'success', {
+                        orderNo: data.data?.orderNo,
+                        orderId: data.data?._id,
+                        status: data.data?.status,
+                        total: data.data?.amounts?.total,
+                        fullResponse: data
+                    });
+                    return data.data;
+                } else {
+                    addResult('3. 创建测试订单', 'error', { error: data.error || '创建失败', fullResponse: data });
+                    return null;
+                }
+            } catch (error) {
+                addResult('3. 创建测试订单', 'error', { error: error.message });
+                return null;
+            }
+        }
+        
+        // 测试4: 查询订单列表
+        async function testQueryOrders() {
+            if (!testUserId) {
+                addResult('4. 查询订单列表', 'error', { error: '没有有效的用户ID，跳过测试' });
+                return;
+            }
+            
+            try {
+                const response = await fetch(`${apiBase}/cleaning/orders?userId=${encodeURIComponent(testUserId)}`, {
+                    headers: { 'Authorization': `Bearer ${testToken}` }
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    addResult('4. 查询订单列表', 'success', {
+                        total: data.data?.total || 0,
+                        count: data.data?.list?.length || 0,
+                        orders: data.data?.list?.map(o => ({
+                            orderNo: o.orderNo,
+                            status: o.status,
+                            total: o.amounts?.total
+                        })),
+                        fullResponse: data
+                    });
+                } else {
+                    addResult('4. 查询订单列表', 'error', { error: data.error || '查询失败', fullResponse: data });
+                }
+            } catch (error) {
+                addResult('4. 查询订单列表', 'error', { error: error.message });
+            }
+        }
+        
+        // 测试5: 查询订单详情
+        async function testQueryOrderDetail(orderId) {
+            if (!orderId) {
+                addResult('5. 查询订单详情', 'error', { error: '没有订单ID，跳过测试' });
+                return;
+            }
+            
+            try {
+                const response = await fetch(`${apiBase}/cleaning/orders/${orderId}`, {
+                    headers: { 'Authorization': `Bearer ${testToken}` }
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    addResult('5. 查询订单详情', 'success', {
+                        orderNo: data.data?.orderNo,
+                        status: data.data?.status,
+                        userId: data.data?.userId,
+                        items: data.data?.items?.length,
+                        fullResponse: data
+                    });
+                } else {
+                    addResult('5. 查询订单详情', 'error', { error: data.error || '查询失败', fullResponse: data });
+                }
+            } catch (error) {
+                addResult('5. 查询订单详情', 'error', { error: error.message });
+            }
+        }
+        
+        // 运行所有测试
+        async function runAllTests() {
+            clearResults();
+            
+            // 健康检查
+            const isHealthy = await testHealthCheck();
+            if (!isHealthy) {
+                addResult('诊断中断', 'error', { 
+                    message: '后端服务不可用，请先启动后端服务',
+                    hint: '1. 打开终端\n2. cd backend\n3. npm run dev\n或\npm2 start ecosystem.config.js'
+                });
+                return;
+            }
+            
+            // 创建用户
+            const userCreated = await testCreateUser();
+            if (!userCreated) {
+                addResult('诊断中断', 'error', { message: '无法创建测试用户，请检查认证接口' });
+                return;
+            }
+            
+            // 创建订单
+            const order = await testCreateOrder();
+            
+            // 查询订单列表
+            await testQueryOrders();
+            
+            // 查询订单详情
+            await testQueryOrderDetail(order?._id);
+            
+            // 总结
+            addResult('诊断完成', 'success', {
+                message: '如果所有测试都通过，说明API功能正常',
+                nextSteps: [
+                    '1. 检查小程序 app.js 中的 apiBaseUrl 配置',
+                    '2. 确保小程序开发者工具已开启"不校验合法域名"（开发阶段）',
+                    '3. 在小程序中测试登录和下单流程',
+                    '4. 查看小程序控制台输出的日志信息'
+                ]
+            });
+        }
+        
+        // 页面加载时自动运行测试
+        window.onload = runAllTests;
+    </script>
+</body>
+</html>

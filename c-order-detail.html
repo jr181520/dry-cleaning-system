@@ -1405,6 +1405,42 @@
         }
       });
       
+      // 服务价目表（用于回退：当订单物品缺少price时，按名称匹配）
+      const SERVICE_PRICE_CATALOG = {
+        '西装干洗': 50,
+        '衬衫清洗': 30,
+        '羽绒服清洗': 80,
+        '运动鞋清洗': 40,
+        '皮鞋护理': 45,
+        '皮包护理': 100,
+        '床单被罩': 60,
+        '沙发清洗': 120,
+        '裤子清洗': 35,
+        '大衣干洗': 55,
+        '毛衣清洗': 35,
+        'T恤清洗': 25,
+        '外套干洗': 45,
+        '裙子清洗': 40,
+        '西装套装': 80,
+        '西裤干洗': 30
+      };
+
+      // 根据物品名称从价目表中查找价格
+      function lookupServicePrice(name) {
+        if (!name) return 0;
+        // 精确匹配
+        if (SERVICE_PRICE_CATALOG[name]) return SERVICE_PRICE_CATALOG[name];
+        // 模糊匹配：遍历价目表查找包含关系
+        for (const [key, price] of Object.entries(SERVICE_PRICE_CATALOG)) {
+          if (name.includes(key) || key.includes(name)) return price;
+        }
+        // 如果有"干洗"关键词，给一个默认价
+        if (name.includes('干洗')) return 50;
+        if (name.includes('清洗')) return 30;
+        if (name.includes('护理')) return 45;
+        return 0;
+      }
+
       // 更新物品列表（优先使用items，如果没有则使用services）
       // 合并API数据和本地数据，确保物品价格不丢失
       let items = order.items || order.services || [];
@@ -1413,6 +1449,24 @@
       if ((!items || items.length === 0 || !items.some(i => i.price > 0)) && order.debugItems && order.debugItems.length > 0) {
         console.log('[C端详情] 使用debugItems数据（包含价格信息）');
         items = order.debugItems.map(i => ({ name: i.name, price: i.price, quantity: i.quantity }));
+      }
+      
+      // 为缺少价格的物品补充价格（从服务价目表匹配）
+      let priceFallbackCount = 0;
+      items = items.map(item => {
+        const name = item.name || item.serviceName || '';
+        const hasPrice = item.price && item.price > 0;
+        if (!hasPrice) {
+          const fallbackPrice = lookupServicePrice(name);
+          if (fallbackPrice > 0) {
+            priceFallbackCount++;
+            return { ...item, _priceSource: 'catalog', price: fallbackPrice };
+          }
+        }
+        return { ...item, _priceSource: hasPrice ? 'data' : 'unknown' };
+      });
+      if (priceFallbackCount > 0) {
+        console.log(`[C端详情] 从价目表补充了 ${priceFallbackCount} 个物品的价格`);
       }
       
       console.log('[C端详情] 订单物品数据:', {
@@ -1450,11 +1504,10 @@
       document.getElementById('orderNo').textContent = order.orderNo || orderId;
       document.getElementById('createTime').textContent = order.createTime ? new Date(order.createTime).toLocaleString('zh-CN') : '-';
       
-      // 计算并更新总金额（优先使用items/services计算，确保修改后的金额正确）
+      // 计算并更新总金额（使用已补充价格的items数据，确保金额正确）
       let totalAmount = 0;
-      const itemsForCalc = order.items || order.services || [];
-      if (itemsForCalc.length > 0) {
-        totalAmount = itemsForCalc.reduce((sum, item) => sum + (item.price || 0) * (item.quantity || 1), 0);
+      if (items.length > 0) {
+        totalAmount = items.reduce((sum, item) => sum + (item.price || 0) * (item.quantity || 1), 0);
       } else if (order.fees?.total) {
         totalAmount = order.fees.total;
       } else if (order.total) {

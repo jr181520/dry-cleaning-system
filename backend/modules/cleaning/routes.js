@@ -45,13 +45,24 @@ router.post('/orders', async (req, res) => {
 /**
  * 获取订单列表
  * GET /api/cleaning/orders
+ * 支持通过JWT token或查询参数识别用户，实现跨平台数据同步
  */
-router.get('/orders', async (req, res) => {
+router.get('/orders', optionalAuth, async (req, res) => {
   try {
-    const { page, pageSize, status, storeId, userId, openid } = req.query;
+    const { page, pageSize, status, storeId, userId, openid, phone } = req.query;
     
-    // 支持 userId 或 openid 查询
-    const queryUserId = userId || openid || req.user?.id;
+    // 用户识别优先级：JWT token用户 > 查询参数userId > 查询参数openid > 查询参数phone
+    let queryUserId = userId || openid || null;
+    
+    // 如果JWT中有用户信息，优先使用（包括openid用于跨平台匹配）
+    if (req.user?.id) {
+      queryUserId = req.user.id;
+    }
+    
+    // 支持通过手机号查询关联订单
+    if (!queryUserId && phone) {
+      queryUserId = phone;
+    }
     
     const result = await orderService.getOrders({
       userId: queryUserId,
@@ -89,7 +100,7 @@ router.get('/orders/:id', async (req, res) => {
  * 取消订单
  * POST /api/cleaning/orders/:id/cancel
  */
-router.post('/orders/:id/cancel', async (req, res) => {
+router.post('/orders/:id/cancel', optionalAuth, async (req, res) => {
   try {
     const result = await orderService.cancelOrder(req.params.id, {
       userId: req.query.userId || req.user?.id,
@@ -97,6 +108,22 @@ router.post('/orders/:id/cancel', async (req, res) => {
       reason: req.body.reason
     });
     res.json({ success: true, data: result });
+  } catch (error) {
+    res.status(400).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * 删除订单记录（软删除）
+ * POST /api/cleaning/orders/:id/delete
+ */
+router.post('/orders/:id/delete', optionalAuth, async (req, res) => {
+  try {
+    const result = await orderService.deleteOrder(req.params.id, {
+      userId: req.query.userId || req.user?.id,
+      roles: req.user?.roles
+    });
+    res.json({ success: true, data: { orderId: result._id, orderNo: result.orderNo, status: result.status, isDeleted: result.isDeleted } });
   } catch (error) {
     res.status(400).json({ success: false, error: error.message });
   }
@@ -469,12 +496,13 @@ router.get('/orders/:id/status', async (req, res) => {
  */
 router.put('/orders/:id/status', async (req, res) => {
   try {
-    const { status, note } = req.body;
+    const { status, note, items } = req.body;
     
-    // 更新订单状态
+    // 更新订单状态（含物品数据）
     const order = await orderService.updateOrderStatus(req.params.id, {
       status,
       note,
+      items,
       userId: req.user?.id || req.body.userId || 'store_staff',
       roles: req.user?.roles || ['store_staff']
     });
@@ -783,6 +811,42 @@ router.get('/stores', async (req, res) => {
       ],
       message: '使用默认数据' 
     });
+  }
+});
+
+/**
+ * 获取门店所有订单（M端使用，无需admin权限）
+ * GET /api/cleaning/store/:storeId/orders
+ */
+router.get('/store/:storeId/orders', async (req, res) => {
+  try {
+    const { storeId } = req.params;
+    const { page = 1, pageSize = 50, status } = req.query;
+
+    const mongoose = require('mongoose');
+    const Order = mongoose.models.Order;
+    if (!Order) {
+      return res.json({ success: true, data: { list: [], pagination: { page: 1, pageSize: 50, total: 0, totalPages: 0 } } });
+    }
+
+    const filter = { storeId };
+    if (status) filter.status = status;
+
+    const [orders, total] = await Promise.all([
+      Order.find(filter).sort({ createdAt: -1 }).skip((parseInt(page) - 1) * parseInt(pageSize)).limit(parseInt(pageSize)),
+      Order.countDocuments(filter)
+    ]);
+
+    res.json({
+      success: true,
+      data: {
+        list: orders,
+        pagination: { page: parseInt(page), pageSize: parseInt(pageSize), total, totalPages: Math.ceil(total / parseInt(pageSize)) }
+      }
+    });
+  } catch (error) {
+    console.error('[门店订单] 获取失败:', error);
+    res.status(500).json({ success: false, error: 'server_error', message: '获取门店订单失败' });
   }
 });
 

@@ -53,6 +53,22 @@ async function authMiddleware(req, res, next) {
       return;
     }
     
+    // 开发模式：处理 mock_token 格式（小程序模拟登录）
+    if (process.env.NODE_ENV !== 'production' && token.startsWith('mock_token_')) {
+      const openid = token.replace('mock_token_', '');
+      req.user = {
+        id: openid,
+        userNo: 'MOCK001',
+        phone: '00000000000',
+        name: '模拟用户',
+        roles: ['customer'],
+        storeId: null,
+        creditScore: 100
+      };
+      next();
+      return;
+    }
+    
     if (!parsed) {
       return res.status(401).json({ 
         success: false, 
@@ -72,7 +88,8 @@ async function authMiddleware(req, res, next) {
       name: user.name,
       roles: user.roles,
       storeId: user.storeId,
-      creditScore: user.creditScore
+      creditScore: user.creditScore,
+      openid: user.openid || null  // 用于跨平台用户识别
     };
 
     next();
@@ -93,6 +110,23 @@ async function optionalAuth(req, res, next) {
     const authHeader = req.headers.authorization;
     if (authHeader && authHeader.startsWith('Bearer ')) {
       const token = authHeader.slice(7);
+      
+      // 开发模式：处理 mock_token 格式（小程序模拟登录）
+      if (process.env.NODE_ENV !== 'production' && token.startsWith('mock_token_')) {
+        const openid = token.replace('mock_token_', '');
+        req.user = {
+          id: openid,
+          userNo: 'MOCK001',
+          phone: '00000000000',
+          name: '模拟用户',
+          roles: ['customer'],
+          storeId: null,
+          creditScore: 100
+        };
+        next();
+        return;
+      }
+      
       const parsed = authService.parseToken(token);
       
       if (parsed) {
@@ -103,7 +137,8 @@ async function optionalAuth(req, res, next) {
           phone: user.phone,
           name: user.name,
           roles: user.roles,
-          storeId: user.storeId
+          storeId: user.storeId,
+          openid: user.openid || null  // 用于跨平台用户识别
         };
       }
     }

@@ -72,6 +72,7 @@
         <view class="store-header">
           <view class="store-title-row">
             <text class="store-name">{{item.name}}</text>
+            <text class="store-id-badge">{{item.storeId}}</text>
             <view class="store-status {{item.isOnline ? 'online' : 'offline'}}">
               <view class="status-dot"></view>
               <text class="status-text">{{item.isOnline ? '营业中' : '休息中'}}</text>

@@ -10,6 +10,8 @@
     <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
     <!-- html5-qrcode 二维码扫描库 -->
     <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+    <!-- 统一数据同步模块 -->
+    <script src="js/unified-sync.js"></script>
     
     <script>
         tailwind.config = {
@@ -420,8 +422,17 @@
             await loadModuleConfig();
             loadServices();
             loadStores();
+            
+            // 启动统一数据同步（从后端获取最新订单）
+            UnifiedSync.start();
             loadPendingOrders();
             renderDynamicNav();
+            
+            // 监听同步完成事件，自动刷新UI
+            window.addEventListener('unifiedSyncComplete', () => {
+                console.log('[C端] 收到同步完成通知，刷新订单列表');
+                loadPendingOrders();
+            });
         });
 
         // 加载模块配置
@@ -540,9 +551,24 @@
 
         // 加载待取件订单
         function loadPendingOrders() {
-            // 从localStorage获取待取件订单
-            const orders = JSON.parse(localStorage.getItem('orders') || '[]');
-            pendingOrders = orders.filter(order => order.status === 'ready' || order.status === 'delivered');
+            // 优先从统一同步的c_orders读取，兼容旧的orders key
+            const syncedOrders = JSON.parse(localStorage.getItem('c_orders') || '[]');
+            const oldOrders = JSON.parse(localStorage.getItem('orders') || '[]');
+            
+            // 以统一同步数据为主，旧数据为补充（去重）
+            const syncedIds = new Set(syncedOrders.map(o => o.orderId || o.orderNo || o.id));
+            const mergedOrders = [...syncedOrders];
+            oldOrders.forEach(order => {
+                const id = order.orderId || order.orderNo || order.id;
+                if (!syncedIds.has(id)) {
+                    mergedOrders.push(order);
+                }
+            });
+            
+            // 也写入旧key保持兼容
+            localStorage.setItem('orders', JSON.stringify(mergedOrders));
+            
+            pendingOrders = mergedOrders.filter(order => order.status === 'ready' || order.status === 'delivered');
             
             // 区分门店自提和配送订单
             const pickupOrders = pendingOrders.filter(order => order.deliveryMethod === 'pickup');

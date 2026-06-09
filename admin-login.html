@@ -170,6 +170,10 @@
                         // 存储登录状态
                         localStorage.setItem('adminUser', JSON.stringify(user));
                         
+                        // 存储 dev-admin token（后端auth中间件会识别并赋予admin角色）
+                        localStorage.setItem('adminToken', 'dev-admin-' + user.id);
+                        localStorage.setItem('adminAuthToken', 'dev-admin-' + user.id);
+                        
                         // 跳转到主页面
                         window.location.href = 'admin.html';
                     } else {

@@ -1,21 +1,28 @@
 /* 订单页面样式 */
 
 .order-tabs {
-  display: flex;
   background: #ffffff;
-  padding: 24rpx 0;
   position: sticky;
   top: 0;
   z-index: 10;
+  white-space: nowrap;
+  padding: 16rpx 0;
+}
+
+.tabs-wrapper {
+  display: inline-flex;
+  padding: 0 16rpx;
 }
 
 .tab-item {
-  flex: 1;
+  display: inline-block;
   text-align: center;
-  font-size: 28rpx;
+  font-size: 26rpx;
   color: #6b7280;
-  padding: 16rpx 0;
+  padding: 14rpx 28rpx;
   position: relative;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .tab-item.active {
@@ -26,10 +33,9 @@
 .tab-item.active::after {
   content: '';
   position: absolute;
-  bottom: -8rpx;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 48rpx;
+  bottom: 0;
+  left: 28rpx;
+  right: 28rpx;
   height: 6rpx;
   background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
   border-radius: 3rpx;
@@ -80,10 +86,16 @@
 }
 
 .tag-pending { background: #fef3c7; color: #92400e; }
-.tag-processing { background: #dbeafe; color: #1e40af; }
+.tag-paid { background: #d1fae5; color: #065f46; }
+.tag-delivering { background: #dbeafe; color: #1e40af; }
+.tag-received { background: #f3e8ff; color: #7c3aed; }
+.tag-cleaning { background: #fff7ed; color: #c2410c; }
+.tag-cleaned { background: #e0f2fe; color: #0369a1; }
+.tag-processing { background: #fee2e2; color: #991b1b; }
 .tag-ready { background: #d1fae5; color: #065f46; }
+.tag-delivering_back { background: #dbeafe; color: #1e40af; }
 .tag-completed { background: #f3f4f6; color: #374151; }
-.tag-cancelled { background: #fee2e2; color: #991b1b; }
+.tag-cancelled { background: #f3f4f6; color: #9ca3af; }
 
 .order-content {
   display: flex;
@@ -163,6 +175,20 @@
 
 .action-btn.primary {
   background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  color: #ffffff;
+  border: none;
+}
+
+/* 门店自提按钮 */
+.action-btn.store-pickup-btn {
+  background: linear-gradient(135deg, #4caf50 0%, #2e7d32 100%);
+  color: #ffffff;
+  border: none;
+}
+
+/* 跑腿配送按钮 */
+.action-btn.courier-btn {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   color: #ffffff;
   border: none;
 }

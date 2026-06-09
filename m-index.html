@@ -15,11 +15,17 @@
     <!-- QRCode 生成库 -->
     <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
     
+    <!-- MQTT.js for real-time events（异步加载，失败不影响页面） -->
+    <script src="https://unpkg.com/mqtt@5.3.0/dist/mqtt.min.js" async onload="window.__mqttLoaded=true" onerror="console.warn('[MQTT] mqtt.js 加载失败，实时事件将使用轮询模式')"></script>
+    
     <!-- 统一API配置 -->
     <script src="js/api-config.js"></script>
     
     <!-- 数据同步模块 -->
     <script src="js/order-sync.js"></script>
+    
+    <!-- 订单实时事件模块（MQTT WebSocket） -->
+    <script src="js/order-event-client.js"></script>
     
     <!-- 门店自提模块 -->
     <script src="js/store-pickup.js"></script>
@@ -108,7 +114,7 @@
                 }
             }
             
-            // 跳转到灯条系统时刷新待取物品
+            // 跳转到灯条系统时刷新待取物品并加载终端状态
             if (target === 'light-system') {
                 setTimeout(() => {
                     if (typeof refreshPickupItems === 'function') {
@@ -116,6 +122,11 @@
                     }
                     // 检查C端灯条请求
                     checkPendingLightRequests();
+                    // 加载灯条终端状态和MQTT连接
+                    loadTerminalStatus();
+                    checkMQTTStatus();
+                    // 更新侧边栏灯条徽章
+                    updateLightSystemBadge();
                 }, 100);
             }
         }
@@ -450,6 +461,10 @@
                 </button>
                 <h1 class="text-lg font-semibold text-gray-800">干洗店管理</h1>
                 <span id="header-store-display" class="px-2 py-1 bg-blue-100 text-blue-700 text-xs font-medium rounded-full hidden sm:inline">ST001</span>
+                <span id="mqtt-status-badge" class="px-2 py-1 text-xs font-medium rounded-full hidden sm:inline-flex items-center gap-1 bg-gray-100 text-gray-500" title="MQTT实时连接状态">
+                    <span id="mqtt-status-dot" class="w-1.5 h-1.5 rounded-full bg-gray-400"></span>
+                    <span id="mqtt-status-text">离线</span>
+                </span>
             </div>
             <div class="flex items-center space-x-3">
                 <div class="relative">
@@ -566,6 +581,7 @@
                     <a href="#light-system" class="nav-link flex items-center space-x-3 p-3 rounded-lg text-gray-700 hover:bg-blue-50 hover:text-primary transition-all duration-300 ease-in-out" onclick="navigateTo('light-system')">
                         <i class="fa fa-lightbulb-o w-5 text-center"></i>
                         <span>智能灯条系统</span>
+                        <span id="light-system-badge" class="ml-auto px-2 py-0.5 bg-red-500 text-white text-xs rounded-full" style="display:none;"></span>
                     </a>
                 </li>
                 <li>
@@ -689,7 +705,7 @@
             <div class="bg-white rounded-xl shadow-card p-4 border border-gray-200 mb-6">
                 <div class="flex justify-between items-center mb-4">
                     <h3 class="text-lg font-semibold text-gray-800">最近订单</h3>
-                    <button onclick="switchSection('orders')" class="text-sm text-primary hover:underline">查看全部</button>
+                    <button onclick="navigateTo('orders')" class="text-sm text-primary hover:underline">查看全部</button>
                 </div>
                 <div id="recent-orders-container" class="space-y-3">
                     <!-- 动态加载订单 -->
@@ -1196,91 +1212,70 @@
                     </div>
                 </div>
                 
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <!-- 灯条区域A -->
-                    <div class="border border-gray-200 rounded-lg p-3">
-                        <div class="flex items-center justify-between mb-3">
-                            <h4 class="font-medium text-gray-800 text-sm">区域 A</h4>
-                            <span class="px-2 py-0.5 bg-green-100 text-green-800 rounded-full text-xs">正常</span>
-                        </div>
-                        <div class="grid grid-cols-4 gap-1.5 mb-3">
-                            <div class="light-bar-container text-center">
-                                <div class="light-bar light-bar-normal rounded h-6"></div>
-                                <span class="text-xs text-gray-600 mt-1 block">A1</span>
-                            </div>
-                            <div class="light-bar-container text-center">
-                                <div class="light-bar light-bar-normal rounded h-6"></div>
-                                <span class="text-xs text-gray-600 mt-1 block">A2</span>
-                            </div>
-                            <div class="light-bar-container text-center">
-                                <div class="light-bar light-bar-normal rounded h-6"></div>
-                                <span class="text-xs text-gray-600 mt-1 block">A3</span>
-                            </div>
-                            <div class="light-bar-container text-center">
-                                <div class="light-bar light-bar-normal rounded h-6"></div>
-                                <span class="text-xs text-gray-600 mt-1 block">A4</span>
-                            </div>
-                        </div>
-                        <div class="text-xs text-gray-500">
-                            <p>物品: 8件 | 5分钟前更新</p>
+                <!-- 灯条触发控制 -->
+                <div class="mb-4 p-4 bg-gradient-to-r from-orange-50 to-yellow-50 border border-orange-200 rounded-lg">
+                    <div class="flex items-center justify-between mb-3">
+                        <h4 class="font-semibold text-gray-800 text-sm">⚡ 灯条触发控制</h4>
+                        <div id="mqtt-status-badge-control" class="flex items-center gap-2">
+                            <span class="w-2 h-2 rounded-full bg-gray-400"></span>
+                            <span class="text-xs text-gray-600">检测中...</span>
                         </div>
                     </div>
-                    
-                    <!-- 灯条区域B -->
-                    <div class="border border-gray-200 rounded-lg p-3">
-                        <div class="flex items-center justify-between mb-3">
-                            <h4 class="font-medium text-gray-800 text-sm">区域 B</h4>
-                            <span class="px-2 py-0.5 bg-green-100 text-green-800 rounded-full text-xs">正常</span>
+                    <div class="grid grid-cols-2 md:grid-cols-5 gap-2 mb-3">
+                        <div>
+                            <label class="block text-xs font-medium text-gray-700 mb-1">灯条ID</label>
+                            <input type="text" id="trigger-light-id" placeholder="如 A1, B3" class="w-full px-2 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-400">
                         </div>
-                        <div class="grid grid-cols-4 gap-1.5 mb-3">
-                            <div class="light-bar-container text-center">
-                                <div class="light-bar light-bar-normal rounded h-6"></div>
-                                <span class="text-xs text-gray-600 mt-1 block">B1</span>
-                            </div>
-                            <div class="light-bar-container text-center">
-                                <div class="light-bar light-bar-normal rounded h-6"></div>
-                                <span class="text-xs text-gray-600 mt-1 block">B2</span>
-                            </div>
-                            <div class="light-bar-container text-center">
-                                <div class="light-bar light-bar-normal rounded h-6"></div>
-                                <span class="text-xs text-gray-600 mt-1 block">B3</span>
-                            </div>
-                            <div class="light-bar-container text-center">
-                                <div class="light-bar light-bar-normal rounded h-6"></div>
-                                <span class="text-xs text-gray-600 mt-1 block">B4</span>
-                            </div>
+                        <div>
+                            <label class="block text-xs font-medium text-gray-700 mb-1">颜色</label>
+                            <select id="trigger-light-color" class="w-full px-2 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-400">
+                                <option value="green">绿色</option>
+                                <option value="red">红色</option>
+                                <option value="blue">蓝色</option>
+                                <option value="yellow">黄色</option>
+                                <option value="white">白色</option>
+                            </select>
                         </div>
-                        <div class="text-xs text-gray-500">
-                            <p>物品: 12件 | 3分钟前更新</p>
+                        <div>
+                            <label class="block text-xs font-medium text-gray-700 mb-1">优先级</label>
+                            <select id="trigger-light-priority" class="w-full px-2 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-400">
+                                <option value="normal">普通</option>
+                                <option value="high">紧急</option>
+                            </select>
+                        </div>
+                        <div class="flex items-end gap-1">
+                            <button onclick="triggerLightOn()" class="flex-1 bg-green-500 text-white px-3 py-1.5 rounded-lg hover:bg-green-600 transition text-xs font-medium">
+                                <i class="fa fa-lightbulb-o mr-1"></i>点亮
+                            </button>
+                            <button onclick="triggerLightOff()" class="flex-1 bg-red-500 text-white px-3 py-1.5 rounded-lg hover:bg-red-600 transition text-xs font-medium">
+                                <i class="fa fa-power-off mr-1"></i>关闭
+                            </button>
+                        </div>
+                        <div class="flex items-end gap-1">
+                            <button onclick="triggerAllLightsOn()" class="flex-1 bg-orange-500 text-white px-3 py-1.5 rounded-lg hover:bg-orange-600 transition text-xs font-medium">
+                                <i class="fa fa-lightbulb-o mr-1"></i>全部点亮
+                            </button>
+                            <button onclick="triggerAllLightsOff()" class="flex-1 bg-gray-600 text-white px-3 py-1.5 rounded-lg hover:bg-gray-700 transition text-xs font-medium">
+                                <i class="fa fa-power-off mr-1"></i>全部关闭
+                            </button>
                         </div>
                     </div>
-                    
-                    <!-- 灯条区域C -->
-                    <div class="border border-gray-200 rounded-lg p-3">
-                        <div class="flex items-center justify-between mb-3">
-                            <h4 class="font-medium text-gray-800 text-sm">区域 C</h4>
-                            <span class="px-2 py-0.5 bg-green-100 text-green-800 rounded-full text-xs">正常</span>
-                        </div>
-                        <div class="grid grid-cols-4 gap-1.5 mb-3">
-                            <div class="light-bar-container text-center">
-                                <div class="light-bar light-bar-normal rounded h-6"></div>
-                                <span class="text-xs text-gray-600 mt-1 block">C1</span>
-                            </div>
-                            <div class="light-bar-container text-center">
-                                <div class="light-bar light-bar-normal rounded h-6"></div>
-                                <span class="text-xs text-gray-600 mt-1 block">C2</span>
-                            </div>
-                            <div class="light-bar-container text-center">
-                                <div class="light-bar light-bar-normal rounded h-6"></div>
-                                <span class="text-xs text-gray-600 mt-1 block">C3</span>
-                            </div>
-                            <div class="light-bar-container text-center">
-                                <div class="light-bar light-bar-normal rounded h-6"></div>
-                                <span class="text-xs text-gray-600 mt-1 block">C4</span>
-                            </div>
-                        </div>
-                        <div class="text-xs text-gray-500">
-                            <p>物品: 6件 | 8分钟前更新</p>
+                </div>
+
+                <!-- 在线终端列表 -->
+                <div id="terminal-status-section" class="mb-4">
+                    <div class="flex items-center justify-between mb-3">
+                        <h4 class="font-semibold text-gray-800 text-sm">
+                            📡 在线终端 
+                            <span id="terminal-count" class="text-xs text-gray-500">(加载中...)</span>
+                        </h4>
+                        <button onclick="loadTerminalStatus()" class="text-xs text-blue-500 hover:text-blue-700">
+                            <i class="fa fa-refresh mr-1"></i>刷新
+                        </button>
+                    </div>
+                    <div id="terminal-list" class="grid grid-cols-2 md:grid-cols-4 gap-2">
+                        <div class="col-span-full text-center py-6 text-gray-400 text-sm">
+                            <i class="fa fa-spinner fa-spin mr-2"></i>加载终端状态...
                         </div>
                     </div>
                 </div>
@@ -1798,8 +1793,8 @@
                 const storeUser = JSON.parse(localStorage.getItem('storeUser') || '{}');
                 const myStoreId = storeUser.storeId || 'ST002';
                 
-                // 1. 从API获取最新订单 - 使用动态端口
-                const response = await fetch(`${API_BASE_URL}/api/admin/store/${myStoreId}/orders`);
+                // 1. 从API获取最新订单（所有状态，不限于pending）
+                const response = await fetch(`${API_BASE_URL}/api/cleaning/store/${myStoreId}/orders`);
                 if (!response.ok) {
                     throw new Error('API请求失败');
                 }
@@ -1807,9 +1802,10 @@
                 const result = await response.json();
                 
                 if (result.success && result.data) {
+                    const orderList = result.data.list || result.data || [];
                     // 2. 合并到本地localStorage
-                    mergeAndSyncOrders(result.data);
-                    console.log('【同步管理器】同步成功，共', result.data.length, '条订单');
+                    mergeAndSyncOrders(orderList);
+                    console.log('【同步管理器】同步成功，共', orderList.length, '条订单');
                 }
                 
                 // 3. 同时同步C端订单（解决C端已支付但门店端看不到的问题）
@@ -2748,58 +2744,115 @@
             }
         });
         
-        // 灯条请求检测轮询（每2秒检测一次）
-        let lastLightRequestKey = null;
+        // 灯条请求检测轮询（每2秒向后端API查询一次）
+        let lastProcessedNotifications = new Set(); // 已处理的通知ID集合
         function startLightRequestPolling() {
-            console.log('【M端】启动灯条请求轮询检测');
+            console.log('[M端] 启动灯条请求轮询检测（API模式）');
             
-            setInterval(() => {
-                const request = localStorage.getItem('store_light_request');
-                if (!request) return;
-                
+            setInterval(async () => {
                 try {
-                    const data = JSON.parse(request);
                     const currentStore = JSON.parse(localStorage.getItem('currentStore') || '{}');
                     const storeId = currentStore.storeId || 'ST001';
-                    const currentStoreIdAlt = localStorage.getItem('currentStoreId') || '';
+                    const apiBase = getApiBaseUrl();
                     
-                    console.log('【M端轮询】检测到灯条请求:', data.orderId, '| 门店:', data.storeId, '| 当前门店:', storeId);
+                    const resp = await fetch(`${apiBase}/store/order-light/pending-notifications/${storeId}`);
+                    if (!resp.ok) return;
                     
-                    // 检查门店ID是否匹配（兼容多种存储方式）
-                    const storeIdMatch = (data.storeId === storeId) || 
-                                         (data.storeId === currentStoreIdAlt) || 
-                                         (storeId === currentStoreIdAlt);
+                    const result = await resp.json();
+                    if (!result.success || !result.data) return;
                     
-                    // 只处理60秒内的请求，且不重复处理同一个请求
-                    const requestKey = `${data.orderId}-${data.timestamp}`;
-                    const isRecentRequest = (Date.now() - data.timestamp) < 60000; // 60秒内
-                    const isNewRequest = requestKey !== lastLightRequestKey;
+                    const notifications = result.data.notifications || [];
+                    const pendingNotifications = notifications.filter(n => n.status === 'pending');
                     
-                    if (storeIdMatch && isRecentRequest && isNewRequest) {
-                        console.log('【M端轮询】处理灯条请求:', data.orderId, '| 物品数:', data.items?.length || 0);
+                    if (pendingNotifications.length === 0) return;
+                    
+                    // 过滤已处理的
+                    const newNotifications = pendingNotifications.filter(
+                        n => !lastProcessedNotifications.has(n.notificationId)
+                    );
+                    
+                    if (newNotifications.length === 0) return;
+                    
+                    console.log(`[M端API轮询] 发现 ${newNotifications.length} 条新灯条通知:`, 
+                        newNotifications.map(n => n.orderId).join(', '));
+                    
+                    // 标记为已处理
+                    newNotifications.forEach(n => lastProcessedNotifications.add(n.notificationId));
+                    
+                    // 清理过大的set（保持最近1000条）
+                    if (lastProcessedNotifications.size > 1000) {
+                        const arr = Array.from(lastProcessedNotifications);
+                        lastProcessedNotifications = new Set(arr.slice(-500));
+                    }
+                    
+                    // 按订单分组
+                    const ordersMap = new Map();
+                    newNotifications.forEach(n => {
+                        if (!ordersMap.has(n.orderId)) {
+                            ordersMap.set(n.orderId, {
+                                orderId: n.orderId,
+                                storeId: n.storeId,
+                                customerName: n.customerName,
+                                timestamp: n.createdAt,
+                                items: []
+                            });
+                        }
+                        ordersMap.get(n.orderId).items.push({
+                            itemId: n.notificationId,
+                            itemName: n.itemName,
+                            lampIndex: (n.itemIndex ?? 0),
+                            orderId: n.orderId
+                        });
+                    });
+                    
+                    // 处理每个订单的灯条请求
+                    for (const [orderId, data] of ordersMap) {
+                        console.log(`[M端API轮询] 处理订单: ${orderId}, 物品数: ${data.items.length}`);
                         
-                        lastLightRequestKey = requestKey;
+                        // 将API通知数据同步到localStorage，使"查看详情"按钮能找到
+                        localStorage.setItem('store_light_request', JSON.stringify({
+                            orderId: data.orderId,
+                            storeId: data.storeId,
+                            customerName: data.customerName,
+                            timestamp: data.timestamp,
+                            items: data.items,
+                            type: 'api_notification'
+                        }));
                         
-                        // 先显示通知条
+                        // 同步当前灯条数据供多标签页检测
+                        localStorage.setItem('current_light_data', JSON.stringify({
+                            orderId: data.orderId,
+                            storeId: data.storeId,
+                            items: data.items,
+                            updatedAt: Date.now()
+                        }));
+                        
+                        // 显示顶部通知条（不自动跳转，让店员主动选择）
                         showLightRequestAlert(data);
                         
-                        // 导航到灯条系统页面（如果当前不在该页面）
-                        const lightSystemContent = document.getElementById('light-system-content');
-                        if (!lightSystemContent || lightSystemContent.classList.contains('hidden')) {
-                            navigateTo('light-system');
-                            // 延迟处理灯条请求，确保页面已切换
-                            setTimeout(() => {
-                                handleCustomerLightRequest(data);
-                                activateLamps(data.items || []);
-                            }, 300);
-                        } else {
-                            // 已经在灯条系统页面，直接处理
-                            handleCustomerLightRequest(data);
-                            activateLamps(data.items || []);
-                        }
+                        // 更新侧边栏灯条徽章
+                        updateLightSystemBadge();
+                        
+                        // 刷新门店自提订单列表和主订单列表
+                        loadStorePickupOrders();
+                        loadStoreOrders();
                     }
+                    
+                    // 标记通知为已读（告知后端可以清理）
+                    try {
+                        await fetch(`${apiBase}/store/order-light/mark-read/${storeId}`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ 
+                                notificationIds: newNotifications.map(n => n.notificationId) 
+                            })
+                        });
+                    } catch (e) {
+                        // 忽略标记失败
+                    }
+                    
                 } catch (e) {
-                    console.warn('【M端】灯条请求轮询检测失败:', e);
+                    console.warn('[M端] API轮询检测失败:', e.message);
                 }
             }, 2000);
         }
@@ -2837,7 +2890,10 @@
                     </div>
                 </div>
                 <div style="display: flex; gap: 8px;">
-                    <button onclick="viewLightRequestDetail()" style="background: white; color: #ff5722; border: none; padding: 8px 16px; border-radius: 20px; cursor: pointer; font-weight: 600;">
+                    <button onclick="navigateToLightAndProcess()" style="background: white; color: #ff5722; border: none; padding: 8px 16px; border-radius: 20px; cursor: pointer; font-weight: 600;">
+                        🔦 前往处理
+                    </button>
+                    <button onclick="viewLightRequestDetail()" style="background: rgba(255,255,255,0.3); color: white; border: 1px solid rgba(255,255,255,0.5); padding: 8px 16px; border-radius: 20px; cursor: pointer;">
                         查看详情
                     </button>
                     <button onclick="dismissLightAlert()" style="background: rgba(255,255,255,0.2); color: white; border: none; padding: 8px 12px; border-radius: 50%; cursor: pointer;">
@@ -2851,7 +2907,7 @@
             // 添加页面顶部内边距，避免遮挡
             document.body.style.paddingTop = '60px';
             
-            // 10秒后自动隐藏
+            // 30秒后自动隐藏（给店员足够时间反应）
             setTimeout(() => {
                 const el = document.getElementById('light-request-alert');
                 if (el) {
@@ -2861,7 +2917,7 @@
                         document.body.style.paddingTop = '0';
                     }, 300);
                 }
-            }, 10000);
+            }, 30000);
         }
         
         // 查看灯条请求详情
@@ -2889,6 +2945,82 @@
                 }, 300);
             }
         };
+        
+        // 前往灯条系统并处理当前请求
+        window.navigateToLightAndProcess = function() {
+            // 保存当前灯条请求数据供灯条页面使用
+            const request = localStorage.getItem('store_light_request');
+            let data = null;
+            if (request) {
+                try {
+                    data = JSON.parse(request);
+                } catch (e) {}
+            }
+            
+            // 先导航到灯条系统
+            navigateTo('light-system');
+            
+            // 延迟处理，等待页面渲染完成
+            setTimeout(() => {
+                if (data) {
+                    handleCustomerLightRequest(data);
+                    activateLamps(data.items || []);
+                }
+                // 刷新门店自提订单
+                loadStorePickupOrders();
+            }, 300);
+            
+            dismissLightAlert();
+        };
+        
+        // 更新侧边栏灯条系统徽章（显示待处理数量）
+        function updateLightSystemBadge() {
+            const badgeEl = document.getElementById('light-system-badge');
+            if (!badgeEl) return;
+            
+            const currentStore = JSON.parse(localStorage.getItem('currentStore') || '{}');
+            const storeId = currentStore.storeId || 'ST002';
+            
+            // 统计所有活跃的灯条请求（未过期 + 未被标记处理）
+            let pendingCount = 0;
+            const now = Date.now();
+            const validStoreIds = ['ST001', 'ST002', 'ALL', null, undefined, ''];
+            
+            // 检查全局灯条请求
+            const lightRequest = localStorage.getItem('store_light_request');
+            if (lightRequest) {
+                try {
+                    const request = JSON.parse(lightRequest);
+                    const isExpired = now - request.timestamp > 300000;
+                    if (!isExpired && (!request.storeId || validStoreIds.includes(request.storeId) || request.storeId === storeId)) {
+                        pendingCount++;
+                    }
+                } catch (e) {}
+            }
+            
+            // 检查单个物品灯条请求
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                if (key && key.startsWith('light_request_') && key !== 'store_light_request') {
+                    try {
+                        const request = JSON.parse(localStorage.getItem(key));
+                        if (request && request.timestamp) {
+                            const isExpired = now - request.timestamp > 300000;
+                            if (!isExpired && (!request.storeId || validStoreIds.includes(request.storeId) || request.storeId === storeId)) {
+                                pendingCount++;
+                            }
+                        }
+                    } catch (e) {}
+                }
+            }
+            
+            if (pendingCount > 0) {
+                badgeEl.textContent = pendingCount;
+                badgeEl.style.display = 'inline-block';
+            } else {
+                badgeEl.style.display = 'none';
+            }
+        }
         
         // 添加动画样式
         if (!document.querySelector('#light-alert-animation')) {
@@ -3033,7 +3165,7 @@
             showToast('已通知用户：物品准备中', 'success');
         };
         
-        // 查看请求对应的订单详情
+        // 查看请求对应的订单详情（在M端弹窗中显示）
         window.viewRequestOrderDetail = function() {
             const request = localStorage.getItem('store_light_request');
             if (!request) {
@@ -3045,13 +3177,13 @@
                 const data = JSON.parse(request);
                 const orderId = data.orderId;
                 
-                // 保存当前要查看的订单ID，M端会打开新窗口
-                localStorage.setItem('viewOrderFromM', orderId);
+                if (!orderId) {
+                    showToast('未找到订单ID', 'error');
+                    return;
+                }
                 
-                // 打开C端订单详情页（在新窗口）
-                window.open(`c-order-detail.html?id=${orderId}`, '_blank');
-                
-                showToast(`正在打开订单 ${orderId} 详情...`, 'info');
+                // 在M端弹窗中显示订单详情
+                viewOrder(orderId);
             } catch (e) {
                 console.error('【灯条】查看订单详情失败:', e);
                 showToast('查看订单详情失败', 'error');
@@ -3074,15 +3206,18 @@
             
             // 合并并筛选待取件订单
             const allOrders = [...storeOrders, ...orders];
+            const TERMINAL_STATUSES = ['out', 'customer_picked_up', 'completed', 'checked_out', 'picked_up'];
             const pendingPickupOrders = allOrders.filter(order => {
                 const orderStoreId = order.storeId || (order.store ? order.store.id : null);
                 if (orderStoreId !== storeId) return false;
                 
-                // 检查物品状态
+                // 检查物品状态（双重检查 status + itemStatus）
                 const items = order.items || order.services || [];
                 return items.some(item => {
                     const status = item.status || '';
-                    return ['ready', 'cleaned', 'awaiting_pickup', 'lighted'].includes(status);
+                    const itemStatus = item.itemStatus || '';
+                    const isTerminal = TERMINAL_STATUSES.includes(status) || TERMINAL_STATUSES.includes(itemStatus);
+                    return !isTerminal && ['ready', 'cleaned', 'awaiting_pickup', 'lighted', 'received'].includes(status);
                 });
             });
             
@@ -3111,9 +3246,17 @@
                 const customerName = order.contact?.name || order.customerName || '客户';
                 const createTime = order.createTime || (order.createdAt ? new Date(order.createdAt).toLocaleString() : '');
                 
-                const pendingItems = items.filter(item => {
+                // 收集待出库物品时保留原始索引，避免过滤后index错位
+                // 【双重过滤】同时检查 status 和 itemStatus，防止任一字段残留导致已出库物品仍显示
+                const TERMINAL_STATUSES = ['out', 'customer_picked_up', 'completed', 'checked_out', 'picked_up'];
+                const pendingItems = [];
+                items.forEach((item, origIdx) => {
                     const status = item.status || '';
-                    return ['ready', 'cleaned', 'awaiting_pickup', 'lighted'].includes(status);
+                    const itemStatus = item.itemStatus || '';
+                    const isTerminal = TERMINAL_STATUSES.includes(status) || TERMINAL_STATUSES.includes(itemStatus);
+                    if (!isTerminal && ['ready', 'cleaned', 'awaiting_pickup', 'lighted', 'received'].includes(status)) {
+                        pendingItems.push({ item, _origIdx: origIdx });
+                    }
                 });
                 
                 if (pendingItems.length === 0) return '';
@@ -3128,22 +3271,22 @@
                             <span class="text-xs text-gray-400">${createTime}</span>
                         </div>
                         <div class="space-y-2">
-                            ${pendingItems.map((item, itemIndex) => {
-                                const itemId = `${orderId}-${itemIndex}`;
+                            ${pendingItems.map(({ item, _origIdx }) => {
+                                const itemId = `${orderId}-${_origIdx}`;
                                 const isActive = activeItemIds.includes(itemId);
                                 const itemName = item.name || item.serviceName || '物品';
                                 
                                 return `
                                     <div class="flex items-center gap-3 p-3 bg-white rounded-lg ${isActive ? 'ring-2 ring-yellow-400 bg-yellow-50' : ''}">
                                         <div class="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${isActive ? 'bg-yellow-400 text-white' : 'bg-gray-200 text-gray-600'}">
-                                            ${isActive ? '💡' : itemIndex + 1}
+                                            ${isActive ? '💡' : _origIdx + 1}
                                         </div>
                                         <div class="flex-1">
                                             <div class="font-medium text-gray-800">${itemName}</div>
                                             <div class="text-xs text-gray-500">¥${item.price || 0}</div>
                                         </div>
                                         <div class="flex gap-2">
-                                            <button onclick="outboundItem('${orderId}', ${itemIndex}, '${itemName}')" 
+                                            <button onclick="outboundItem('${orderId}', ${_origIdx}, '${itemName}')" 
                                                     class="bg-green-500 text-white px-3 py-1 rounded text-xs hover:bg-green-600">
                                                 出库
                                             </button>
@@ -3167,19 +3310,89 @@
         
         // 物品出库
         window.outboundItem = function(orderId, itemIndex, itemName) {
-            if (!confirm(`确认物品"${itemName}"已出库？`)) return;
+            console.log(`[出库] 开始处理: 订单=${ orderId}, 物品索引=${ itemIndex}, 名称="${ itemName}"`);
             
-            // 更新订单中的物品状态
-            updateItemStatus(orderId, itemIndex, 'out');
+            // 直接更新本地数据，不弹确认框（outboundItem自己已经confirm过了）
+            const updatedOrder = _updateItemStatusCore(orderId, itemIndex, 'out');
+            if (!updatedOrder) { 
+                console.error(`[出库] ❌ 未找到订单: ${ orderId}`);
+                showToast('未找到订单: ' + orderId, 'error'); 
+                return; 
+            }
+            
+            console.log(`[出库] ✅ 本地状态已更新, order.status=${ updatedOrder.status}`);
             
             // 移除激活灯条
             removeActiveLamp(orderId, itemIndex);
             
-            // 检查是否所有物品都已出库
-            checkOrderComplete(orderId);
+            // 【关键修复】清理对应的 light_request_* 缓存键，防止残留数据导致订单继续显示在列表中
+            try {
+                for (let i = 0; i < localStorage.length; i++) {
+                    const key = localStorage.key(i);
+                    if (key && key.startsWith('light_request_') && key.includes(orderId)) {
+                        console.log(`[出库] 🧹 清理灯条请求缓存: ${ key}`);
+                        localStorage.removeItem(key);
+                    }
+                }
+                // 同时检查 store_light_request 是否属于当前订单
+                const storeReq = localStorage.getItem('store_light_request');
+                if (storeReq) {
+                    try {
+                        const parsed = JSON.parse(storeReq);
+                        if (parsed.orderId === orderId) {
+                            console.log('[出库] 🧹 清理全局灯条请求: store_light_request');
+                            localStorage.removeItem('store_light_request');
+                        }
+                    } catch(e) {}
+                }
+            } catch(e) {
+                console.warn('[出库] 清理light_request缓存时出错:', e);
+            }
             
-            showToast(`物品"${itemName}"已出库`, 'success');
-            refreshPickupItems();
+            // 检查是否所有物品都已出库
+            const allOut = (updatedOrder.items || []).every(i => 
+                ['out', 'customer_picked_up', 'completed'].includes(i.status) ||
+                ['checked_out', 'picked_up'].includes(i.itemStatus)
+            );
+            
+            if (allOut) {
+                // 全部出库 → 关闭灯条弹窗，同步到API并标记完成（checkOrderComplete统一处理API同步，避免双重PUT）
+                _syncItemStatusToAPI(orderId, updatedOrder.status, updatedOrder.items || []);
+                checkOrderComplete(orderId);
+                closeLightGuideModal();
+            } else {
+                // 部分出库 → 同步物品状态到API
+                _syncItemStatusToAPI(orderId, updatedOrder.status, updatedOrder.items || []);
+                
+                // 刷新灯条管理列表和门店自提区，保持联动
+                refreshPickupItems();
+                if (typeof loadStorePickupOrders === 'function') loadStorePickupOrders();
+                
+                // 如果灯条引导弹窗还开着，用剩余待出库物品重新渲染它
+                if (document.getElementById('light-guide-modal')) {
+                    const remainingItems = (updatedOrder.items || []).filter(item => 
+                        !['out', 'customer_picked_up', 'completed'].includes(item.status) &&
+                        !['checked_out', 'picked_up'].includes(item.itemStatus)
+                    );
+                    if (remainingItems.length > 0) {
+                        // 用第一个剩余物品重新显示弹窗
+                        const nextIdx = updatedOrder.items.indexOf(remainingItems[0]);
+                        showLightGuideModal({
+                            orderId: orderId,
+                            itemIndex: nextIdx,
+                            itemName: remainingItems[0].name || remainingItems[0].serviceName || '物品'
+                        });
+                    } else {
+                        closeLightGuideModal();
+                    }
+                }
+            }
+            
+            const remainingCount = (updatedOrder.items||[]).filter(i => 
+                !['out','completed','customer_picked_up'].includes(i.status) &&
+                !['checked_out','picked_up'].includes(i.itemStatus)
+            ).length;
+            showToast(`物品"${itemName}"已出库${allOut ? '' : '，还有 ' + remainingCount + ' 件待出库'}`, 'success');
         };
         
         // 批量出库订单所有物品
@@ -3194,63 +3407,62 @@
             if (order) {
                 const items = order.items || order.services || [];
                 items.forEach((item, index) => {
-                    updateItemStatus(orderId, index, 'out');
+                    _updateItemStatusCore(orderId, index, 'out');
                 });
+                
+                // 重新读取更新后的物品数据（_updateItemStatusCore 会写回localStorage，需重新获取）
+                const updatedStoreOrders = JSON.parse(localStorage.getItem('store_orders') || '[]');
+                const updatedOrder = updatedStoreOrders.find(o => 
+                    o.orderId === orderId || o._id === orderId || o.orderNo === orderId || o.id === orderId
+                );
+                const updatedItems = updatedOrder ? (updatedOrder.items || updatedOrder.services || []) : items;
+                
+                // 同步到后端（异步）
+                _syncItemStatusToAPI(orderId, 'completed', updatedItems);
             }
             
             // 清除该订单的所有激活灯条
             clearOrderLamps(orderId);
             
-            // 更新订单状态为已完成
-            updateOrderStatus(orderId, 'completed');
+            // 清理对应的 light_request 缓存键
+            try {
+                for (let i = localStorage.length - 1; i >= 0; i--) {
+                    const key = localStorage.key(i);
+                    if (key && key.startsWith('light_request_') && key.includes(orderId)) {
+                        localStorage.removeItem(key);
+                    }
+                }
+                const storeReq = localStorage.getItem('store_light_request');
+                if (storeReq) {
+                    try { const p = JSON.parse(storeReq); if (p.orderId === orderId) localStorage.removeItem('store_light_request'); } catch(e) {}
+                }
+            } catch(e) {}
+            
+            // 直接更新订单状态为已完成
+            _updateOrderStatusLocal(orderId, 'completed');
             
             showToast('订单所有物品已出库，订单已完成', 'success');
             refreshPickupItems();
         };
         
-        // 更新物品状态
-        function updateItemStatus(orderId, itemIndex, newStatus) {
-            const storeOrders = JSON.parse(localStorage.getItem('store_orders') || '[]');
-            const orders = JSON.parse(localStorage.getItem('orders') || '[]');
-            
-            // 更新store_orders
-            const storeOrderIdx = storeOrders.findIndex(o => (o.orderId || o.id || o._id) === orderId);
-            if (storeOrderIdx > -1) {
-                const items = storeOrders[storeOrderIdx].items || storeOrders[storeOrderIdx].services || [];
-                if (items[itemIndex]) {
-                    items[itemIndex].status = newStatus;
-                    items[itemIndex].outboundTime = new Date().toISOString();
-                    localStorage.setItem('store_orders', JSON.stringify(storeOrders));
-                }
-            }
-            
-            // 更新orders
-            const orderIdx = orders.findIndex(o => (o.orderId || o.id || o._id) === orderId);
-            if (orderIdx > -1) {
-                const items = orders[orderIdx].items || orders[orderIdx].services || [];
-                if (items[itemIndex]) {
-                    items[itemIndex].status = newStatus;
-                    items[itemIndex].outboundTime = new Date().toISOString();
-                    localStorage.setItem('orders', JSON.stringify(orders));
-                }
-            }
-        }
+
         
-        // 更新订单状态
-        function updateOrderStatus(orderId, newStatus) {
+        // 更新订单状态（纯本地操作，供出库/完成流程调用）
+        function _updateOrderStatusLocal(orderId, newStatus) {
             const storeOrders = JSON.parse(localStorage.getItem('store_orders') || '[]');
             const orders = JSON.parse(localStorage.getItem('orders') || '[]');
             
-            const updateOrders = (arr) => {
+            const updateArr = (arr) => {
                 const idx = arr.findIndex(o => (o.orderId || o.id || o._id) === orderId);
                 if (idx > -1) {
                     arr[idx].status = newStatus;
                     arr[idx].completedAt = new Date().toISOString();
+                    arr[idx].updatedAt = new Date().toISOString();
                 }
             };
             
-            updateOrders(storeOrders);
-            updateOrders(orders);
+            updateArr(storeOrders);
+            updateArr(orders);
             
             localStorage.setItem('store_orders', JSON.stringify(storeOrders));
             localStorage.setItem('orders', JSON.stringify(orders));
@@ -3270,6 +3482,9 @@
             localStorage.setItem('activeLamps', JSON.stringify(filtered));
         }
         
+        // 并发PUT锁：防止同一订单短时间内重复调用API
+        const _completionLocks = new Map();
+        
         // 检查订单是否完成
         function checkOrderComplete(orderId) {
             const storeOrders = JSON.parse(localStorage.getItem('store_orders') || '[]');
@@ -3279,19 +3494,57 @@
             const order = allOrders.find(o => (o.orderId || o.id || o._id) === orderId);
             if (order) {
                 const items = order.items || order.services || [];
-                const allOut = items.every(item => item.status === 'out' || item.status === 'customer_picked_up');
+                const allOut = items.every(item => ['out','customer_picked_up','completed','checked_out','picked_up'].includes(item.status) || ['out','customer_picked_up','completed','checked_out','picked_up'].includes(item.itemStatus));
                 
-                if (allOut) {
-                    updateOrderStatus(orderId, 'completed');
+                if (allOut && items.length > 0) {
+                    _updateOrderStatusLocal(orderId, 'completed');
+                    
+                    // 防并发：同一订单2秒内不重复发送
+                    const lockKey = orderId;
+                    const lastTime = _completionLocks.get(lockKey) || 0;
+                    if (Date.now() - lastTime < 2000) {
+                        console.log(`[checkOrderComplete] 跳过重复请求: ${orderId}`);
+                        showToast('订单所有物品已出库，订单已完成', 'success');
+                        return;
+                    }
+                    _completionLocks.set(lockKey, Date.now());
+                    
+                    // 异步同步到后端（带错误日志）
+                    const itemsForApi = items.map(item => ({
+                        ...item,
+                        status: item.status || 'completed',
+                        itemStatus: item.itemStatus || 'checked_out'
+                    }));
+                    setTimeout(() => {
+                        fetch(`http://localhost:3000/api/cleaning/orders/${orderId}/status`, {
+                            method: 'PUT',
+                            headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-cache' },
+                            body: JSON.stringify({ 
+                                status: 'completed',
+                                note: ORDER_STATUS.completed?.text || '已完成',
+                                userId: 'store_staff',
+                                items: itemsForApi
+                            })
+                        }).then(async res => {
+                            if (!res.ok) {
+                                const errBody = await res.text();
+                                console.error(`[checkOrderComplete] ❌ API返回错误(${res.status}): ${errBody}`, 'orderId:', orderId);
+                            } else {
+                                console.log(`[checkOrderComplete] ✅ API同步成功: ${orderId} → completed`);
+                            }
+                        }).catch(err => {
+                            console.error('[checkOrderComplete] ❌ 网络错误:', err.message, 'orderId:', orderId);
+                        });
+                    }, 50);
+                    
                     showToast('订单所有物品已出库，订单已完成', 'success');
                     
                     // 通知C端
-                    const response = {
+                    localStorage.setItem('store_light_response', JSON.stringify({
                         action: 'order_completed',
                         orderId: orderId,
                         timestamp: Date.now()
-                    };
-                    localStorage.setItem('store_light_response', JSON.stringify(response));
+                    }));
                 }
             }
         }
@@ -3339,6 +3592,7 @@
             const storeOrders = JSON.parse(localStorage.getItem('store_orders') || '[]');
             const orders = JSON.parse(localStorage.getItem('orders') || '[]');
             const allOrders = [...storeOrders, ...orders];
+            const TERMINAL_STATUSES = ['out', 'customer_picked_up', 'completed', 'checked_out', 'picked_up'];
             
             allOrders.forEach(order => {
                 const orderStoreId = order.storeId || (order.store ? order.store.id : null);
@@ -3350,7 +3604,9 @@
                 
                 items.forEach((item, index) => {
                     const status = item.status || '';
-                    if (['ready', 'cleaned', 'awaiting_pickup', 'lighted'].includes(status)) {
+                    const itemStatus = item.itemStatus || '';
+                    const isTerminal = TERMINAL_STATUSES.includes(status) || TERMINAL_STATUSES.includes(itemStatus);
+                    if (!isTerminal && ['ready', 'cleaned', 'awaiting_pickup', 'lighted'].includes(status)) {
                         updateItemStatus(orderId, index, 'out');
                         hasReady = true;
                     }
@@ -3358,6 +3614,14 @@
                 
                 if (hasReady) {
                     updateOrderStatus(orderId, 'completed');
+                }
+                
+                // 清理对应的 light_request 缓存
+                for (let i = localStorage.length - 1; i >= 0; i--) {
+                    const key = localStorage.key(i);
+                    if (key && key.startsWith('light_request_') && key.includes(orderId)) {
+                        localStorage.removeItem(key);
+                    }
                 }
             });
             
@@ -3370,6 +3634,8 @@
         
         // 关闭所有灯条
         window.turnOffAllLamps = function() {
+            // 调用后端API关闭所有灯条
+            triggerAllLightsOff();
             localStorage.setItem('activeLamps', JSON.stringify([]));
             showToast('所有灯条已关闭', 'success');
             refreshPickupItems();
@@ -3395,6 +3661,300 @@
                 setTimeout(() => toast.remove(), 300);
             }, 2500);
         }
+        
+        // ========================================
+        // 灯条触发控制 - 后端API交互
+        // ========================================
+        
+        // 获取当前门店ID
+        function getCurrentStoreId() {
+            const currentStore = JSON.parse(localStorage.getItem('currentStore') || '{}');
+            return currentStore.storeId || 'ST002';
+        }
+        
+        // 获取API基础地址
+        function getApiBaseUrl() {
+            if (typeof API_CONFIG !== 'undefined' && API_CONFIG.baseUrl) {
+                return API_CONFIG.baseUrl;
+            }
+            return 'http://localhost:3000/api';
+        }
+        
+        // 检查MQTT连接状态
+        async function checkMQTTStatus() {
+            try {
+                const apiBase = getApiBaseUrl();
+                const resp = await fetch(`${apiBase}/store/status`);
+                const data = await resp.json();
+                const dot = document.getElementById('mqtt-status-dot');
+                const text = document.getElementById('mqtt-status-text');
+                if (dot && text) {
+                    if (data.success && data.data && data.data.mqttConnected) {
+                        dot.className = 'w-1.5 h-1.5 rounded-full bg-green-500';
+                        text.textContent = 'MQTT已连接';
+                    } else {
+                        dot.className = 'w-1.5 h-1.5 rounded-full bg-red-500';
+                        text.textContent = 'MQTT未连接';
+                    }
+                }
+            } catch (e) {
+                console.warn('检查MQTT状态失败:', e);
+                const dot = document.getElementById('mqtt-status-dot');
+                const text = document.getElementById('mqtt-status-text');
+                if (dot && text) {
+                    dot.className = 'w-1.5 h-1.5 rounded-full bg-gray-400';
+                    text.textContent = '无法检测';
+                }
+            }
+        }
+        
+        // 加载终端状态
+        async function loadTerminalStatus() {
+            const storeId = getCurrentStoreId();
+            const terminalList = document.getElementById('terminal-list');
+            const terminalCount = document.getElementById('terminal-count');
+            
+            if (!terminalList) return;
+            
+            try {
+                const apiBase = getApiBaseUrl();
+                
+                // 获取终端列表
+                const terminalsResp = await fetch(`${apiBase}/store/terminals`);
+                const terminalsData = await terminalsResp.json();
+                
+                // 获取门店灯条状态
+                const storeLightsResp = await fetch(`${apiBase}/store/store/${storeId}/terminal-lights`);
+                const storeLightsData = await storeLightsResp.json();
+                
+                const allTerminals = terminalsData.data || {};
+                const storeLights = storeLightsData.data?.lights || [];
+                const mqttConnected = terminalsData.mqttConnected || false;
+                
+                // 更新MQTT状态
+                const dot = document.getElementById('mqtt-status-dot');
+                const text = document.getElementById('mqtt-status-text');
+                if (dot && text) {
+                    dot.className = `w-1.5 h-1.5 rounded-full ${mqttConnected ? 'bg-green-500' : 'bg-red-500'}`;
+                    text.textContent = mqttConnected ? 'MQTT已连接' : 'MQTT未连接';
+                }
+                
+                // 获取所有门店的终端（扁平化）
+                let terminals = [];
+                for (const [sid, termMap] of Object.entries(allTerminals)) {
+                    for (const [tid, info] of Object.entries(termMap)) {
+                        terminals.push({
+                            storeId: sid,
+                            terminalId: tid,
+                            online: info.online !== false,
+                            subscribed: info.subscribed || false,
+                            lastHeartbeat: info.lastHeartbeat || 0,
+                            metadata: info.metadata || {}
+                        });
+                    }
+                }
+                
+                // 过滤当前门店的终端
+                const storeTerminals = terminals.filter(t => t.storeId === storeId);
+                
+                // 也显示其他门店终端（标记不同）
+                const otherTerminals = terminals.filter(t => t.storeId !== storeId);
+                
+                // 更新计数
+                if (terminalCount) {
+                    const onlineCount = storeTerminals.filter(t => t.online).length;
+                    terminalCount.textContent = `(本店 ${onlineCount}/${storeTerminals.length} 在线)`;
+                }
+                
+                // 渲染终端列表
+                if (terminals.length === 0) {
+                    terminalList.innerHTML = `
+                        <div class="col-span-full text-center py-8 text-gray-400">
+                            <i class="fa fa-plug text-3xl mb-2 block"></i>
+                            <p class="text-sm">暂无在线终端</p>
+                            <p class="text-xs mt-1">请确保灯条设备已连接MQTT</p>
+                        </div>
+                    `;
+                    return;
+                }
+                
+                // 先去重（按 lightId）
+                const seen = new Set();
+                const uniqueTerminals = terminals.filter(t => {
+                    const key = `${t.storeId}_${t.terminalId}`;
+                    if (seen.has(key)) return false;
+                    seen.add(key);
+                    return true;
+                });
+                
+                terminalList.innerHTML = uniqueTerminals.map(t => {
+                    const isOnline = t.online;
+                    const isCurrentStore = t.storeId === storeId;
+                    const lightId = t.metadata.lightId || t.terminalId;
+                    const lightName = t.metadata.name || lightId;
+                    const lastHb = t.lastHeartbeat ? Math.floor((Date.now() - t.lastHeartbeat) / 1000) : 999;
+                    const hbText = lastHb < 60 ? `${lastHb}秒前` : '离线';
+                    
+                    return `
+                        <div class="border rounded-lg p-3 ${isCurrentStore ? 'border-blue-200 bg-blue-50/30' : 'border-gray-200 bg-gray-50'}">
+                            <div class="flex items-center justify-between mb-2">
+                                <div class="flex items-center gap-2">
+                                    <span class="w-2 h-2 rounded-full ${isOnline ? 'bg-green-500 animate-pulse' : 'bg-gray-400'}"></span>
+                                    <span class="font-medium text-sm text-gray-800">${lightName}</span>
+                                </div>
+                                <span class="text-xs ${isOnline ? 'text-green-600' : 'text-gray-400'}">${isOnline ? hbText : '离线'}</span>
+                            </div>
+                            <div class="text-xs text-gray-500 mb-2">
+                                <span>ID: ${lightId}</span>
+                                ${!isCurrentStore ? `<span class="ml-1 text-blue-500">(${t.storeId})</span>` : ''}
+                            </div>
+                            <div class="flex gap-1">
+                                <button onclick="triggerSingleLightOn('${lightId}')" 
+                                    class="flex-1 bg-green-500 text-white px-2 py-1 rounded text-xs hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed" 
+                                    ${!isOnline ? 'disabled' : ''}>
+                                    <i class="fa fa-lightbulb-o"></i> 点亮
+                                </button>
+                                <button onclick="triggerSingleLightOff('${lightId}')" 
+                                    class="flex-1 bg-red-500 text-white px-2 py-1 rounded text-xs hover:bg-red-600 disabled:opacity-50 disabled:cursor-not-allowed" 
+                                    ${!isOnline ? 'disabled' : ''}>
+                                    <i class="fa fa-power-off"></i> 关闭
+                                </button>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+                
+            } catch (e) {
+                console.error('加载终端状态失败:', e);
+                terminalList.innerHTML = `
+                    <div class="col-span-full text-center py-8 text-red-400">
+                        <i class="fa fa-exclamation-triangle text-3xl mb-2 block"></i>
+                        <p class="text-sm">加载失败: ${e.message}</p>
+                        <button onclick="loadTerminalStatus()" class="mt-2 text-blue-500 hover:text-blue-700 text-xs">
+                            <i class="fa fa-refresh mr-1"></i>重试
+                        </button>
+                    </div>
+                `;
+            }
+        }
+        
+        // 触发点亮单个灯条
+        async function triggerSingleLightOn(lightId) {
+            const storeId = getCurrentStoreId();
+            try {
+                const apiBase = getApiBaseUrl();
+                const resp = await fetch(`${apiBase}/store/lights/${storeId}/turn-on`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ lightId, color: 'green', priority: 'normal' })
+                });
+                const data = await resp.json();
+                if (data.success) {
+                    showToast(`灯条 ${lightId} 已点亮`, 'success');
+                } else {
+                    showToast(`点亮失败: ${data.message || '未知错误'}`, 'error');
+                }
+            } catch (e) {
+                console.error('点亮灯条失败:', e);
+                showToast(`点亮失败: ${e.message}`, 'error');
+            }
+        }
+        
+        // 触发关闭单个灯条
+        async function triggerSingleLightOff(lightId) {
+            const storeId = getCurrentStoreId();
+            try {
+                const apiBase = getApiBaseUrl();
+                const resp = await fetch(`${apiBase}/store/lights/${storeId}/turn-off`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ lightId })
+                });
+                const data = await resp.json();
+                if (data.success) {
+                    showToast(`灯条 ${lightId} 已关闭`, 'success');
+                } else {
+                    showToast(`关闭失败: ${data.message || '未知错误'}`, 'error');
+                }
+            } catch (e) {
+                console.error('关闭灯条失败:', e);
+                showToast(`关闭失败: ${e.message}`, 'error');
+            }
+        }
+        
+        // 触发点亮指定灯条（从输入框读取）
+        window.triggerLightOn = async function() {
+            const lightId = document.getElementById('trigger-light-id')?.value.trim();
+            if (!lightId) {
+                showToast('请输入灯条ID', 'warning');
+                return;
+            }
+            await triggerSingleLightOn(lightId);
+        };
+        
+        // 触发关闭指定灯条（从输入框读取）
+        window.triggerLightOff = async function() {
+            const lightId = document.getElementById('trigger-light-id')?.value.trim();
+            if (!lightId) {
+                showToast('请输入灯条ID', 'warning');
+                return;
+            }
+            await triggerSingleLightOff(lightId);
+        };
+        
+        // 全部点亮
+        window.triggerAllLightsOn = async function() {
+            const storeId = getCurrentStoreId();
+            const color = document.getElementById('trigger-light-color')?.value || 'green';
+            const priority = document.getElementById('trigger-light-priority')?.value || 'normal';
+            
+            try {
+                const apiBase = getApiBaseUrl();
+                const resp = await fetch(`${apiBase}/store/lights/${storeId}/turn-on-all`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ color, priority })
+                });
+                const data = await resp.json();
+                if (data.success) {
+                    showToast(`门店 ${storeId} 全部灯条已点亮 (${color})`, 'success');
+                } else {
+                    showToast(`点亮失败: ${data.message || '未知错误'}`, 'error');
+                }
+            } catch (e) {
+                console.error('全部点亮失败:', e);
+                showToast(`点亮失败: ${e.message}`, 'error');
+            }
+        };
+        
+        // 全部关闭
+        window.triggerAllLightsOff = async function() {
+            const storeId = getCurrentStoreId();
+            
+            try {
+                const apiBase = getApiBaseUrl();
+                const resp = await fetch(`${apiBase}/store/lights/${storeId}/turn-off-all`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({})
+                });
+                const data = await resp.json();
+                if (data.success) {
+                    showToast(`门店 ${storeId} 全部灯条已关闭`, 'success');
+                } else {
+                    showToast(`关闭失败: ${data.message || '未知错误'}`, 'error');
+                }
+            } catch (e) {
+                console.error('全部关闭失败:', e);
+                showToast(`关闭失败: ${e.message}`, 'error');
+            }
+        };
+        
+        // 暴露给全局
+        window.loadTerminalStatus = loadTerminalStatus;
+        window.checkMQTTStatus = checkMQTTStatus;
+        window.triggerSingleLightOn = triggerSingleLightOn;
+        window.triggerSingleLightOff = triggerSingleLightOff;
         
         // ========================================
         
@@ -3499,6 +4059,52 @@
                 console.log('M端订单已同步，刷新列表...');
                 loadStoreOrders();
             });
+
+            // 启动订单实时事件监听（MQTT WebSocket）
+            try {
+                const storeUser = JSON.parse(localStorage.getItem('storeUser') || '{}');
+                const currentStore = JSON.parse(localStorage.getItem('currentStore') || '{}');
+                const myStoreId = currentStore.storeId || storeUser.storeId || 'ST002';
+                
+                if (typeof OrderEventClient !== 'undefined') {
+                    OrderEventClient.start({
+                        storeId: myStoreId,
+                        mode: 'store',
+                        onOrderUpdate: (event) => {
+                            // 事件去重：同一订单+同一事件2秒内不重复处理
+                            const eventKey = `${event.orderId || event.orderNo}:${event.event}`;
+                            const lastEventTime = _recentEvents.get(eventKey) || 0;
+                            if (Date.now() - lastEventTime < 2000) {
+                                console.log('【实时事件】跳过重复事件:', event.event, event.orderNo);
+                                return;
+                            }
+                            _recentEvents.set(eventKey, Date.now());
+                            // 清理旧的去重记录（保留最近30条）
+                            if (_recentEvents.size > 30) {
+                                const oldestKey = _recentEvents.keys().next().value;
+                                _recentEvents.delete(oldestKey);
+                            }
+                            
+                            console.log('【实时事件】收到订单更新:', event.event, event.orderNo);
+                            // 收到实时事件后刷新订单列表（自带防抖）
+                            loadStoreOrders();
+                            // 如果是新订单，显示通知
+                            if (event.event === 'order_created') {
+                                showOrderNotification('新订单', `订单 ${event.orderNo} 已创建`);
+                            } else if (event.event === 'order_paid') {
+                                showOrderNotification('支付成功', `订单 ${event.orderNo} 已支付 ¥${event.totalAmount}`);
+                            }
+                        },
+                        onConnect: () => {
+                            console.log('【实时事件】已连接到 MQTT，实时同步已开启');
+                        }
+                    });
+                } else {
+                    console.log('[实时事件] OrderEventClient 未加载，使用轮询模式');
+                }
+            } catch (e) {
+                console.error('[实时事件] 启动失败，不影响其他功能:', e.message);
+            }
             
             // 启动灯条请求实时检测（每2秒检测一次）
             startLightRequestPolling();
@@ -3536,6 +4142,11 @@
                     try {
                         const lightRequest = JSON.parse(e.newValue);
                         handleLightRequest(lightRequest);
+                        // 处理后清除请求键，避免重复检查
+                        setTimeout(() => {
+                            localStorage.removeItem(e.key);
+                            console.log('[M端-storage] 已清除灯条请求键:', e.key);
+                        }, 3000);
                     } catch (err) {
                         console.error('解析灯条请求失败:', err);
                     }
@@ -3648,8 +4259,23 @@
                                     if (storeMatch) {
                                         console.log('[M端-主动检查] ✅ 发现待处理灯条请求:', request);
                                         handleLightRequest(request);
-                                        // 标记为已处理（使用timestamp作为唯一标识）
+                                        // 标记为已处理并清除原始key，避免后续重复检查
                                         localStorage.setItem(requestId, 'true');
+                                        console.log('[M端-主动检查] 处理完毕，清除请求键:', key);
+                                        localStorage.removeItem(key);
+                                    }
+                                } else if (isExpired) {
+                                    // 过期请求直接清除，避免垃圾数据堆积
+                                    console.log('[M端-主动检查] 清除过期请求键:', key);
+                                    localStorage.removeItem(key);
+                                    localStorage.removeItem(requestId);
+                                } else if (isProcessed) {
+                                    // 已处理但未被清除的（兜底清理），保留5分钟后清理
+                                    const age = Date.now() - request.timestamp;
+                                    if (age > 600000) { // 10分钟仍留存则强制清理
+                                        console.log('[M端-主动检查] 清理滞留已处理键:', key);
+                                        localStorage.removeItem(key);
+                                        localStorage.removeItem(requestId);
                                     }
                                 }
                             }
@@ -4149,30 +4775,96 @@
             return `<span class="px-2 py-1 rounded-full text-xs font-medium ${statusInfo.bgClass} ${statusInfo.textClass}">${statusInfo.text}</span>`;
         }
         
+        // 订单通知弹窗
+        function showOrderNotification(title, message) {
+            // 创建通知元素
+            let notif = document.getElementById('order-event-notification');
+            if (!notif) {
+                notif = document.createElement('div');
+                notif.id = 'order-event-notification';
+                notif.style.cssText = 'position:fixed;top:20px;left:50%;transform:translateX(-50%);z-index:9999;padding:12px 24px;border-radius:12px;background:linear-gradient(135deg,#667eea,#764ba2);color:#fff;font-size:14px;box-shadow:0 4px 20px rgba(102,126,234,0.4);transition:all 0.3s;opacity:0;pointer-events:none;max-width:90vw;text-align:center;';
+                document.body.appendChild(notif);
+            }
+            notif.innerHTML = `<div style="font-weight:700;margin-bottom:4px">${title}</div><div>${message}</div>`;
+            notif.style.opacity = '1';
+            notif.style.transform = 'translateX(-50%) translateY(0)';
+            // 3秒后自动消失
+            clearTimeout(notif._timer);
+            notif._timer = setTimeout(() => {
+                notif.style.opacity = '0';
+                notif.style.transform = 'translateX(-50%) translateY(-20px)';
+            }, 3000);
+        }
+
         // 加载门店订单（从后端API）
-        async function loadStoreOrders() {
+        // 防抖：800ms 内的重复调用自动跳过，防止MQTT事件重复触发大量API请求
+        let _loadStoreOrdersTimer = null;
+        let _lastLoadStoreOrdersTime = 0;
+        const _LOAD_DEBOUNCE_MS = 800;
+        // 记录最近处理的事件，防止同一订单同一事件重复处理
+        const _recentEvents = new Map(); // key: "orderId:event", value: timestamp
+        // 缓存：避免每次都重新解析不变的 localStorage 数据
+        let _lsCache = { storeUser: null, currentStore: null, _ts: 0 };
+        const _LS_CACHE_TTL = 2000; // 缓存有效期 2秒
+        
+        function _getLSCache(key) {
+            if (Date.now() - _lsCache._ts > _LS_CACHE_TTL) {
+                _lsCache._ts = Date.now();
+                _lsCache.storeUser = JSON.parse(localStorage.getItem('storeUser') || '{}');
+                _lsCache.currentStore = JSON.parse(localStorage.getItem('currentStore') || '{}');
+            }
+            return _lsCache[key];
+        }
+        
+        // 是否正在加载中（防止并发重复请求）
+        let _loadingStoreOrders = false;
+        // requestAnimationFrame 句柄（延迟渲染用）
+        let _renderRAF = null;
+        
+        async function loadStoreOrders(forceImmediate = false) {
+            const now = Date.now();
+            
+            // 非强制模式：800ms内的重复调用直接跳过
+            if (!forceImmediate && (now - _lastLoadStoreOrdersTime) < _LOAD_DEBOUNCE_MS) {
+                console.log('[门店订单] 跳过重复加载（距上次不足' + _LOAD_DEBOUNCE_MS + 'ms）');
+                // 但仍然设置一个定时器，保证最后一次调用能执行
+                if (_loadStoreOrdersTimer) clearTimeout(_loadStoreOrdersTimer);
+                _loadStoreOrdersTimer = setTimeout(() => loadStoreOrders(true), _LOAD_DEBOUNCE_MS);
+                return;
+            }
+            
+            // 并发保护：如果正在请求中，不再发起重复请求
+            if (_loadingStoreOrders && !forceImmediate) {
+                console.log('[门店订单] 正在请求中，跳过');
+                return;
+            }
+            
+            _lastLoadStoreOrdersTime = now;
+            _loadingStoreOrders = true;
+            
             try {
-                const storeUser = JSON.parse(localStorage.getItem('storeUser') || '{}');
-                const currentStore = JSON.parse(localStorage.getItem('currentStore') || '{}');
-                // 优先使用currentStore的storeId，确保门店切换后使用正确的ID
+                // 使用缓存的 localStorage 数据（避免重复解析）
+                const storeUser = _getLSCache('storeUser');
+                const currentStore = _getLSCache('currentStore');
                 const myStoreId = currentStore.storeId || storeUser.storeId || 'ST002';
                 
                 console.log('[门店订单] 正在从API获取订单, 门店ID:', myStoreId);
                 
                 let myOrders = [];
                 
-                // 1. 尝试从后端API获取订单
+                // 1. 尝试从后端API获取订单（获取所有状态，不限于pending）
                 try {
-                    const response = await fetch(`http://localhost:3000/api/admin/store/${myStoreId}/pending-orders`);
+                    const response = await fetch(`http://localhost:3000/api/cleaning/store/${myStoreId}/orders`);
                     const result = await response.json();
                     
                     if (result.success && result.data) {
+                        const orderList = result.data.list || result.data || [];
                         // API返回的数据需要按当前门店ID过滤
-                        myOrders = result.data.filter(order => {
+                        myOrders = orderList.filter(order => {
                             const orderStoreId = order.storeId || (order.store ? order.store.id : null);
                             return orderStoreId === myStoreId;
                         });
-                        console.log('[门店订单] 从API获取到', result.data.length, '条订单，过滤后', myOrders.length, '条');
+                        console.log('[门店订单] 从API获取到', orderList.length, '条订单，过滤后', myOrders.length, '条');
                     }
                 } catch (apiError) {
                     console.warn('[门店订单] API调用失败:', apiError.message);
@@ -4207,7 +4899,7 @@
                             storeId: orderStoreId
                         });
                     } else {
-                        // 更新已存在的订单状态
+                        // 【修复】更新已存在的订单 — 保护M端已操作的物品状态不被C端数据覆盖
                         const idx = myOrders.findIndex(o => 
                             o.orderId === cOrder.orderId || 
                             o.id === cOrder.orderId ||
@@ -4216,33 +4908,50 @@
                             o.orderNo === cOrder.orderNo
                         );
                         if (idx > -1) {
-                            // 保留API返回的数据，但更新状态
-                            // 特别注意：保留items字段，避免被覆盖
                             const existingItems = myOrders[idx].items || myOrders[idx].services || [];
                             const cOrderItems = cOrder.items || cOrder.services || [];
-                            // 合并items：优先使用C端的items（特别是当C端有modifiedAt标记时）
+                            
+                            // 【关键修复】items 合并策略：字段级补充，绝不整体替换
+                            // 原来的逻辑会在C端有modifiedAt/name时整体替换items，导致item.status全部丢失
+                            let mergedItems;
+                            if (cOrderItems.length > 0 && existingItems.length > 0 && cOrderItems.length === existingItems.length) {
+                                // 数量匹配时，逐个物品做字段级合并：保留本地status，只补C端的展示字段
+                                mergedItems = existingItems.map((existingItem, i) => {
+                                    const cItem = cOrderItems[i] || {};
+                                    return {
+                                        ...existingItem,   // 保留本地的完整数据（特别是status/barcode/receivedAt等）
+                                        // 只从C端补充可能缺失的展示性字段
+                                        ...(cItem.name && !existingItem.name ? { name: cItem.name } : {}),
+                                        ...(cItem.serviceName && !existingItem.serviceName ? { serviceName: cItem.serviceName } : {}),
+                                        ...(cItem.image && !existingItem.image ? { image: cItem.image } : {}),
+                                        ...(cItem.category && !existingItem.category ? { category: cItem.category } : {}),
+                                        ...(cItem.price !== undefined && existingItem.price === undefined ? { price: cItem.price } : {}),
+                                        ...(cItem.quantity !== undefined && existingItem.quantity === undefined ? { quantity: cItem.quantity } : {})
+                                    };
+                                });
+                            } else if (cOrderItems.length > 0 && existingItems.length === 0) {
+                                // 本地完全没有items时才使用C端数据
+                                mergedItems = cOrderItems;
+                            } else {
+                                // 数量不匹配或C端无数据，保留本地不变
+                                mergedItems = existingItems;
+                            }
+                            
+                            // 判断是否应该使用C端的订单级别状态
                             const c端ModifiedAt = cOrder.modifiedAt ? new Date(cOrder.modifiedAt) : null;
                             const existingModifiedAt = myOrders[idx].modifiedAt ? new Date(myOrders[idx].modifiedAt) : null;
-                            const shouldUseC端Items = cOrderItems.length > 0 && (
-                                (c端ModifiedAt && (!existingModifiedAt || c端ModifiedAt > existingModifiedAt)) ||
-                                (cOrderItems[0]?.name && !existingItems[0]?.name)
-                            );
-                            const mergedItems = shouldUseC端Items ? cOrderItems : existingItems;
-                            
-                            // 判断是否应该保留本地/C端的状态（如果C端有更新的modifiedAt）
                             const shouldUseC端Status = c端ModifiedAt && (!existingModifiedAt || c端ModifiedAt > existingModifiedAt);
                             
-                            // 合并订单数据，避免重复和字段丢失
+                            // 合并订单数据：【修复】排除 items 和 services 避免被 ...cOrder 覆盖
+                            const { items: _, services: __, ...cOrderWithoutItems } = cOrder;
                             myOrders[idx] = { 
                                 ...myOrders[idx], 
-                                ...cOrder, 
-                                orderId: myOrders[idx].orderId || cOrder.orderId, // 保持orderId一致
+                                ...cOrderWithoutItems,  // 展开C端数据但排除items/services
+                                orderId: myOrders[idx].orderId || cOrder.orderId,
                                 orderNo: myOrders[idx].orderNo || cOrder.orderNo || cOrder.orderId,
                                 items: mergedItems,
-                                services: cOrder.services || myOrders[idx].services || [],
-                                // 如果C端有更新的modifiedAt，保留C端的状态（修改后应为paid）
+                                services: mergedItems,  // services 与 items 保持一致
                                 status: shouldUseC端Status ? cOrder.status : (myOrders[idx].status || cOrder.status),
-                                // 保留最早创建时间和最新更新时间
                                 createdAt: myOrders[idx].createdAt || cOrder.createdAt,
                                 updatedAt: cOrder.updatedAt || myOrders[idx].updatedAt
                             };
@@ -4250,29 +4959,70 @@
                     }
                 });
                 
-                // 3. 从store_orders本地缓存补充（用于离线场景）
+                // 3. 从store_orders本地缓存合并（保护M端已操作的状态不被API旧数据覆盖）
                 const localStoreOrders = JSON.parse(localStorage.getItem('store_orders') || '[]');
                 localStoreOrders.forEach(localOrder => {
                     const orderStoreId = localOrder.storeId || (localOrder.store ? localOrder.store.id : null);
                     if (orderStoreId !== myStoreId) return;
                     
                     // 更严格的重复检查：检查所有可能的ID字段
-                    const exists = myOrders.find(o => {
+                    const existIdx = myOrders.findIndex(o => {
                         const sameOrderId = o.orderId && localOrder.orderId && o.orderId === localOrder.orderId;
                         const sameId = o.id && localOrder.id && o.id === localOrder.id;
                         const same_id = o._id && localOrder._id && o._id === localOrder._id;
                         const sameOrderNo = o.orderNo && localOrder.orderNo && o.orderNo === localOrder.orderNo;
-                        // 如果localOrder没有orderId但有id，也检查
                         const localOrderId = localOrder.orderId || localOrder.id || localOrder._id;
                         const myOrderId = o.orderId || o.id || o._id;
                         const sameAnyId = localOrderId && myOrderId && localOrderId === myOrderId;
                         return sameOrderId || sameId || same_id || sameOrderNo || sameAnyId;
                     });
-                    if (!exists) {
+                    if (existIdx === -1) {
                         myOrders.push(localOrder);
                         console.log('[门店订单] 从本地缓存补充订单:', localOrder.orderId || localOrder.id);
                     } else {
-                        console.log('[门店订单] 跳过已存在的本地订单:', localOrder.orderId || localOrder.id);
+                        // 【关键修复】订单已存在 → 合并本地缓存中的数据，优先保留本地操作过的字段
+                        const apiOrder = myOrders[existIdx];
+                        const localItems = localOrder.items || localOrder.services || [];
+                        const apiItems = apiOrder.items || apiOrder.services || [];
+                        
+                        // 合并 items：逐物品保留本地 status，只补 API 缺失的展示字段
+                        let mergedItems;
+                        if (localItems.length > 0) {
+                            mergedItems = localItems.map((localItem, i) => {
+                                const apiItem = apiItems[i] || {};
+                                return {
+                                    ...localItem,  // 本地优先（保留 status/barcode/receivedAt 等操作痕迹）
+                                    // 只从 API 补缺失的展示字段
+                                    ...(apiItem.name && !localItem.name ? { name: apiItem.name } : {}),
+                                    ...(apiItem.serviceName && !localItem.serviceName ? { serviceName: apiItem.serviceName } : {}),
+                                    ...(apiItem.image && !localItem.image ? { image: apiItem.image } : {}),
+                                    ...(apiItem.category && !localItem.category ? { category: apiItem.category } : {}),
+                                    ...(apiItem.price !== undefined && localItem.price === undefined ? { price: apiItem.price } : {}),
+                                    ...(apiItem.quantity !== undefined && localItem.quantity === undefined ? { quantity: apiItem.quantity } : {})
+                                };
+                            });
+                        } else {
+                            mergedItems = apiItems;
+                        }
+                        
+                        // 合并订单字段：本地 status 优先（保护M端操作过的状态）
+                        myOrders[existIdx] = {
+                            ...apiOrder,           // API 数据作为基底
+                            ...localOrder,         // 本地数据覆盖
+                            items: mergedItems,
+                            services: mergedItems,
+                            // 本地状态优先（M端操作过的状态不会丢失）
+                            status: localOrder.status || apiOrder.status,
+                            updatedAt: localOrder.updatedAt || apiOrder.updatedAt
+                        };
+                        console.log('[门店订单] 合并本地缓存订单:', localOrder.orderId || localOrder.id, '本地状态:', localOrder.status);
+                    }
+                });
+                
+                // 确保所有订单都有统一的 orderId 字段（兼容API返回的_id/orderNo等不同字段名）
+                myOrders.forEach(o => {
+                    if (!o.orderId) {
+                        o.orderId = o.orderNo || o._id || o.id;
                     }
                 });
                 
@@ -4301,11 +5051,15 @@
                 // 按创建时间倒序排列（最新的在前）
                 myOrders.sort((a, b) => new Date(b.createdAt || b.orderTime || 0) - new Date(a.createdAt || a.orderTime || 0));
                 
-                // 加载最近订单到首页
+                // 加载最近订单到首页（立即更新）
                 loadRecentOrders(myOrders.slice(0, 3));
                 
-                // 加载订单列表到页面
-                loadOrderList(myOrders);
+                // 延迟渲染订单列表到页面，避免阻塞主线程
+                // 使用 requestAnimationFrame 确保浏览器在当前帧完成后再渲染
+                if (_renderRAF) cancelAnimationFrame(_renderRAF);
+                _renderRAF = requestAnimationFrame(() => {
+                    loadOrderList(myOrders);
+                });
                 
             } catch (error) {
                 console.error('[门店订单] 加载失败:', error);
@@ -4317,6 +5071,8 @@
                     return orderStoreId === currentStoreId;
                 });
                 loadOrderList(filteredOrders);
+            } finally {
+                _loadingStoreOrders = false;
             }
         }
         
@@ -4392,28 +5148,31 @@
             myOrders.sort((a, b) => (statusPriority[a.status] || 99) - (statusPriority[b.status] || 99));
             
             tableBody.innerHTML = myOrders.map(order => {
+                // 确保使用稳定的订单ID（兼容API返回的_id/orderNo和本地orderId）
+                const oid = order.orderId || order._id || order.orderNo || order.id;
+                
                 // 根据状态显示不同的操作按钮
-                let actionButtons = `<button onclick="viewOrder('${order.orderId}')" class="px-2 py-1 bg-blue-500 text-white rounded text-xs hover:bg-blue-600 transition">查看</button>`;
+                let actionButtons = `<button onclick="viewOrder('${oid}')" class="px-2 py-1 bg-blue-500 text-white rounded text-xs hover:bg-blue-600 transition">查看</button>`;
                 
                 // 自送到店订单需要先确认收货
                 if (order.deliveryMethod === 'pickup' && order.deliveryStatus === 'awaiting_store_confirm') {
-                    actionButtons += `<button onclick="confirmStoreReceipt('${order.orderId}')" class="px-2 py-1 bg-blue-600 text-white rounded text-xs hover:bg-blue-700 transition">确认收货</button>`;
+                    actionButtons += `<button onclick="confirmStoreReceipt('${oid}')" class="px-2 py-1 bg-blue-600 text-white rounded text-xs hover:bg-blue-700 transition">确认收货</button>`;
                 }
                 // 跑腿配送订单：骑手送达后确认收货
                 else if (order.deliveryMethod === 'courier' && order.deliveryStatus === 'delivering') {
-                    actionButtons += `<button onclick="confirmCourierReceipt('${order.orderId}')" class="px-2 py-1 bg-blue-600 text-white rounded text-xs hover:bg-blue-700 transition">确认收货</button>`;
+                    actionButtons += `<button onclick="confirmCourierReceipt('${oid}')" class="px-2 py-1 bg-blue-600 text-white rounded text-xs hover:bg-blue-700 transition">确认收货</button>`;
                 }
                 // 已支付/已收货状态：显示物品管理（入库环节）
                 else if (['paid', 'received'].includes(order.status)) {
-                    actionButtons += `<button onclick="manageOrderItems('${order.orderId}')" class="px-2 py-1 bg-yellow-500 text-white rounded text-xs hover:bg-yellow-600 transition">物品入库</button>`;
+                    actionButtons += `<button onclick="manageOrderItems('${oid}')" class="px-2 py-1 bg-yellow-500 text-white rounded text-xs hover:bg-yellow-600 transition">物品入库</button>`;
                 }
                 // 清洗中：显示物品管理
                 else if (order.status === 'cleaning') {
-                    actionButtons += `<button onclick="manageOrderItems('${order.orderId}')" class="px-2 py-1 bg-blue-500 text-white rounded text-xs hover:bg-blue-600 transition">物品管理</button>`;
+                    actionButtons += `<button onclick="manageOrderItems('${oid}')" class="px-2 py-1 bg-blue-500 text-white rounded text-xs hover:bg-blue-600 transition">物品管理</button>`;
                 }
                 // 清洗完成：显示物品管理（可以上架）
                 else if (order.status === 'cleaned') {
-                    actionButtons += `<button onclick="manageOrderItems('${order.orderId}')" class="px-2 py-1 bg-purple-500 text-white rounded text-xs hover:bg-purple-600 transition">上架管理</button>`;
+                    actionButtons += `<button onclick="manageOrderItems('${oid}')" class="px-2 py-1 bg-purple-500 text-white rounded text-xs hover:bg-purple-600 transition">上架管理</button>`;
                 }
                 // 待取件：确认取件（根据配送方式分流）
                 else if (order.status === 'ready') {
@@ -4423,16 +5182,16 @@
                     
                     if (isCourier) {
                         // 跑腿配送：显示确认取件（交给骑手）
-                        actionButtons += `<button onclick="confirmPickup('${order.orderId}', 'courier')" class="px-2 py-1 bg-green-500 text-white rounded text-xs hover:bg-green-600 transition">确认出库</button>`;
+                        actionButtons += `<button onclick="confirmPickup('${oid}', 'courier')" class="px-2 py-1 bg-green-500 text-white rounded text-xs hover:bg-green-600 transition">确认出库</button>`;
                     } else {
                         // 门店自提：显示确认取件（用户到店）
-                        actionButtons += `<button onclick="confirmPickup('${order.orderId}', 'store')" class="px-2 py-1 bg-green-500 text-white rounded text-xs hover:bg-green-600 transition">确认取件</button>`;
+                        actionButtons += `<button onclick="confirmPickup('${oid}', 'store')" class="px-2 py-1 bg-green-500 text-white rounded text-xs hover:bg-green-600 transition">确认取件</button>`;
                     }
                 }
                 
                 return `
                     <tr class="hover:bg-gray-50 transition-all duration-200 ease-in-out">
-                        <td class="py-3 px-4 text-sm text-gray-800 font-medium">${order.orderId}</td>
+                        <td class="py-3 px-4 text-sm text-gray-800 font-medium">${oid}</td>
                         <td class="py-3 px-4 text-sm text-gray-800">
                             <div>${order.customerName || order.contact?.name || '客户'}</div>
                             <div class="text-xs text-gray-500">${order.customerPhone || order.contact?.phone || ''}</div>
@@ -4445,7 +5204,7 @@
                         <td class="py-3 px-4">
                             <div class="flex flex-wrap gap-1">
                                 ${actionButtons}
-                                <button onclick="openCustomerChat('${order.orderId}')" class="px-2 py-1 bg-gray-500 text-white rounded text-xs hover:bg-gray-600 transition">联系客户</button>
+                                <button onclick="openCustomerChat('${oid}')" class="px-2 py-1 bg-gray-500 text-white rounded text-xs hover:bg-gray-600 transition">联系客户</button>
                             </div>
                         </td>
                     </tr>
@@ -4466,12 +5225,50 @@
 
             const allOrders = JSON.parse(localStorage.getItem('store_orders') || '[]');
             
-            // 筛选门店自提订单且状态为awaiting_store_confirm或ready
+            // 【修复】先收集所有有活跃灯条请求的订单ID
+            const activeLightOrderIds = new Set();
+            const activeItemLights = {};
+            const now = Date.now();
+            const lightRequest = localStorage.getItem('store_light_request');
+            if (lightRequest) {
+                try {
+                    const request = JSON.parse(lightRequest);
+                    if (request.status === 'active' && (now - request.timestamp) < 300000) {
+                        activeLightOrderIds.add(request.orderId);
+                    }
+                } catch (e) {}
+            }
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                if (key && key.startsWith('light_request_') && key !== 'store_light_request') {
+                    try {
+                        const request = JSON.parse(localStorage.getItem(key));
+                        if (request && request.status === 'active' && (now - request.timestamp) < 300000) {
+                            activeLightOrderIds.add(request.orderId);
+                            if (!activeItemLights[request.orderId]) {
+                                activeItemLights[request.orderId] = [];
+                            }
+                            activeItemLights[request.orderId].push(request.lampIndex ?? request.itemIndex ?? 0);
+                        }
+                    } catch (e) {}
+                }
+            }
+            
+            // 筛选：有活跃灯条请求 或 门店自提且待取件
             const pickupOrders = allOrders.filter(order => {
                 const orderStoreId = order.storeId || (order.store ? order.store.id : null);
-                return orderStoreId === storeId && 
-                       order.deliveryMethod === 'pickup' &&
-                       ['awaiting_store_confirm', 'ready'].includes(order.status);
+                if (orderStoreId !== storeId) return false;
+                
+                const orderId = order.orderId || order.id || order._id;
+                
+                // 1. 有活跃灯条请求的订单（最高优先级）
+                if (activeLightOrderIds.has(orderId)) return true;
+                
+                // 2. 门店自提且处于待取/就绪状态
+                const isPickupMethod = order.deliveryMethod === 'pickup' || order.pickupMethod === 'store';
+                const isReadyStatus = ['awaiting_store_confirm', 'ready', 'cleaned', 'received'].includes(order.status);
+                
+                return isPickupMethod && isReadyStatus;
             });
 
             if (pickupOrders.length === 0) {
@@ -4485,43 +5282,15 @@
                 return;
             }
 
-            // 检查灯条请求（全局请求）
-            const lightRequest = localStorage.getItem('store_light_request');
-            let activeOrderIds = [];
-            let activeItemLights = {};
-            
-            if (lightRequest) {
-                try {
-                    const request = JSON.parse(lightRequest);
-                    if (request.storeId === storeId && (Date.now() - request.timestamp) < 30000) {
-                        activeOrderIds.push(request.orderId);
-                    }
-                } catch (e) {}
-            }
-            
-            // 检查单个物品灯条请求
-            pickupOrders.forEach(order => {
-                (order.items || []).forEach((item, index) => {
-                    const itemLightRequest = localStorage.getItem(`light_request_${order.orderId}_${index}`);
-                    if (itemLightRequest) {
-                        try {
-                            const request = JSON.parse(itemLightRequest);
-                            if (request.storeId === storeId && (Date.now() - request.timestamp) < 60000) {
-                                if (!activeItemLights[order.orderId]) {
-                                    activeItemLights[order.orderId] = [];
-                                }
-                                activeItemLights[order.orderId].push(index);
-                            }
-                        } catch (e) {}
-                    }
-                });
-            });
+            // 使用筛选阶段已收集的活跃灯条数据
+            const activeOrderIdsArr = Array.from(activeLightOrderIds);
 
             container.innerHTML = pickupOrders.map(order => {
-                const isActive = activeOrderIds.includes(order.orderId);
+                const orderId = order.orderId || order.id || order._id;
+                const isActive = activeLightOrderIds.has(orderId);
                 const pendingItems = (order.items || []).filter(item => item.itemStatus !== 'checked_out');
                 const checkedOutItems = (order.items || []).filter(item => item.itemStatus === 'checked_out');
-                const orderItemLights = activeItemLights[order.orderId] || [];
+                const orderItemLights = activeItemLights[orderId] || [];
                 
                 return `
                     <div class="bg-white rounded-lg p-4 border-2 ${isActive || orderItemLights.length > 0 ? 'border-yellow-400 shadow-lg' : 'border-gray-200'}">
@@ -4767,63 +5536,36 @@
             loadStorePickupOrders();
         }
 
-        // 快速出库单个物品
+        // 快速出库单个物品（门店自提区调用）
         function quickCheckoutItem(orderId, itemIndex) {
-            const storeOrders = JSON.parse(localStorage.getItem('store_orders') || '[]');
-            const orderIndex = storeOrders.findIndex(o => o.orderId === orderId);
+            const itemName = (() => {
+                const storeOrders = JSON.parse(localStorage.getItem('store_orders') || '[]');
+                const order = storeOrders.find(o => o.orderId === orderId);
+                return order?.items?.[itemIndex]?.name || order?.items?.[itemIndex]?.serviceName || '物品';
+            })();
             
-            if (orderIndex === -1) {
-                alert('订单不存在');
-                return;
-            }
+            // 使用统一核心函数，保证 status + itemStatus 双写
+            const updatedOrder = _updateItemStatusCore(orderId, itemIndex, 'out');
+            if (!updatedOrder) { alert('订单不存在'); return; }
             
-            const order = storeOrders[orderIndex];
+            _syncItemStatusToAPI(orderId, updatedOrder.status, updatedOrder.items || []);
             
-            // 更新物品状态
-            if (order.items && order.items[itemIndex]) {
-                order.items[itemIndex].itemStatus = 'checked_out';
-                order.items[itemIndex].checkedOutAt = new Date().toISOString();
-            }
-            
-            // 更新灯条
+            // 更新灯条绑定状态
             const lightBindings = JSON.parse(localStorage.getItem('light_bindings') || '[]');
-            const bindingIndex = lightBindings.findIndex(
-                b => b.orderId === orderId && b.itemIndex === itemIndex
-            );
+            const bindingIndex = lightBindings.findIndex(b => b.orderId === orderId && b.itemIndex === itemIndex);
             if (bindingIndex > -1) {
                 lightBindings[bindingIndex].status = 'off';
                 localStorage.setItem('light_bindings', JSON.stringify(lightBindings));
             }
             
-            // 检查是否所有物品都已出库
-            const allCheckedOut = (order.items || []).every(
-                item => item.itemStatus === 'checked_out'
-            );
+            removeActiveLamp(orderId, itemIndex);
             
-            if (allCheckedOut) {
-                order.status = 'ready';
-                order.allCheckedOutAt = new Date().toISOString();
-            }
+            const allOut = (updatedOrder.items || []).every(i => i.status === 'out' || i.status === 'customer_picked_up' || i.status === 'completed');
+            if (allOut) checkOrderComplete(orderId);
             
-            // 保存
-            storeOrders[orderIndex] = order;
-            localStorage.setItem('store_orders', JSON.stringify(storeOrders));
+            // 同步刷新灯条管理列表
+            if (typeof refreshPickupItems === 'function') refreshPickupItems();
             
-            // 同步到C端
-            const cOrders = JSON.parse(localStorage.getItem('orders') || '[]');
-            const cOrderIndex = cOrders.findIndex(o => o.orderId === orderId);
-            if (cOrderIndex > -1) {
-                cOrders[cOrderIndex] = { ...cOrders[cOrderIndex], ...order };
-                localStorage.setItem('orders', JSON.stringify(cOrders));
-                
-                if (allCheckedOut) {
-                    window.dispatchEvent(new CustomEvent('orderStatusUpdated', {
-                        detail: { orderId: orderId, status: 'ready' }
-                    }));
-                }
-            }
-            
-            alert(allCheckedOut ? '✅ 所有物品已出库，等待用户确认取件' : '✅ 物品已出库');
             loadStorePickupOrders();
         }
 
@@ -4951,9 +5693,15 @@
         
         // 查看订单详情（改进版 - 弹窗显示）
         function viewOrder(orderId) {
-            const orders = JSON.parse(localStorage.getItem('store_orders') || '[]');
-            const allOrders = JSON.parse(localStorage.getItem('orders') || '[]');
-            const order = orders.find(o => o.orderId === orderId) || allOrders.find(o => o.orderId === orderId);
+            // 从所有来源查找订单（包括服务器API同步的数据）
+            const storeOrders = JSON.parse(localStorage.getItem('store_orders') || '[]');
+            const userOrders = JSON.parse(localStorage.getItem('orders') || '[]');
+            const adminOrders = JSON.parse(localStorage.getItem('admin_orders') || '[]');
+            const allOrders = JSON.parse(localStorage.getItem('all_orders') || '[]');
+            const order = storeOrders.find(o => o.orderId === orderId || o.id === orderId || o._id === orderId || o.orderNo === orderId)
+                || userOrders.find(o => o.orderId === orderId || o.id === orderId || o._id === orderId || o.orderNo === orderId)
+                || adminOrders.find(o => o.orderId === orderId || o.id === orderId || o._id === orderId || o.orderNo === orderId)
+                || allOrders.find(o => o.orderId === orderId || o.id === orderId || o._id === orderId || o.orderNo === orderId);
             
             if (!order) {
                 alert('未找到订单');
@@ -5228,31 +5976,33 @@
             // 确保所有物品都有状态字段
             items.forEach((item, idx) => {
                 if (!item.status) {
-                    item.status = order.status || 'pending';
+                    // 优先使用 itemStatus（灯条/出库流程），否则用订单状态
+                    item.status = item.itemStatus || order.status || 'pending';
                 }
             });
             
             let itemsHtml = items.map((item, index) => {
                 const name = item.name || item.serviceName || '物品' + (index + 1);
-                // 修复：确保itemStatus有有效值
-                let itemStatus = item.status || order.status || 'pending';
-                // 映射订单状态到物品状态
-                const statusMapping = {
-                    'paid': 'pending',
-                    'received': 'pending',
-                    'processing': 'cleaning',
-                    'in_progress': 'cleaning',
-                    'cleaning': 'cleaning',
-                    'cleaned': 'cleaned',
-                    'ready': 'ready',
-                    'completed': 'completed',
-                    'customer_picked_up': 'customer_picked_up',
-                    'courier_waiting': 'courier_waiting',
-                    'courier_picked_up': 'courier_picked_up',
-                    'courier_delivering': 'courier_delivering',
-                    'customer_received': 'customer_received'
-                };
-                itemStatus = statusMapping[itemStatus] || itemStatus || 'pending';
+                // 【修复】区分物品自身状态和订单级状态回退
+                const knownStatuses = ['pending','received','cleaning','cleaned','ready','completed','checked_out',
+                    'customer_picked_up','courier_waiting','courier_picked_up','courier_delivering','customer_received'];
+                const hasOwnStatus = !!item.status && knownStatuses.includes(item.status);
+                let itemStatus;
+                if (hasOwnStatus) {
+                    // 物品有自己独立的状态，直接使用（不经过映射）
+                    itemStatus = item.status;
+                } else {
+                    // 物品无状态，从订单级状态映射推断
+                    itemStatus = item.status || order.status || 'pending';
+                    // 仅对订单级状态做合理映射（订单级 received → 物品也应该是 received）
+                    const orderToItemMapping = {
+                        'paid': 'pending',
+                        'received': 'received',    // 订单已入库 → 物品也应为已入库
+                        'processing': 'cleaning',
+                        'in_progress': 'cleaning'
+                    };
+                    itemStatus = orderToItemMapping[itemStatus] || itemStatus || 'pending';
+                }
                 
                 // 判断订单是否为跑腿配送模式
                 const isCourier = order.deliveryMethod === 'courier' || order.pickupMethod === 'home_delivery' || order.deliveryProvider;
@@ -5273,6 +6023,7 @@
                         'cleaning': '清洗中',
                         'cleaned': '已清洗',
                         'ready': '待取件',
+                        'checked_out': '已出库',
                         'courier_waiting': '骑手待取件',
                         'courier_picked_up': '骑手已取件',
                         'courier_delivering': '骑手配送中',
@@ -5285,6 +6036,7 @@
                         'cleaning': 'bg-yellow-100 text-yellow-800',
                         'cleaned': 'bg-purple-100 text-purple-800',
                         'ready': 'bg-orange-100 text-orange-800',
+                        'checked_out': 'bg-cyan-100 text-cyan-800',
                         'courier_waiting': 'bg-red-100 text-red-800',
                         'courier_picked_up': 'bg-pink-100 text-pink-800',
                         'courier_delivering': 'bg-indigo-100 text-indigo-800',
@@ -5292,14 +6044,16 @@
                         'completed': 'bg-emerald-100 text-emerald-800'
                     };
                 } else {
-                    // 门店自提模式的状态选项
-                    statusOptions = ['pending', 'received', 'cleaning', 'cleaned', 'ready', 'customer_picked_up', 'completed'];
+                    // 门店自提模式的状态选项（包含灯条出库状态）
+                    statusOptions = ['pending', 'received', 'cleaning', 'cleaned', 'ready', 'out', 'customer_picked_up', 'completed'];
                     statusLabels = {
                         'pending': '待入库',
                         'received': '已入库',
                         'cleaning': '清洗中',
                         'cleaned': '已清洗',
                         'ready': '待取件',
+                        'out': '已出库',
+                        'checked_out': '已出库',
                         'customer_picked_up': '用户已取件',
                         'completed': '已完成'
                     };
@@ -5309,6 +6063,8 @@
                         'cleaning': 'bg-yellow-100 text-yellow-800',
                         'cleaned': 'bg-purple-100 text-purple-800',
                         'ready': 'bg-orange-100 text-orange-800',
+                        'out': 'bg-green-100 text-green-800',
+                        'checked_out': 'bg-cyan-100 text-cyan-800',
                         'customer_picked_up': 'bg-green-100 text-green-800',
                         'completed': 'bg-emerald-100 text-emerald-800'
                     };
@@ -5345,144 +6101,149 @@
             `;
         }
         
-        // 更新单个物品状态
-        window.updateItemStatus = async function(orderId, itemIndex, newStatus) {
+        // 更新单个物品状态（内部同步核心 — 纯数据操作，无UI阻塞）
+        function _updateItemStatusCore(orderId, itemIndex, newStatus) {
+            const storeOrders = JSON.parse(localStorage.getItem('store_orders') || '[]');
+            const cOrders = JSON.parse(localStorage.getItem('orders') || '[]');
+            
+            const storeOrder = storeOrders.find(o => o.orderId === orderId || o._id === orderId || o.orderNo === orderId || o.id === orderId);
+            const cOrder = cOrders.find(o => o.orderId === orderId || o._id === orderId || o.orderNo === orderId || o.id === orderId);
+            const currentOrder = storeOrder || cOrder;
+            if (!currentOrder) return null;
+            
+            const items = currentOrder.items || currentOrder.services || [];
+            if (itemIndex >= items.length) return null;
+            
+            // 更新指定物品状态（同时写 status 和 itemStatus，保持两套UI一致）
+            const updatedItems = items.map((item, idx) => {
+                if (idx === itemIndex) {
+                    const mappedItemStatus = newStatus === 'out' ? 'checked_out' : 
+                                              newStatus === 'customer_picked_up' ? 'picked_up' : newStatus;
+                    return { ...item, status: newStatus, itemStatus: mappedItemStatus, statusUpdatedAt: new Date().toISOString() };
+                }
+                return item;
+            });
+            
+            // 根据物品状态计算订单级状态
+            let orderStatus = _calcOrderStatusFromItems(currentOrder.status, updatedItems);
+            
+            // 写入 store_orders
+            const sIdx = storeOrders.findIndex(o => o.orderId === orderId || o._id === orderId || o.orderNo === orderId || o.id === orderId);
+            if (sIdx > -1) {
+                storeOrders[sIdx].items = updatedItems;
+                storeOrders[sIdx].services = updatedItems;
+                storeOrders[sIdx].status = orderStatus;
+                storeOrders[sIdx].updatedAt = new Date().toISOString();
+                localStorage.setItem('store_orders', JSON.stringify(storeOrders));
+            }
+            
+            // 写入 orders (C端)
+            const cIdx = cOrders.findIndex(o => o.orderId === orderId || o._id === orderId || o.orderNo === orderId || o.id === orderId);
+            if (cIdx > -1) {
+                cOrders[cIdx].items = updatedItems;
+                cOrders[cIdx].services = updatedItems;
+                cOrders[cIdx].status = orderStatus;
+                cOrders[cIdx].updatedAt = new Date().toISOString();
+                localStorage.setItem('orders', JSON.stringify(cOrders));
+            }
+            
+            return storeOrders[sIdx] || cOrders[cIdx] || { ...currentOrder, items: updatedItems, status: orderStatus };
+        }
+        
+        // 根据物品状态计算订单级状态（支持 out/completed 等出库状态）
+        function _calcOrderStatusFromItems(currentStatus, items) {
+            if (!items || items.length === 0) return currentStatus;
+            const isTerminal = s => ['completed','out','customer_picked_up'].includes(s);
+            const allTerminal = items.every(item => isTerminal(item.status));
+            const allReady = items.every(item => ['ready','completed','out','customer_picked_up'].includes(item.status));
+            const allCleaned = items.every(item => ['cleaned','ready','completed','out','customer_picked_up'].includes(item.status));
+            const allCleaning = items.every(item => ['cleaning','cleaned','ready','completed','out','customer_picked_up'].includes(item.status));
+            
+            if (allTerminal) return 'completed';
+            if (allReady) return 'ready';
+            if (allCleaned) return 'cleaned';
+            if (allCleaning) return 'cleaning';
+            
+            if (items.some(i => i.status === 'cleaning')) return 'cleaning';
+            if (items.some(i => i.status === 'received')) return 'received';
+            return currentStatus;
+        }
+        
+        // 异步同步到后端API（静默，不阻塞）
+        function _syncItemStatusToAPI(orderId, orderStatus, updatedItems) {
+            // 防并发：同一订单2秒内不重复发送
+            const lockKey = '_sync_' + orderId;
+            const lastTime = _completionLocks.get(lockKey) || 0;
+            if (Date.now() - lastTime < 2000) {
+                console.log('[物品状态] 跳过重复同步:', orderId);
+                return;
+            }
+            _completionLocks.set(lockKey, Date.now());
+            
+            setTimeout(async () => {
+                try {
+                    const storeUser = JSON.parse(localStorage.getItem('storeUser') || '{}');
+                    const response = await fetch(`http://localhost:3000/api/cleaning/orders/${orderId}/status`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-cache' },
+                        body: JSON.stringify({
+                            status: orderStatus,
+                            note: ORDER_STATUS[orderStatus]?.text || orderStatus,
+                            userId: storeUser.staffId || storeUser.storeId || 'store_staff',
+                            items: updatedItems
+                        })
+                    });
+                    if (!response.ok) {
+                        const errBody = await response.text();
+                        console.error(`[物品状态] ❌ API返回错误(${response.status}): ${errBody}`, 'orderId:', orderId, 'status:', orderStatus);
+                    } else {
+                        console.log('[物品状态] ✅ API同步完成:', orderId, '→', orderStatus);
+                    }
+                } catch (e) { console.warn('[物品状态] API同步失败:', e.message); }
+            }, 50);
+        }
+        
+        // UI版本 — 供下拉菜单手动操作调用（带确认框）
+        window.updateItemStatus = async function(orderId, itemIndex, newStatus, opts = {}) {
             const statusLabels = { 
                 'pending': '待入库', 
                 'received': '已入库',
                 'cleaning': '清洗中', 
                 'cleaned': '清洗完成', 
                 'ready': '待取件',
+                'checked_out': '已出库',
                 'customer_picked_up': '用户已取件',
-                'courier_waiting': '骑手待取件',
-                'courier_picked_up': '骑手已取件',
-                'courier_delivering': '骑手配送中',
-                'customer_received': '用户已收货',
+                'out': '已出库',
                 'completed': '已完成' 
             };
             
-            if (!confirm(`确定将物品状态更新为「${statusLabels[newStatus]}」吗？`)) {
+            if (!opts.skipConfirm && !confirm(`确定将物品状态更新为「${statusLabels[newStatus]}」吗？`)) {
                 return;
             }
             
-            // 先获取更新后的订单状态
-            let storeOrders = JSON.parse(localStorage.getItem('store_orders') || '[]');
-            let cOrders = JSON.parse(localStorage.getItem('orders') || '[]');
+            const updatedOrder = _updateItemStatusCore(orderId, itemIndex, newStatus);
+            if (!updatedOrder) { showToast('未找到订单', 'error'); return; }
             
-            // 获取当前订单的items
-            const storeOrder = storeOrders.find(o => o.orderId === orderId);
-            const cOrder = cOrders.find(o => o.orderId === orderId);
-            const currentOrder = storeOrder || cOrder;
-            
-            if (!currentOrder) {
-                alert('未找到订单');
-                return;
+            if (!opts.skipToast) {
+                showToast(`物品状态已更新为「${statusLabels[newStatus]}」`, 'success');
             }
             
-            const items = currentOrder.items || currentOrder.services || [];
-            
-            // 创建新的items数组，设置指定物品的状态
-            const updatedItems = items.map((item, idx) => {
-                if (idx === itemIndex) {
-                    return {
-                        ...item,
-                        status: newStatus,
-                        statusUpdatedAt: new Date().toISOString()
-                    };
-                }
-                return item;
-            });
-            
-            // 根据物品状态计算订单状态
-            let orderStatus = currentOrder.status;
-            const allCleaning = updatedItems.every(item => 
-                item.status === 'cleaning' || item.status === 'cleaned' || item.status === 'ready' || item.status === 'completed'
-            );
-            const allCleaned = updatedItems.every(item => 
-                item.status === 'cleaned' || item.status === 'ready' || item.status === 'completed'
-            );
-            const allReady = updatedItems.every(item => 
-                item.status === 'ready' || item.status === 'completed'
-            );
-            
-            if (allReady) {
-                orderStatus = 'ready';
-            } else if (allCleaned) {
-                orderStatus = 'cleaned';
-            } else if (allCleaning) {
-                orderStatus = 'cleaning';
-            } else {
-                // 至少有一个物品已入库且有物品正在清洗
-                const hasReceived = updatedItems.some(item => item.status === 'received');
-                const hasCleaning = updatedItems.some(item => item.status === 'cleaning');
-                if (hasCleaning) {
-                    orderStatus = 'cleaning';
-                } else if (hasReceived) {
-                    orderStatus = 'received';
-                }
+            if (!opts.skipModalRefresh) {
+                showItemManagementModal(updatedOrder);
             }
             
-            // 调用API更新后端数据库
-            let apiSuccess = false;
-            try {
-                const storeUser = JSON.parse(localStorage.getItem('storeUser') || '{}');
-                const response = await fetch(`http://localhost:3000/api/cleaning/orders/${orderId}/status`, {
-                    method: 'PUT',
-                    headers: { 
-                        'Content-Type': 'application/json',
-                        'Cache-Control': 'no-cache'
-                    },
-                    body: JSON.stringify({ 
-                        status: orderStatus,
-                        note: ORDER_STATUS[orderStatus]?.text || orderStatus,
-                        userId: storeUser.staffId || storeUser.storeId || 'store_staff',
-                        items: updatedItems  // 同时更新物品数据
-                    })
-                });
-                const result = await response.json();
-                if (result.success) {
-                    apiSuccess = true;
-                    console.log('【物品更新】API更新成功:', result.data);
-                }
-            } catch (error) {
-                console.warn('【物品更新】API调用失败，将继续更新本地数据:', error);
+            if (!opts.skipAPISync) {
+                _syncItemStatusToAPI(orderId, updatedOrder.status, updatedOrder.items || []);
+                setTimeout(() => loadStoreOrders(), 200);
             }
-            
-            // 更新store_orders
-            const storeOrderIndex = storeOrders.findIndex(o => o.orderId === orderId);
-            if (storeOrderIndex > -1) {
-                storeOrders[storeOrderIndex].items = updatedItems;
-                storeOrders[storeOrderIndex].services = updatedItems;
-                storeOrders[storeOrderIndex].status = orderStatus;
-                storeOrders[storeOrderIndex].updatedAt = new Date().toISOString();
-                localStorage.setItem('store_orders', JSON.stringify(storeOrders));
-            }
-            
-            // 更新C端订单
-            const cOrderIndex = cOrders.findIndex(o => o.orderId === orderId);
-            if (cOrderIndex > -1) {
-                cOrders[cOrderIndex].items = updatedItems;
-                cOrders[cOrderIndex].services = updatedItems;
-                cOrders[cOrderIndex].status = orderStatus;
-                cOrders[cOrderIndex].updatedAt = new Date().toISOString();
-                localStorage.setItem('orders', JSON.stringify(cOrders));
-            }
-            
-            // 显示更新结果
-            alert(`物品状态已更新为「${statusLabels[newStatus]}」，订单状态更新为「${ORDER_STATUS[orderStatus]?.text || orderStatus}」`);
-            
-            // 刷新弹窗和列表
-            if (currentOrder) {
-                showItemManagementModal(currentOrder);
-            }
-            loadStoreOrders();
-        }
+        };
         
         // 渲染订单状态更新按钮
         function renderOrderStatusButtons(order) {
             const currentStatus = order.status;
             const deliveryMethod = order.deliveryMethod;
             const deliveryStatus = order.deliveryStatus;
+            const oid = order.orderId || order._id || order.orderNo || order.id;
             
             if (currentStatus === 'completed' || currentStatus === 'cancelled') {
                 return '<p style="color: #6b7280; font-size: 13px;">订单已结束，无法更新状态</p>';
@@ -5500,7 +6261,7 @@
                             客户选择自送到店，请先确认收货后再开始处理
                         </p>
                         ${buttons.map(btn => `
-                            <button onclick="confirmStoreReceipt('${order.orderId}'); closeOrderDetail();"
+                            <button onclick="confirmStoreReceipt('${oid}'); closeOrderDetail();"
                                     style="padding: 10px 16px; background-color: #3b82f6; color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 13px; font-weight: 500;">
                                 ${btn.text}
                             </button>
@@ -5523,7 +6284,7 @@
                             配送员: ${order.courier?.name || '配送员'} | 电话: ${order.courier?.phone || '未知'}
                         </p>
                         ${buttons.map(btn => `
-                            <button onclick="confirmCourierReceipt('${order.orderId}'); closeOrderDetail();"
+                            <button onclick="confirmCourierReceipt('${oid}'); closeOrderDetail();"
                                     style="padding: 10px 16px; background-color: #3b82f6; color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 13px; font-weight: 500;">
                                 ${btn.text}
                             </button>
@@ -5585,13 +6346,13 @@
                 // 根据action类型生成不同的点击事件
                 let onclick = '';
                 if (btn.action === 'manageItems') {
-                    onclick = `manageOrderItems('${order.orderId}'); closeOrderDetail();`;
+                    onclick = `manageOrderItems('${oid}'); closeOrderDetail();`;
                 } else if (btn.action === 'confirmCourierOutbound') {
-                    onclick = `confirmPickup('${order.orderId}', 'courier'); closeOrderDetail();`;
+                    onclick = `confirmPickup('${oid}', 'courier'); closeOrderDetail();`;
                 } else if (btn.action === 'confirmStorePickup') {
-                    onclick = `confirmPickup('${order.orderId}', 'store'); closeOrderDetail();`;
+                    onclick = `confirmPickup('${oid}', 'store'); closeOrderDetail();`;
                 } else {
-                    onclick = `updateOrderStatus('${order.orderId}', '${btn.status}'); closeOrderDetail();`;
+                    onclick = `updateOrderStatus('${oid}', '${btn.status}'); closeOrderDetail();`;
                 }
                 
                 return `<button onclick="${onclick}"
@@ -5630,7 +6391,7 @@
             
             // 更新门店订单
             let orders = JSON.parse(localStorage.getItem('store_orders') || '[]');
-            const orderIndex = orders.findIndex(o => o.orderId === orderId);
+            const orderIndex = orders.findIndex(o => o.orderId === orderId || o._id === orderId || o.orderNo === orderId || o.id === orderId);
             if (orderIndex > -1) {
                 orders[orderIndex].deliveryStatus = 'store_confirmed';
                 orders[orderIndex].status = 'paid';
@@ -5641,7 +6402,7 @@
             
             // 同时更新C端订单
             let cOrders = JSON.parse(localStorage.getItem('orders') || '[]');
-            const cOrderIndex = cOrders.findIndex(o => o.orderId === orderId);
+            const cOrderIndex = cOrders.findIndex(o => o.orderId === orderId || o._id === orderId || o.orderNo === orderId || o.id === orderId);
             if (cOrderIndex > -1) {
                 cOrders[cOrderIndex].deliveryStatus = 'store_confirmed';
                 cOrders[cOrderIndex].status = 'paid';
@@ -5805,19 +6566,30 @@
                 sendCustomerNotification(orderId, 'pickup_ready', 
                     `您的衣物已准备完成，请到店取件！\n\n到店后请扫描物品标签完成取件。\n\n门店：${currentStore.name || storeUser.storeName || '干洗店'}\n地址：${currentStore.address || order.pickupAddress || '门店地址'}`);
                 
-                // 2. 检查物品状态，如果都是ready则显示取件确认
+                // 2. 检查物品状态，如果都是ready或已出库则显示取件确认
                 const items = order.items || order.services || [];
-                const allReady = items.every(item => item.status === 'ready' || item.status === 'completed');
+                const allReady = items.every(item => 
+                    item.status === 'ready' || item.status === 'completed' || 
+                    item.itemStatus === 'checked_out'  // 灯条/出库流程的物品
+                );
                 
                 if (allReady) {
                     // 所有物品已准备好，商家可以直接确认取件
+                    const itemListText = items.map((item, idx) => {
+                        const name = item.name || item.serviceName || '物品';
+                        const checkStatus = item.itemStatus === 'checked_out' ? '✅已出库' : 
+                                           (item.status === 'ready' ? '待取件' : 
+                                           (item.status === 'completed' ? '已完成' : item.status || ''));
+                        return `${idx + 1}. ${name} [${checkStatus}]`;
+                    }).join('\n');
+                    
                     const confirmMsg = `【门店自提 - 确认取件】
                     
 客户：${order.customerName || order.contact?.name || '客户'}
 电话：${order.customerPhone || order.contact?.phone || ''}
 
 物品清单：
-${items.map((item, idx) => `${idx + 1}. ${item.name || item.serviceName || '物品'}`).join('\n')}
+${itemListText}
 
 确认用户已到店并取走所有物品吗？
 此操作将完成订单。`;
@@ -5827,6 +6599,7 @@ ${items.map((item, idx) => `${idx + 1}. ${item.name || item.serviceName || '物�
                         const updatedItems = items.map(item => ({
                             ...item,
                             status: 'customer_picked_up',
+                            itemStatus: 'customer_picked_up',
                             pickedUpAt: new Date().toISOString(),
                             pickedUpBy: order.customerName || order.contact?.name || '客户'
                         }));
@@ -5849,10 +6622,19 @@ ${items.map((item, idx) => `${idx + 1}. ${item.name || item.serviceName || '物�
                     }
                 } else {
                     // 有物品未准备好
-                    alert('⚠ 还有物品未完成清洗\n\n请先完成所有物品的清洗操作，再进行取件确认。');
+                    const notReadyItems = items.filter(item => 
+                        item.status !== 'ready' && item.status !== 'completed' && 
+                        item.itemStatus !== 'checked_out'
+                    );
+                    const notReadyNames = notReadyItems.map((item, idx) => {
+                        const name = item.name || item.serviceName || `物品${idx + 1}`;
+                        const itemStatusText = item.itemStatus || item.status || '未知';
+                        return `${name}（状态: ${itemStatusText}）`;
+                    }).join('\n');
+                    
+                    alert(`⚠ 还有 ${notReadyItems.length} 件物品未准备好\n\n${notReadyNames}\n\n请先处理以上物品，再进行取件确认。`);
                     
                     // 列出未准备好的物品
-                    const notReadyItems = items.filter(item => item.status !== 'ready' && item.status !== 'completed');
                     console.log('[确认取件] 未准备好的物品:', notReadyItems);
                 }
                 
@@ -6238,100 +7020,58 @@ ${(order.items || order.services || []).map((item, idx) => `${idx + 1}. ${item.n
             }
         }
         
-        // 处理灯条取件
+        // 处理灯条取件（使用统一的 _updateItemStatusCore，保证 status/itemStatus 双写一致）
         window.processLightPickup = async function(orderId, itemIndex) {
             closeLightGuideModal();
             
-            // 更新物品状态为已出库
-            const storeOrders = JSON.parse(localStorage.getItem('store_orders') || '[]');
-            const cOrders = JSON.parse(localStorage.getItem('orders') || '[]');
-            const orderIndex = storeOrders.findIndex(o => o.orderId === orderId);
-            
-            if (orderIndex === -1) {
-                alert('订单未找到');
-                return;
-            }
-            
-            const order = storeOrders[orderIndex];
-            
-            if (itemIndex !== null && itemIndex !== undefined && order.items && order.items[itemIndex]) {
-                // 更新单个物品
-                order.items[itemIndex].itemStatus = 'checked_out';
-                order.items[itemIndex].checkedOutAt = new Date().toISOString();
+            if (itemIndex !== null && itemIndex !== undefined) {
+                // 单个物品出库 — 使用核心函数，双写 status + itemStatus
+                const updatedOrder = _updateItemStatusCore(orderId, itemIndex, 'out');
+                if (!updatedOrder) { alert('订单未找到'); return; }
                 
-                // 检查是否所有物品都已出库
-                const allCheckedOut = order.items.every(item => item.itemStatus === 'checked_out');
-                if (allCheckedOut) {
-                    order.status = 'completed';
-                    order.completedAt = new Date().toISOString();
-                } else {
-                    order.status = 'ready';
+                _syncItemStatusToAPI(orderId, updatedOrder.status, updatedOrder.items || []);
+                removeActiveLamp(orderId, itemIndex);
+                
+                const allOut = (updatedOrder.items || []).every(i => i.status === 'out' || i.status === 'customer_picked_up' || i.status === 'completed');
+                if (allOut) {
+                    checkOrderComplete(orderId);
+                    clearOrderLamps(orderId);
                 }
             } else {
-                // 更新整个订单为已出库
-                (order.items || []).forEach(item => {
-                    item.itemStatus = 'checked_out';
-                    item.checkedOutAt = new Date().toISOString();
-                });
-                order.status = 'completed';
-                order.completedAt = new Date().toISOString();
-            }
-            
-            // 更新时间戳
-            order.updatedAt = new Date().toISOString();
-            
-            // 保存M端订单更新
-            storeOrders[orderIndex] = order;
-            localStorage.setItem('store_orders', JSON.stringify(storeOrders));
-            
-            // 同步到C端订单列表
-            const cOrderIndex = cOrders.findIndex(o => o.orderId === orderId);
-            if (cOrderIndex > -1) {
-                // 更新C端订单的物品状态
-                if (itemIndex !== null && itemIndex !== undefined && cOrders[cOrderIndex].items && cOrders[cOrderIndex].items[itemIndex]) {
-                    cOrders[cOrderIndex].items[itemIndex].itemStatus = 'checked_out';
-                    cOrders[cOrderIndex].items[itemIndex].checkedOutAt = new Date().toISOString();
-                    
-                    const allCheckedOut = cOrders[cOrderIndex].items.every(item => item.itemStatus === 'checked_out');
-                    if (allCheckedOut) {
-                        cOrders[cOrderIndex].status = 'completed';
-                        cOrders[cOrderIndex].completedAt = new Date().toISOString();
-                    } else {
-                        cOrders[cOrderIndex].status = 'ready';
-                    }
-                } else {
-                    // 更新所有物品
-                    (cOrders[cOrderIndex].items || []).forEach(item => {
-                        item.itemStatus = 'checked_out';
-                        item.checkedOutAt = new Date().toISOString();
-                    });
-                    cOrders[cOrderIndex].status = 'completed';
-                    cOrders[cOrderIndex].completedAt = new Date().toISOString();
+                // 全部出库
+                const storeOrders = JSON.parse(localStorage.getItem('store_orders') || '[]');
+                const order = storeOrders.find(o => o.orderId === orderId);
+                if (order) {
+                    const items = order.items || order.services || [];
+                    items.forEach((_, idx) => _updateItemStatusCore(orderId, idx, 'out'));
+                    setTimeout(() => _syncItemStatusToAPI(orderId, 'completed', items), 50);
+                    _updateOrderStatusLocal(orderId, 'completed');
+                    clearOrderLamps(orderId);
                 }
-                
-                cOrders[cOrderIndex].updatedAt = order.updatedAt;
-                localStorage.setItem('orders', JSON.stringify(cOrders));
-                console.log('[M端→C端] 物品出库状态已同步到C端:', orderId);
-                
-                // 通知C端刷新
-                window.dispatchEvent(new CustomEvent('pickupCompleted', {
-                    detail: { orderId: orderId }
-                }));
             }
             
-            // 尝试同步到后端API
+            // 尝试同步灯条绑定状态到后端（关键：让小程序轮询检测到 checkedOut）
             try {
-                await fetch('http://localhost:3000/api/cleaning/orders/' + orderId + '/pickup', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        userId: order.customerPhone || 'store',
-                        itemIndex: itemIndex
-                    })
-                });
-                console.log('[M端] 后端API同步成功');
+                const currentStore = JSON.parse(localStorage.getItem('currentStore') || '{}');
+                const storeId = currentStore.storeId || 'ST002';
+                
+                if (itemIndex !== null && itemIndex !== undefined) {
+                    await fetch('http://localhost:3000/api/store/order-light/unbind', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ orderId, storeId, itemIndex, reason: 'item_checked_out' })
+                    });
+                    console.log('[M端] 灯条绑定已标记完成: itemIndex=', itemIndex);
+                } else {
+                    await fetch('http://localhost:3000/api/store/order-light/unbind', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ orderId, storeId, reason: 'all_items_checked_out' })
+                    });
+                    console.log('[M端] 所有灯条绑定已标记完成');
+                }
             } catch (apiError) {
-                console.log('[M端] 后端API同步失败（使用本地存储）:', apiError.message);
+                console.log('[M端] 灯条解绑API调用失败:', apiError.message);
             }
             
             // 清除灯条请求
@@ -6340,7 +7080,7 @@ ${(order.items || order.services || []).map((item, idx) => `${idx + 1}. ${item.n
             }
             
             // 显示成功消息
-            showNotification(`✅ 订单 ${orderId} 已完成出库`, 'success');
+            showToast(`✅ 物品已出库`, 'success');
             
             // 立即刷新M端的订单列表，确保用户看到最新状态
             setTimeout(() => {
@@ -6727,30 +7467,48 @@ ${(order.items || order.services || []).map((item, idx) => `${idx + 1}. ${item.n
                     localStorage.setItem('store_orders', JSON.stringify(orders));
                 }
             } else {
-                // 如果在store_orders中找到，也检查C端是否有更新的数据
+                // 如果在store_orders中找到，也检查C端是否有需要合并的数据
                 const c端Order = findOrderById(c端Orders, orderId);
                 if (c端Order) {
-                    // 合并C端订单的items数据（C端有完整的name字段）
+                    // 【修复】智能合并非替换：保留store端的物品状态，只从C端补充缺失字段
                     const c端Items = c端Order.items || c端Order.services || [];
                     const storeItems = order.items || order.services || [];
-                    // 优先使用C端的items（特别是当C端有modifiedAt标记时）
-                    const c端ModifiedAt = c端Order.modifiedAt ? new Date(c端Order.modifiedAt) : null;
-                    const storeModifiedAt = order.modifiedAt ? new Date(order.modifiedAt) : null;
-                    const shouldUseC端Items = c端Items.length > 0 && (
-                        (c端ModifiedAt && (!storeModifiedAt || c端ModifiedAt > storeModifiedAt)) ||
-                        (c端Items[0].name && !storeItems[0]?.name)
-                    );
                     
-                    if (shouldUseC端Items) {
-                        // C端items有name字段或更新，优先使用
+                    // 只有当C端有数据且数量匹配时才做字段级合并
+                    if (c端Items.length > 0 && c端Items.length === storeItems.length) {
+                        let needsUpdate = false;
+                        const mergedItems = storeItems.map((storeItem, idx) => {
+                            const cItem = c端Items[idx] || {};
+                            // 检查是否需要补充name等字段
+                            const needsName = (!storeItem.name && cItem.name) || 
+                                               (!storeItem.serviceName && cItem.serviceName);
+                            if (needsName) needsUpdate = true;
+                            
+                            return {
+                                ...storeItem,   // 保留store端的所有数据（特别是status）
+                                // 只从C端补充缺失的展示性字段，不覆盖status
+                                ...(cItem.name ? { name: cItem.name } : {}),
+                                ...(cItem.serviceName && !storeItem.serviceName ? { serviceName: cItem.serviceName } : {}),
+                                ...(cItem.image ? { image: cItem.image } : {}),
+                                ...(cItem.category ? { category: cItem.category } : {})
+                            };
+                        });
+                        
+                        if (needsUpdate) {
+                            order.items = mergedItems;
+                            order.services = mergedItems;
+                            const idx = orders.findIndex(o => 
+                                o.orderId === orderId || o.id === orderId || o._id === orderId || o.orderNo === orderId
+                            );
+                            if (idx > -1) {
+                                orders[idx] = order;
+                                localStorage.setItem('store_orders', JSON.stringify(orders));
+                            }
+                        }
+                    } else if (c端Items.length > 0 && storeItems.length === 0) {
+                        // store端完全没有items时才使用C端
                         order.items = c端Items;
                         order.services = c端Order.services || order.services;
-                        order.modifiedAt = c端Order.modifiedAt;
-                        // 重要：同时更新状态（修改后应为paid以显示入库按钮）
-                        if (c端Order.status) {
-                            order.status = c端Order.status;
-                        }
-                        // 更新store_orders
                         const idx = orders.findIndex(o => 
                             o.orderId === orderId || o.id === orderId || o._id === orderId || o.orderNo === orderId
                         );
@@ -6772,12 +7530,64 @@ ${(order.items || order.services || []).map((item, idx) => `${idx + 1}. ${item.n
         };
         
         // 显示物品管理弹窗
+        // 重要：始终从 localStorage 重新读取最新数据，避免使用过期引用
         function showItemManagementModal(order) {
-            let items = order.items || order.services || [];
+            const orderId = order?.orderId || order?.id || order?._id || order?.orderNo;
+            
+            // 【修复】每次打开弹窗时都从 localStorage 重新读取最新订单数据
+            // 防止传入的 order 引用对象包含过期的 items 状态
+            let freshOrder = order;
+            if (orderId) {
+                const storeOrders = JSON.parse(localStorage.getItem('store_orders') || '[]');
+                const cOrders = JSON.parse(localStorage.getItem('orders') || '[]');
+                
+                const findOrderById = (list, id) => list.find(o => 
+                    o.orderId === id || o.id === id || o._id === id || o.orderNo === id
+                );
+                
+                const storeOrder = findOrderById(storeOrders, orderId);
+                const cOrder = findOrderById(cOrders, orderId);
+                
+                // 优先使用 store_orders（M端操作的主要数据源）
+                if (storeOrder) {
+                    freshOrder = storeOrder;
+                    
+                    // 合并：如果 store_orders 的物品缺少 name 等字段，从 C端补充（但保留状态）
+                    if (cOrder && cOrder.items && cOrder.items.length > 0) {
+                        const storeItems = freshOrder.items || freshOrder.services || [];
+                        const cItems = cOrder.items || cOrder.services || [];
+                        
+                        if (storeItems.length === cItems.length) {
+                            freshOrder.items = storeItems.map((item, idx) => {
+                                const cItem = cItems[idx] || {};
+                                return {
+                                    ...cItem,           // 先用C端的完整数据（name等字段）
+                                    status: item.status || cItem.status || 'pending',  // 但优先保留已有状态
+                                    barcode: item.barcode || cItem.barcode,
+                                    receivedAt: item.receivedAt || cItem.receivedAt,
+                                    statusUpdatedAt: item.statusUpdatedAt || cItem.statusUpdatedAt,
+                                    outboundTime: item.outboundTime || cItem.outboundTime
+                                };
+                            });
+                            freshOrder.services = freshOrder.items;
+                        } else if (storeItems.length > 0) {
+                            // 数量不一致，保留 store_orders 的数据不变
+                        } else {
+                            // store_orders 无数据，才用C端
+                            freshOrder.items = cItems;
+                            freshOrder.services = cItems;
+                        }
+                    }
+                } else if (cOrder) {
+                    freshOrder = cOrder;
+                }
+            }
+            
+            let items = freshOrder.items || freshOrder.services || [];
             
             // 如果items为空，尝试从其他字段获取
-            if (items.length === 0 && order.orderDetails?.items) {
-                items = order.orderDetails.items;
+            if (items.length === 0 && freshOrder.orderDetails?.items) {
+                items = freshOrder.orderDetails.items;
             }
             
             // 如果仍然没有items，显示提示
@@ -6786,13 +7596,33 @@ ${(order.items || order.services || []).map((item, idx) => `${idx + 1}. ${item.n
                 return;
             }
             
-            // 为每个物品生成唯一条码（如果没有）
+            // 深拷贝 items 避免修改原始数据影响渲染
+            items = items.map(item => ({...item}));
+            
+            // 【修复】智能设置物品默认状态
+            // 只有当物品确实没有状态时才设默认值，且根据订单级别状态推断
+            const orderLevelStatus = freshOrder.status || order?.status || '';
+            const validItemStatuses = ['pending', 'received', 'cleaning', 'cleaned', 'ready', 'out', 'checked_out', 'customer_picked_up', 'completed'];
+            
             items.forEach((item, index) => {
                 if (!item.barcode) {
-                    item.barcode = generateItemBarcode(order.orderId, index);
+                    item.barcode = generateItemBarcode(freshOrder.orderId || orderId, index);
                 }
-                if (!item.status) {
-                    item.status = 'pending';
+                // 只有当 status 完全不存在 或 不在有效值列表中 时才设默认值
+                if (!item.status || !validItemStatuses.includes(item.status)) {
+                    // 根据订单状态推断合理的物品初始状态
+                    if (['cleaning', 'processing', 'in_progress'].includes(orderLevelStatus)) {
+                        // 订单已在清洗中，新物品不应默认为待入库
+                        item.status = 'received';  // 默认为已入库，用户可手动推进到清洗
+                    } else if (['cleaned'].includes(orderLevelStatus)) {
+                        item.status = 'cleaning';
+                    } else if (['ready'].includes(orderLevelStatus)) {
+                        item.status = 'cleaned';
+                    } else if (['completed'].includes(orderLevelStatus)) {
+                        item.status = 'ready';
+                    } else {
+                        item.status = 'pending';
+                    }
                 }
             });
             
@@ -6803,13 +7633,12 @@ ${(order.items || order.services || []).map((item, idx) => `${idx + 1}. ${item.n
                 <div id="item-management-modal" style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 1000; display: flex; align-items: center; justify-content: center;">
                     <div style="background: white; border-radius: 16px; width: 90%; max-width: 500px; max-height: 80vh; overflow: hidden; display: flex; flex-direction: column;">
                         <div style="padding: 16px 20px; border-bottom: 1px solid #e5e7eb; display: flex; justify-content: space-between; align-items: center;">
-                            <h3 style="font-size: 18px; font-weight: 600;">物品管理 - ${order.orderId}</h3>
+                            <h3 style="font-size: 18px; font-weight: 600;">物品管理 - ${freshOrder.orderId || order.orderId}</h3>
                             <button onclick="closeItemManagementModal()" style="background: none; border: none; font-size: 24px; cursor: pointer;">&times;</button>
                         </div>
                         <div style="padding: 16px 20px; overflow-y: auto; flex: 1;">
                             <p style="color: #6b7280; font-size: 13px; margin-bottom: 12px;">
-                                <i class="fa fa-info-circle" style="margin-right: 6px;"></i>
-                                请先入库打印标签，然后扫码或手动更新物品状态
+                                <i class="fa fa-info-circle" style="margin-right: 6px;"></i>请先入库打印标签，然后扫码或手动更新物品状态
                             </p>
                             <div style="margin-bottom: 16px;">
                                 ${items.map((item, index) => `
@@ -6818,7 +7647,7 @@ ${(order.items || order.services || []).map((item, idx) => `${idx + 1}. ${item.n
                                             <div>
                                                 <div style="font-weight: 500;">${item.name || item.serviceName || '未知物品'}</div>
                                                 <div style="font-size: 12px; color: #6b7280; margin-top: 4px;">
-                                                    条码: ${item.barcode || generateItemBarcode(order.orderId, index)}
+                                                    条码: ${item.barcode || generateItemBarcode(freshOrder.orderId || order.orderId, index)}
                                                 </div>
                                                 <div style="font-size: 12px; margin-top: 4px;">
                                                     状态: <span style="font-weight: 600;">${getItemStatusText(item.status)}</span>
@@ -6826,25 +7655,25 @@ ${(order.items || order.services || []).map((item, idx) => `${idx + 1}. ${item.n
                                             </div>
                                             <div style="display: flex; gap: 8px;">
                                                 ${item.status === 'pending' ? `
-                                                    <button onclick="receiveItemAndPrint('${order.orderId}', ${index})" 
+                                                    <button onclick="receiveItemAndPrint('${freshOrder.orderId || order.orderId}', ${index})" 
                                                             style="padding: 6px 12px; background: #3b82f6; color: white; border: none; border-radius: 6px; font-size: 12px; cursor: pointer;">
                                                         <i class="fa fa-sign-in" style="margin-right: 4px;"></i>入库
                                                     </button>
                                                 ` : ''}
                                                 ${item.status === 'received' ? `
-                                                    <button onclick="updateItemStatus('${order.orderId}', ${index}, 'cleaning')" 
+                                                    <button onclick="updateItemStatus('${freshOrder.orderId || order.orderId}', ${index}, 'cleaning')" 
                                                             style="padding: 6px 12px; background: #f59e0b; color: white; border: none; border-radius: 6px; font-size: 12px; cursor: pointer;">
                                                         开始清洗
                                                     </button>
                                                 ` : ''}
                                                 ${item.status === 'cleaning' ? `
-                                                    <button onclick="updateItemStatus('${order.orderId}', ${index}, 'cleaned')" 
+                                                    <button onclick="updateItemStatus('${freshOrder.orderId || order.orderId}', ${index}, 'cleaned')" 
                                                             style="padding: 6px 12px; background: #8b5cf6; color: white; border: none; border-radius: 6px; font-size: 12px; cursor: pointer;">
                                                         完成清洗
                                                     </button>
                                                 ` : ''}
                                                 ${item.status === 'cleaned' ? `
-                                                    <button onclick="updateItemStatus('${order.orderId}', ${index}, 'ready')" 
+                                                    <button onclick="updateItemStatus('${freshOrder.orderId || order.orderId}', ${index}, 'ready')" 
                                                             style="padding: 6px 12px; background: #10b981; color: white; border: none; border-radius: 6px; font-size: 12px; cursor: pointer;">
                                                         上架待取
                                                     </button>
@@ -6860,12 +7689,12 @@ ${(order.items || order.services || []).map((item, idx) => `${idx + 1}. ${item.n
                             <div style="background: #f3f4f6; padding: 12px; border-radius: 8px;">
                                 <div style="font-size: 13px; color: #374151; margin-bottom: 8px;">快捷操作</div>
                                 <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-                                    <button onclick="printItemLabels('${order.orderId}')" 
+                                    <button onclick="printItemLabels('${freshOrder.orderId || order.orderId}')" 
                                             style="padding: 8px 16px; background: #3b82f6; color: white; border: none; border-radius: 6px; font-size: 13px; cursor: pointer;">
                                         <i class="fa fa-print" style="margin-right: 6px;"></i>打印所有标签
                                     </button>
                                     ${!allReceived ? `
-                                        <button onclick="receiveAllItems('${order.orderId}')" 
+                                        <button onclick="receiveAllItems('${freshOrder.orderId || order.orderId}')" 
                                                 style="padding: 8px 16px; background: #f59e0b; color: white; border: none; border-radius: 6px; font-size: 13px; cursor: pointer;">
                                             <i class="fa fa-sign-in" style="margin-right: 6px;"></i>一键入库
                                         </button>
@@ -6904,9 +7733,13 @@ ${(order.items || order.services || []).map((item, idx) => `${idx + 1}. ${item.n
                 received: 'background: #e0e7ff; border-color: #6366f1;',    // 已入库 - 靛蓝
                 cleaning: 'background: #dbeafe; border-color: #3b82f6;',    // 清洗中 - 蓝色
                 cleaned: 'background: #d1fae5; border-color: #10b981;',     // 清洗完成 - 绿色
-                ready: 'background: #fce7f3; border-color: #ec4899;'        // 待取件 - 粉色
+                ready: 'background: #fce7f3; border-color: #ec4899;',       // 待取件 - 粉色
+                out: 'background: #dcfce7; border-color: #22c55e;',         // 已出库 - 深绿
+                checked_out: 'background: #dcfce7; border-color: #22c55e;',  // 已出库
+                customer_picked_up: 'background: #d1fae5; border-color: #059669;', // 用户已取件
+                completed: 'background: #f3f4f6; border-color: #9ca3af;'     // 已完成 - 灰色
             };
-            return styles[status] || '';
+            return styles[status] || styles.pending;
         }
         
         // 获取物品状态文本
@@ -6916,9 +7749,13 @@ ${(order.items || order.services || []).map((item, idx) => `${idx + 1}. ${item.n
                 received: '已入库',
                 cleaning: '清洗中',
                 cleaned: '清洗完成',
-                ready: '待取件'
+                ready: '待取件',
+                out: '已出库',
+                checked_out: '已出库',
+                customer_picked_up: '用户已取件',
+                completed: '已完成'
             };
-            return texts[status] || '未知';
+            return texts[status] || status || '未知';
         }
         
         // 生成物品条码
@@ -6953,7 +7790,7 @@ ${(order.items || order.services || []).map((item, idx) => `${idx + 1}. ${item.n
         }
         
         // 物品入库并打印标签
-        window.receiveItemAndPrint = function(orderId, itemIndex) {
+        window.receiveItemAndPrint = async function(orderId, itemIndex) {
             // 先更新物品状态为已入库
             const orders = JSON.parse(localStorage.getItem('store_orders') || '[]');
             const orderIndex = orders.findIndex(o => o.orderId === orderId);
@@ -6977,6 +7814,27 @@ ${(order.items || order.services || []).map((item, idx) => `${idx + 1}. ${item.n
                 // 更新订单状态为已入库
                 updateOrderStatusByItems(orderId, items);
                 
+                // 【关键修复】调用后端API持久化入库状态，保证小程序能获取到最新数据
+                try {
+                    const storeUser = JSON.parse(localStorage.getItem('storeUser') || '{}');
+                    const response = await fetch(`http://localhost:3000/api/cleaning/orders/${orderId}/receive`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            storeId: storeUser.storeId,
+                            note: `物品 ${itemIndex} 已入库`
+                        })
+                    });
+                    const result = await response.json();
+                    if (result.success) {
+                        console.log('[入库] 后端API同步成功, 物品:', itemIndex);
+                    } else {
+                        console.warn('[入库] 后端API返回失败:', result.error);
+                    }
+                } catch (error) {
+                    console.warn('[入库] 后端API调用失败，本地数据已保存:', error.message);
+                }
+                
                 // 打印单个物品标签
                 printSingleItemLabel(orderId, itemIndex);
                 
@@ -6988,7 +7846,7 @@ ${(order.items || order.services || []).map((item, idx) => `${idx + 1}. ${item.n
         };
         
         // 一键入库所有物品
-        window.receiveAllItems = function(orderId) {
+        window.receiveAllItems = async function(orderId) {
             if (!confirm('确定要将所有物品入库吗？入库后将自动打印所有标签。')) {
                 return;
             }
@@ -7017,6 +7875,27 @@ ${(order.items || order.services || []).map((item, idx) => `${idx + 1}. ${item.n
             
             // 更新订单状态
             updateOrderStatusByItems(orderId, items);
+            
+            // 【关键修复】调用后端API持久化入库状态，保证小程序能获取到最新数据
+            try {
+                const storeUser = JSON.parse(localStorage.getItem('storeUser') || '{}');
+                const response = await fetch(`http://localhost:3000/api/cleaning/orders/${orderId}/receive`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        storeId: storeUser.storeId,
+                        note: '全部物品已入库'
+                    })
+                });
+                const result = await response.json();
+                if (result.success) {
+                    console.log('[入库] 全部物品后端API同步成功');
+                } else {
+                    console.warn('[入库] 后端API返回失败:', result.error);
+                }
+            } catch (error) {
+                console.warn('[入库] 后端API调用失败，本地数据已保存:', error.message);
+            }
             
             // 打印所有标签
             printItemLabels(orderId);

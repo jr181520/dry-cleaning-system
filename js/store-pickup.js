@@ -360,11 +360,56 @@ const StorePickupManager = {
         storeOrders[orderIndex] = order;
         localStorage.setItem('store_orders', JSON.stringify(storeOrders));
         
+        // 同步到后端API
+        this._syncCheckoutToBackend(orderId, itemIndex, order, allCheckedOut);
+        
         return {
             success: true,
             allCheckedOut: allCheckedOut,
             order: order
         };
+    },
+    
+    /**
+     * 同步出库状态到后端API
+     */
+    _syncCheckoutToBackend(orderId, itemIndex, order, allCheckedOut) {
+        try {
+            const currentStore = JSON.parse(localStorage.getItem('currentStore') || '{}');
+            const storeId = currentStore.storeId || order.storeId || 'ST002';
+            
+            // 1. 关闭灯条绑定
+            fetch('http://localhost:3000/api/store/order-light/unbind', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    orderId: orderId,
+                    storeId: storeId,
+                    itemIndex: itemIndex,
+                    reason: 'item_checked_out'
+                })
+            }).catch(err => console.warn('[store-pickup] 关闭灯条绑定失败:', err));
+            
+            // 2. 更新后端订单物品状态
+            const updatedItems = (order.items || []).map(oi => ({
+                ...oi,
+                status: oi.itemStatus === 'checked_out' ? 'ready' : (oi.status || 'pending')
+            }));
+            
+            fetch(`http://localhost:3000/api/cleaning/orders/${orderId}/status`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-cache' },
+                body: JSON.stringify({
+                    status: allCheckedOut ? 'completed' : 'ready',
+                    items: updatedItems,
+                    note: allCheckedOut ? '所有物品已出库' : '物品出库中',
+                    userId: 'store_staff'
+                })
+            }).catch(err => console.warn('[store-pickup] 更新订单状态失败:', err));
+            
+        } catch (err) {
+            console.warn('[store-pickup] 后端同步失败:', err.message);
+        }
     },
     
     /**

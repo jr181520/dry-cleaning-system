@@ -1,0 +1,118 @@
+<view class="tracking-page">
+  <!-- 配送状态卡片 -->
+  <view class="status-card">
+    <view class="status-header">
+      <view class="status-icon {{delivery.status}}">
+        <text class="iconfont icon-{{delivery.icon}}"></text>
+      </view>
+      <view class="status-info">
+        <view class="status-title">{{delivery.statusText}}</view>
+        <view class="status-subtitle">{{delivery.subtitle}}</view>
+      </view>
+      <view class="live-badge" wx:if="{{delivery.isLive}}">
+        <view class="live-dot"></view>
+        <text>实时</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 配送员信息 -->
+  <view class="driver-card" wx:if="{{delivery.driver}}">
+    <view class="driver-header">
+      <view class="driver-avatar">
+        <text class="iconfont icon-driver"></text>
+      </view>
+      <view class="driver-info">
+        <view class="driver-name">{{delivery.driver.name || '配送员'}}</view>
+        <view class="driver-rating">
+          <text wx:for="{{delivery.driver.stars || 5}}" wx:key="*this">⭐</text>
+        </view>
+      </view>
+      <button class="driver-call-btn" bindtap="onCallDriver">
+        📞
+      </button>
+    </view>
+    <view class="driver-detail">
+      <view class="driver-detail-item">
+        <text class="detail-label">配送车辆</text>
+        <text class="detail-value">{{delivery.driver.vehicle || '电动车'}}</text>
+      </view>
+      <view class="driver-detail-item">
+        <text class="detail-label">预计到达</text>
+        <text class="detail-value highlight">{{delivery.driver.eta || '计算中...'}}</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 配送进度时间线 -->
+  <view class="timeline-card">
+    <view class="section-title">配送进度</view>
+    <view class="timeline">
+      <view class="timeline-item {{step.active ? 'active' : ''}}" 
+            wx:for="{{delivery.timeline}}" 
+            wx:key="key">
+        <view class="timeline-dot">
+          <view class="dot-inner {{step.active ? 'filled' : ''}}"></view>
+        </view>
+        <view class="timeline-content">
+          <view class="timeline-title">{{step.title}}</view>
+          <view class="timeline-time">{{step.time}}</view>
+          <view class="timeline-desc" wx:if="{{step.desc}}">{{step.desc}}</view>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 订单信息卡片 -->
+  <view class="order-card" wx:if="{{order}}">
+    <view class="section-title">订单信息</view>
+    <view class="order-info-grid">
+      <view class="order-info-item">
+        <text class="order-info-label">订单编号</text>
+        <text class="order-info-value">{{order.orderNo}}</text>
+      </view>
+      <view class="order-info-item">
+        <text class="order-info-label">取件地址</text>
+        <text class="order-info-value">{{delivery.pickupAddress || '-'}}</text>
+      </view>
+      <view class="order-info-item">
+        <text class="order-info-label">收件地址</text>
+        <text class="order-info-value">{{delivery.deliveryAddress || '-'}}</text>
+      </view>
+      <view class="order-info-item">
+        <text class="order-info-label">收件人</text>
+        <text class="order-info-value">{{delivery.contactName || '-'}}</text>
+      </view>
+      <view class="order-info-item">
+        <text class="order-info-label">联系电话</text>
+        <text class="order-info-value">{{delivery.contactPhone || '-'}}</text>
+      </view>
+      <view class="order-info-item">
+        <text class="order-info-label">物品数量</text>
+        <text class="order-info-value">{{order.itemCount || 0}} 件</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 底部联系按钮 -->
+  <view class="bottom-actions">
+    <button class="action-btn secondary" bindtap="onContactStore">
+      🏪 联系门店
+    </button>
+    <button class="action-btn primary" bindtap="onCallDriver" wx:if="{{delivery.driver}}">
+      📞 联系配送员
+    </button>
+  </view>
+
+  <!-- 加载状态 -->
+  <view class="loading-state" wx:if="{{loading}}">
+    <view class="loading-spinner"></view>
+    <text>加载配送信息中...</text>
+  </view>
+
+  <!-- 空状态 -->
+  <view class="empty-state" wx:if="{{!loading && !order}}">
+    <text class="empty-icon">📦</text>
+    <text class="empty-text">暂无配送信息</text>
+  </view>
+</view>

@@ -131,6 +131,9 @@ Page({
     app.globalData.selectedServices = this.data.selectedServices;
     app.globalData.serviceTotalPrice = this.data.totalPrice;
     
+    console.log('[服务选择] 保存服务数据:', this.data.selectedServices);
+    console.log('[服务选择] 总价:', this.data.totalPrice);
+    
     // 跳转到门店选择页面
     wx.navigateTo({
       url: '/pages/order/stores/index'

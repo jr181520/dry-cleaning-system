@@ -1511,7 +1511,7 @@
                             <div class="bg-white rounded-xl shadow-card p-6 border border-gray-200 transition-all duration-300 ease-in-out hover:shadow-card-hover animate-fade-in will-change-transform">
                                 <h3 class="text-lg font-semibold text-gray-800 mb-4">收入趋势</h3>
                                 <div class="h-80">
-                                    <canvas id="revenue-chart"></canvas>
+                                    <canvas id="stats-revenue-chart"></canvas>
                                 </div>
                             </div>
                             
@@ -2028,11 +2028,19 @@
             document.getElementById('current-date-time').textContent = now.toLocaleDateString('zh-CN', options);
         }
         
+        // 仪表板图表实例
+        let _dashboardCharts = {};
+        
         // 初始化图表
         function initCharts() {
+            // 销毁已有图表
+            if (_dashboardCharts.revenue) _dashboardCharts.revenue.destroy();
+            if (_dashboardCharts.service) _dashboardCharts.service.destroy();
+            
             // 收入趋势图
-            const revenueCtx = document.getElementById('revenue-chart').getContext('2d');
-            new Chart(revenueCtx, {
+            const revenueCtx = document.getElementById('revenue-chart');
+            if (revenueCtx) {
+                _dashboardCharts.revenue = new Chart(revenueCtx.getContext('2d'), {
                 type: 'line',
                 data: {
                     labels: ['1月', '2月', '3月', '4月', '5月', '6月', '7月'],
@@ -2106,11 +2114,13 @@
                         }
                     }
                 }
-            });
+                });
+            }
             
             // 服务类型分布图
-            const serviceCtx = document.getElementById('service-chart').getContext('2d');
-            new Chart(serviceCtx, {
+            const serviceCtx = document.getElementById('service-chart');
+            if (serviceCtx) {
+                _dashboardCharts.service = new Chart(serviceCtx.getContext('2d'), {
                 type: 'doughnut',
                 data: {
                     labels: ['衣物清洗', '鞋子护理', '家纺清洗', '皮具护理', '其他服务'],
@@ -2166,7 +2176,8 @@
                     },
                     cutout: '70%'
                 }
-            });
+                });
+            }
         }
         
         // 绑定事件
@@ -4125,6 +4136,27 @@
         
         // 初始化消息中心功能
         // 订单管理功能
+        
+        // 根据物品列表计算订单总金额（兼容不同字段格式）
+        function calculateOrderTotal(order) {
+            if (!order) return 0;
+            // 直接取已有总额字段
+            const directFields = ['totalPrice', 'total', 'amount', 'finalAmount'];
+            for (const f of directFields) {
+                if (typeof order[f] === 'number' && order[f] > 0) return order[f];
+            }
+            // 嵌套对象
+            const nested = order.amounts?.total || order.fees?.total || order.payment?.total;
+            if (typeof nested === 'number' && nested > 0) return nested;
+            // 从物品/服务汇总
+            const items = order.items || order.services || [];
+            return items.reduce((sum, item) => {
+                const price = item.price || item.unitPrice || item.servicePrice || 0;
+                const qty = item.quantity || item.qty || 1;
+                return sum + (price * qty);
+            }, 0);
+        }
+        
         function initOrders() {
             let orders = [];
             
@@ -4180,19 +4212,19 @@
                     }
                     
                     row.innerHTML = `
-                        <td class="py-3 px-4 text-sm text-gray-800">${order.id}</td>
-                        <td class="py-3 px-4 text-sm text-gray-800">${order.customerName}</td>
-                        <td class="py-3 px-4 text-sm text-gray-800">${order.customerPhone}</td>
-                        <td class="py-3 px-4 text-sm text-gray-800">¥${order.totalPrice}</td>
+                        <td class="py-3 px-4 text-sm text-gray-800">${order.orderId || order.id}</td>
+                        <td class="py-3 px-4 text-sm text-gray-800">${order.customerName || order.contact?.name || '客户'}</td>
+                        <td class="py-3 px-4 text-sm text-gray-800">${order.customerPhone || order.contact?.phone || ''}</td>
+                        <td class="py-3 px-4 text-sm text-gray-800">¥${order.totalPrice || order.total || order.amounts?.total || order.fees?.total || calculateOrderTotal(order) || 0}</td>
                         <td class="py-3 px-4">
                             <span class="px-2 py-1 ${statusClass} rounded-full text-xs font-medium transition-all duration-300 ease-in-out hover:scale-105">${statusText}</span>
                         </td>
-                        <td class="py-3 px-4 text-sm text-gray-800">${order.createdAt}</td>
+                        <td class="py-3 px-4 text-sm text-gray-800">${order.createTime || (order.createdAt ? new Date(order.createdAt).toLocaleString('zh-CN') : '')}</td>
                         <td class="py-3 px-4">
                             <div class="flex space-x-2">
-                                <button class="text-primary hover:text-primary/80 text-sm font-medium transition-all duration-300 ease-in-out hover:underline">查看</button>
-                                <button class="text-primary hover:text-primary/80 text-sm font-medium transition-all duration-300 ease-in-out hover:underline">编辑</button>
-                                <button class="text-red-500 hover:text-red-700 text-sm font-medium transition-all duration-300 ease-in-out hover:underline">删除</button>
+                                <button class="text-primary hover:text-primary/80 text-sm font-medium transition-all duration-300 ease-in-out hover:underline" onclick="openOrderDetail('${order.orderId || order.id}')">查看</button>
+                                <button class="text-primary hover:text-primary/80 text-sm font-medium transition-all duration-300 ease-in-out hover:underline" onclick="openOrderDetail('${order.orderId || order.id}')">编辑</button>
+                                <button class="text-red-500 hover:text-red-700 text-sm font-medium transition-all duration-300 ease-in-out hover:underline" onclick="if(confirm('确定删除此订单？')) window.deleteOrder('${order.orderId || order.id}')">删除</button>
                             </div>
                         </td>
                     `;
@@ -4215,9 +4247,12 @@
                 searchInput.addEventListener('input', function() {
                     const searchTerm = this.value.toLowerCase();
                     const filteredOrders = orders.filter(order => {
-                        return order.id.toLowerCase().includes(searchTerm) ||
-                               order.customerName.toLowerCase().includes(searchTerm) ||
-                               order.customerPhone.toLowerCase().includes(searchTerm);
+                        const id = (order.orderId || order.id || '').toLowerCase();
+                        const name = (order.customerName || order.contact?.name || '').toLowerCase();
+                        const phone = (order.customerPhone || order.contact?.phone || '').toLowerCase();
+                        return id.includes(searchTerm) ||
+                               name.includes(searchTerm) ||
+                               phone.includes(searchTerm);
                     });
                     renderOrders(filteredOrders);
                 });
@@ -4484,12 +4519,16 @@
         
         // 统计分析功能
         function initStatistics() {
+            // 图表实例引用，用于销毁后重建
+            const chartInstances = {};
+            
             // 初始化图表
             function initCharts() {
                 // 收入趋势图
-                const revenueCtx = document.getElementById('revenue-chart');
+                const revenueCtx = document.getElementById('stats-revenue-chart');
                 if (revenueCtx) {
-                    new Chart(revenueCtx, {
+                    if (chartInstances.revenue) chartInstances.revenue.destroy();
+                    chartInstances.revenue = new Chart(revenueCtx, {
                         type: 'line',
                         data: {
                             labels: ['1月', '2月', '3月', '4月', '5月', '6月'],
@@ -4527,7 +4566,8 @@
                 // 订单趋势图
                 const ordersCtx = document.getElementById('orders-chart');
                 if (ordersCtx) {
-                    new Chart(ordersCtx, {
+                    if (chartInstances.orders) chartInstances.orders.destroy();
+                    chartInstances.orders = new Chart(ordersCtx, {
                         type: 'bar',
                         data: {
                             labels: ['1月', '2月', '3月', '4月', '5月', '6月'],
@@ -4557,7 +4597,8 @@
                 // 客户分布图
                 const customersCtx = document.getElementById('customers-chart');
                 if (customersCtx) {
-                    new Chart(customersCtx, {
+                    if (chartInstances.customers) chartInstances.customers.destroy();
+                    chartInstances.customers = new Chart(customersCtx, {
                         type: 'doughnut',
                         data: {
                             labels: ['普通客户', '会员', 'VIP'],
@@ -4581,7 +4622,8 @@
                 // 物品分类分布图
                 const itemsCtx = document.getElementById('items-chart');
                 if (itemsCtx) {
-                    new Chart(itemsCtx, {
+                    if (chartInstances.items) chartInstances.items.destroy();
+                    chartInstances.items = new Chart(itemsCtx, {
                         type: 'pie',
                         data: {
                             labels: ['衣物', '家居用品', '特殊物品', '其他'],
@@ -5111,6 +5153,1156 @@
             
             alert('测试账号登录成功: ' + username);
         }
+
+        // ========================================
+        // 系统功能 - 从M端同步的核心业务逻辑
+        // ========================================
+
+        // Toast提示
+        function showToast(message, type = 'success') {
+            const colors = {
+                success: 'bg-green-500',
+                warning: 'bg-yellow-500',
+                error: 'bg-red-500',
+                info: 'bg-blue-500'
+            };
+            
+            const toast = document.createElement('div');
+            toast.className = `fixed top-20 left-1/2 transform -translate-x-1/2 ${colors[type] || colors.success} text-white px-6 py-3 rounded-lg shadow-lg z-50`;
+            toast.innerHTML = `<i class="fa fa-${type === 'success' ? 'check-circle' : type === 'warning' ? 'exclamation-circle' : 'info-circle'} mr-2"></i>${message}`;
+            document.body.appendChild(toast);
+            
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                toast.style.transition = 'opacity 0.3s';
+                setTimeout(() => toast.remove(), 300);
+            }, 2500);
+        }
+
+        // 订单状态定义
+        const ORDER_STATUS = {
+            pending: { text: '待支付', color: 'gray', bgClass: 'bg-gray-100', textClass: 'text-gray-800' },
+            paid: { text: '待入库', color: 'blue', bgClass: 'bg-blue-100', textClass: 'text-blue-800' },
+            received: { text: '已入库', color: 'indigo', bgClass: 'bg-indigo-100', textClass: 'text-indigo-800' },
+            cleaning: { text: '清洗中', color: 'yellow', bgClass: 'bg-yellow-100', textClass: 'text-yellow-800' },
+            cleaned: { text: '清洗完成', color: 'purple', bgClass: 'bg-purple-100', textClass: 'text-purple-800' },
+            ready: { text: '待取件', color: 'orange', bgClass: 'bg-orange-100', textClass: 'text-orange-800' },
+            out: { text: '已出库', color: 'teal', bgClass: 'bg-teal-100', textClass: 'text-teal-800' },
+            checked_out: { text: '已出库', color: 'teal', bgClass: 'bg-teal-100', textClass: 'text-teal-800' },
+            customer_picked_up: { text: '用户已取件', color: 'emerald', bgClass: 'bg-emerald-100', textClass: 'text-emerald-800' },
+            completed: { text: '已完成', color: 'green', bgClass: 'bg-green-100', textClass: 'text-green-800' },
+            cancelled: { text: '已取消', color: 'red', bgClass: 'bg-red-100', textClass: 'text-red-800' }
+        };
+
+        // 获取状态显示
+        function getStatusDisplay(status) {
+            const statusInfo = ORDER_STATUS[status] || ORDER_STATUS.pending;
+            return `<span class="px-2 py-1 rounded-full text-xs font-medium ${statusInfo.bgClass} ${statusInfo.textClass}">${statusInfo.text}</span>`;
+        }
+
+        // 并发PUT锁：防止同一订单短时间内重复调用API
+        const _completionLocks = new Map();
+
+        // 更新订单状态（纯本地操作，供出库/完成流程调用）
+        function _updateOrderStatusLocal(orderId, newStatus) {
+            const storeOrders = JSON.parse(localStorage.getItem('store_orders') || '[]');
+            const orders = JSON.parse(localStorage.getItem('orders') || '[]');
+            
+            const updateArr = (arr) => {
+                const idx = arr.findIndex(o => (o.orderId || o.id || o._id) === orderId);
+                if (idx > -1) {
+                    arr[idx].status = newStatus;
+                    arr[idx].completedAt = new Date().toISOString();
+                    arr[idx].updatedAt = new Date().toISOString();
+                }
+            };
+            
+            updateArr(storeOrders);
+            updateArr(orders);
+            
+            localStorage.setItem('store_orders', JSON.stringify(storeOrders));
+            localStorage.setItem('orders', JSON.stringify(orders));
+        }
+
+        // 移除激活灯条
+        function removeActiveLamp(orderId, itemIndex) {
+            const activeLamps = JSON.parse(localStorage.getItem('activeLamps') || '[]');
+            const filtered = activeLamps.filter(l => !(l.orderId === orderId && l.itemIndex === itemIndex));
+            localStorage.setItem('activeLamps', JSON.stringify(filtered));
+        }
+
+        // 清除订单所有灯条
+        function clearOrderLamps(orderId) {
+            const activeLamps = JSON.parse(localStorage.getItem('activeLamps') || '[]');
+            const filtered = activeLamps.filter(l => l.orderId !== orderId);
+            localStorage.setItem('activeLamps', JSON.stringify(filtered));
+        }
+
+        // 根据物品状态计算订单级状态（支持 out/completed 等出库状态）
+        function _calcOrderStatusFromItems(currentStatus, items) {
+            if (!items || items.length === 0) return currentStatus;
+            const isTerminal = s => ['completed','out','customer_picked_up'].includes(s);
+            const allTerminal = items.every(item => isTerminal(item.status));
+            const allReady = items.every(item => ['ready','completed','out','customer_picked_up'].includes(item.status));
+            const allCleaned = items.every(item => ['cleaned','ready','completed','out','customer_picked_up'].includes(item.status));
+            const allCleaning = items.every(item => ['cleaning','cleaned','ready','completed','out','customer_picked_up'].includes(item.status));
+            
+            if (allTerminal) return 'completed';
+            if (allReady) return 'ready';
+            if (allCleaned) return 'cleaned';
+            if (allCleaning) return 'cleaning';
+            
+            if (items.some(i => i.status === 'cleaning')) return 'cleaning';
+            if (items.some(i => i.status === 'received')) return 'received';
+            return currentStatus;
+        }
+
+        // 更新单个物品状态（内部同步核心 — 纯数据操作，无UI阻塞）
+        function _updateItemStatusCore(orderId, itemIndex, newStatus) {
+            const storeOrders = JSON.parse(localStorage.getItem('store_orders') || '[]');
+            const cOrders = JSON.parse(localStorage.getItem('orders') || '[]');
+            
+            const storeOrder = storeOrders.find(o => o.orderId === orderId || o._id === orderId || o.orderNo === orderId || o.id === orderId);
+            const cOrder = cOrders.find(o => o.orderId === orderId || o._id === orderId || o.orderNo === orderId || o.id === orderId);
+            const currentOrder = storeOrder || cOrder;
+            if (!currentOrder) return null;
+            
+            const items = currentOrder.items || currentOrder.services || [];
+            if (itemIndex >= items.length) return null;
+            
+            // 更新指定物品状态（同时写 status 和 itemStatus，保持两套UI一致）
+            const updatedItems = items.map((item, idx) => {
+                if (idx === itemIndex) {
+                    const mappedItemStatus = newStatus === 'out' ? 'checked_out' : 
+                                              newStatus === 'customer_picked_up' ? 'picked_up' : newStatus;
+                    return { ...item, status: newStatus, itemStatus: mappedItemStatus, statusUpdatedAt: new Date().toISOString() };
+                }
+                return item;
+            });
+            
+            // 根据物品状态计算订单级状态
+            let orderStatus = _calcOrderStatusFromItems(currentOrder.status, updatedItems);
+            
+            // 写入 store_orders
+            const sIdx = storeOrders.findIndex(o => o.orderId === orderId || o._id === orderId || o.orderNo === orderId || o.id === orderId);
+            if (sIdx > -1) {
+                storeOrders[sIdx].items = updatedItems;
+                storeOrders[sIdx].services = updatedItems;
+                storeOrders[sIdx].status = orderStatus;
+                storeOrders[sIdx].updatedAt = new Date().toISOString();
+                localStorage.setItem('store_orders', JSON.stringify(storeOrders));
+            }
+            
+            // 写入 orders (C端)
+            const cIdx = cOrders.findIndex(o => o.orderId === orderId || o._id === orderId || o.orderNo === orderId || o.id === orderId);
+            if (cIdx > -1) {
+                cOrders[cIdx].items = updatedItems;
+                cOrders[cIdx].services = updatedItems;
+                cOrders[cIdx].status = orderStatus;
+                cOrders[cIdx].updatedAt = new Date().toISOString();
+                localStorage.setItem('orders', JSON.stringify(cOrders));
+            }
+            
+            return storeOrders[sIdx] || cOrders[cIdx] || { ...currentOrder, items: updatedItems, status: orderStatus };
+        }
+
+        // 异步同步到后端API（静默，不阻塞）
+        function _syncItemStatusToAPI(orderId, orderStatus, updatedItems) {
+            // 防并发：同一订单2秒内不重复发送
+            const lockKey = '_sync_' + orderId;
+            const lastTime = _completionLocks.get(lockKey) || 0;
+            if (Date.now() - lastTime < 2000) {
+                console.log('[物品状态] 跳过重复同步:', orderId);
+                return;
+            }
+            _completionLocks.set(lockKey, Date.now());
+            
+            setTimeout(async () => {
+                try {
+                    const storeUser = JSON.parse(localStorage.getItem('storeUser') || '{}');
+                    const response = await fetch(`http://localhost:3000/api/cleaning/orders/${orderId}/status`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-cache' },
+                        body: JSON.stringify({
+                            status: orderStatus,
+                            note: ORDER_STATUS[orderStatus]?.text || orderStatus,
+                            userId: storeUser.staffId || storeUser.storeId || 'store_staff',
+                            items: updatedItems
+                        })
+                    });
+                    if (!response.ok) {
+                        const errBody = await response.text();
+                        console.error(`[物品状态] \u274C API返回错误(${response.status}): ${errBody}`, 'orderId:', orderId, 'status:', orderStatus);
+                    } else {
+                        console.log('[物品状态] \u2705 API同步完成:', orderId, '→', orderStatus);
+                    }
+                } catch (e) { console.warn('[物品状态] API同步失败:', e.message); }
+            }, 50);
+        }
+
+        // ============ 物品状态关联辅助函数 ============
+
+        // 发送客户通知
+        function sendCustomerNotification(orderId, type, message) {
+            let notifications = JSON.parse(localStorage.getItem('customer_notifications') || '[]');
+            notifications.unshift({
+                id: 'notif_' + Date.now(),
+                orderId: orderId,
+                type: type,
+                message: message,
+                isRead: false,
+                createdAt: new Date().toISOString()
+            });
+            localStorage.setItem('customer_notifications', JSON.stringify(notifications));
+        }
+
+        // 生成物品条码
+        function generateItemBarcode(orderId, itemIndex) {
+            const timestamp = Date.now().toString(36).toUpperCase();
+            return 'ITM' + orderId.slice(-6) + itemIndex + timestamp.slice(-4);
+        }
+
+        // 获取物品状态样式
+        function getItemStatusStyle(status) {
+            const styles = {
+                pending: 'background: #fef3c7; border-color: #f59e0b;',
+                received: 'background: #e0e7ff; border-color: #6366f1;',
+                cleaning: 'background: #dbeafe; border-color: #3b82f6;',
+                cleaned: 'background: #d1fae5; border-color: #10b981;',
+                ready: 'background: #fce7f3; border-color: #ec4899;',
+                out: 'background: #dcfce7; border-color: #22c55e;',
+                checked_out: 'background: #dcfce7; border-color: #22c55e;',
+                customer_picked_up: 'background: #d1fae5; border-color: #059669;',
+                completed: 'background: #f3f4f6; border-color: #9ca3af;'
+            };
+            return styles[status] || styles.pending;
+        }
+
+        // 获取物品状态文本
+        function getItemStatusText(status) {
+            const texts = {
+                pending: '待入库', received: '已入库', cleaning: '清洗中',
+                cleaned: '已清洗', ready: '待取件', out: '已出库',
+                checked_out: '已出库', customer_picked_up: '用户已取件', completed: '已完成'
+            };
+            return texts[status] || status || '未知';
+        }
+
+        // 根据物品状态自动更新订单状态（带通知和UI刷新）
+        function updateOrderStatusByItems(orderId, items) {
+            if (!items || items.length === 0) return;
+            
+            const finalStatuses = ['out', 'checked_out', 'customer_picked_up', 'completed'];
+            const allReceived = items.every(item => item.status !== 'pending');
+            const allCleaning = items.every(item => 
+                ['cleaning','cleaned','ready','out','checked_out','customer_picked_up','completed'].includes(item.status));
+            const allCleaned = items.every(item => 
+                ['cleaned','ready','out','checked_out','customer_picked_up','completed'].includes(item.status));
+            const allReady = items.every(item => 
+                ['ready','out','checked_out','customer_picked_up','completed'].includes(item.status));
+            const allTerminal = items.every(item => finalStatuses.includes(item.status));
+
+            let newStatus = null;
+            let message = '';
+
+            if (allTerminal) {
+                newStatus = 'completed';
+                message = '所有物品已出库/取件，订单已完成';
+            } else if (allReady) {
+                newStatus = 'ready';
+                message = '所有物品已就绪，订单状态更新为待取件';
+            } else if (allCleaned) {
+                newStatus = 'cleaned';
+                message = '所有物品已清洗完成，订单状态更新为清洗完成';
+            } else if (allCleaning) {
+                newStatus = 'cleaning';
+                message = '所有物品开始清洗，订单状态更新为清洗中';
+            } else if (allReceived) {
+                newStatus = 'received';
+                message = '所有物品已入库，订单状态更新为已入库';
+            }
+
+            if (newStatus) {
+                const storeOrders = JSON.parse(localStorage.getItem('store_orders') || '[]');
+                const cOrders = JSON.parse(localStorage.getItem('orders') || '[]');
+                const storeIdx = storeOrders.findIndex(o => 
+                    (o.orderId || o.id || o._id || o.orderNo) === orderId);
+                const cIdx = cOrders.findIndex(o => 
+                    (o.orderId || o.id || o._id || o.orderNo) === orderId);
+                
+                if (storeIdx > -1 && storeOrders[storeIdx].status !== newStatus) {
+                    const oldStatus = storeOrders[storeIdx].status;
+                    storeOrders[storeIdx].status = newStatus;
+                    storeOrders[storeIdx].updatedAt = new Date().toISOString();
+                    if (newStatus === 'completed') storeOrders[storeIdx].completedAt = new Date().toISOString();
+                    localStorage.setItem('store_orders', JSON.stringify(storeOrders));
+                    showToast(message, 'info');
+                    sendCustomerNotification(orderId, newStatus, message);
+                    console.log('[自动状态] 订单', orderId, oldStatus, '→', newStatus, '(由物品状态驱动)');
+                }
+                if (cIdx > -1 && cOrders[cIdx].status !== newStatus) {
+                    cOrders[cIdx].status = newStatus;
+                    cOrders[cIdx].updatedAt = new Date().toISOString();
+                    if (newStatus === 'completed') cOrders[cIdx].completedAt = new Date().toISOString();
+                    localStorage.setItem('orders', JSON.stringify(cOrders));
+                }
+            }
+        }
+
+        // 同步物品数据到C端订单
+        function syncItemsToCEnd(orderId, items) {
+            const cOrders = JSON.parse(localStorage.getItem('orders') || '[]');
+            const cIdx = cOrders.findIndex(o => 
+                (o.orderId || o.id || o._id || o.orderNo) === orderId);
+            if (cIdx > -1) {
+                cOrders[cIdx].items = items;
+                cOrders[cIdx].services = items;
+                cOrders[cIdx].updatedAt = new Date().toISOString();
+                localStorage.setItem('orders', JSON.stringify(cOrders));
+            }
+        }
+
+        // 检查订单是否完成
+        function checkOrderComplete(orderId) {
+            const storeOrders = JSON.parse(localStorage.getItem('store_orders') || '[]');
+            const orders = JSON.parse(localStorage.getItem('orders') || '[]');
+            const allOrders = [...storeOrders, ...orders];
+            
+            const order = allOrders.find(o => (o.orderId || o.id || o._id) === orderId);
+            if (order) {
+                const items = order.items || order.services || [];
+                const allOut = items.every(item => ['out','customer_picked_up','completed','checked_out','picked_up'].includes(item.status) || ['out','customer_picked_up','completed','checked_out','picked_up'].includes(item.itemStatus));
+                
+                if (allOut && items.length > 0) {
+                    _updateOrderStatusLocal(orderId, 'completed');
+                    
+                    // 防并发：同一订单2秒内不重复发送
+                    const lockKey = orderId;
+                    const lastTime = _completionLocks.get(lockKey) || 0;
+                    if (Date.now() - lastTime < 2000) {
+                        console.log(`[checkOrderComplete] 跳过重复请求: ${orderId}`);
+                        showToast('订单所有物品已出库，订单已完成', 'success');
+                        return;
+                    }
+                    _completionLocks.set(lockKey, Date.now());
+                    
+                    // 异步同步到后端（带错误日志）
+                    const itemsForApi = items.map(item => ({
+                        ...item,
+                        status: item.status || 'completed',
+                        itemStatus: item.itemStatus || 'checked_out'
+                    }));
+                    setTimeout(() => {
+                        fetch(`http://localhost:3000/api/cleaning/orders/${orderId}/status`, {
+                            method: 'PUT',
+                            headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-cache' },
+                            body: JSON.stringify({ 
+                                status: 'completed',
+                                note: ORDER_STATUS.completed?.text || '已完成',
+                                userId: 'store_staff',
+                                items: itemsForApi
+                            })
+                        }).then(async res => {
+                            if (!res.ok) {
+                                const errBody = await res.text();
+                                console.error(`[checkOrderComplete] \u274C API返回错误(${res.status}): ${errBody}`, 'orderId:', orderId);
+                            } else {
+                                console.log(`[checkOrderComplete] \u2705 API同步成功: ${orderId} → completed`);
+                            }
+                        }).catch(err => {
+                            console.error('[checkOrderComplete] \u274C 网络错误:', err.message, 'orderId:', orderId);
+                        });
+                    }, 50);
+                    
+                    showToast('订单所有物品已出库，订单已完成', 'success');
+                    
+                    // 通知C端
+                    localStorage.setItem('store_light_response', JSON.stringify({
+                        action: 'order_completed',
+                        orderId: orderId,
+                        timestamp: Date.now()
+                    }));
+                }
+            }
+        }
+
+        // 物品出库
+        window.outboundItem = function(orderId, itemIndex, itemName) {
+            console.log(`[出库] 开始处理: 订单=${ orderId}, 物品索引=${ itemIndex}, 名称="${ itemName}"`);
+            
+            // 直接更新本地数据，不弹确认框（outboundItem自己已经confirm过了）
+            const updatedOrder = _updateItemStatusCore(orderId, itemIndex, 'out');
+            if (!updatedOrder) { 
+                console.error(`[出库] \u274C 未找到订单: ${ orderId}`);
+                showToast('未找到订单: ' + orderId, 'error'); 
+                return; 
+            }
+            
+            console.log(`[出库] \u2705 本地状态已更新, order.status=${ updatedOrder.status}`);
+            
+            // 移除激活灯条
+            removeActiveLamp(orderId, itemIndex);
+            
+            // 清理对应的 light_request_* 缓存键，防止残留数据导致订单继续显示在列表中
+            try {
+                for (let i = 0; i < localStorage.length; i++) {
+                    const key = localStorage.key(i);
+                    if (key && key.startsWith('light_request_') && key.includes(orderId)) {
+                        console.log(`[出库] \uD83E\uDDF9 清理灯条请求缓存: ${ key}`);
+                        localStorage.removeItem(key);
+                    }
+                }
+                const storeReq = localStorage.getItem('store_light_request');
+                if (storeReq) {
+                    try {
+                        const parsed = JSON.parse(storeReq);
+                        if (parsed.orderId === orderId) {
+                            console.log('[出库] \uD83E\uDDF9 清理全局灯条请求: store_light_request');
+                            localStorage.removeItem('store_light_request');
+                        }
+                    } catch(e) {}
+                }
+            } catch(e) {
+                console.warn('[出库] 清理light_request缓存时出错:', e);
+            }
+            
+            // 检查是否所有物品都已出库
+            const allOut = (updatedOrder.items || []).every(i => 
+                ['out', 'customer_picked_up', 'completed'].includes(i.status) ||
+                ['checked_out', 'picked_up'].includes(i.itemStatus)
+            );
+            
+            if (allOut) {
+                // 全部出库 → 同步到API并标记完成（checkOrderComplete统一处理API同步，避免双重PUT）
+                _syncItemStatusToAPI(orderId, updatedOrder.status, updatedOrder.items || []);
+                checkOrderComplete(orderId);
+            } else {
+                // 部分出库 → 同步物品状态到API
+                _syncItemStatusToAPI(orderId, updatedOrder.status, updatedOrder.items || []);
+            }
+            
+            const remainingCount = (updatedOrder.items||[]).filter(i => 
+                !['out','completed','customer_picked_up'].includes(i.status) &&
+                !['checked_out','picked_up'].includes(i.itemStatus)
+            ).length;
+            showToast(`物品"${itemName}"已出库${allOut ? '' : '，还有 ' + remainingCount + ' 件待出库'}`, 'success');
+        };
+
+        // 批量出库订单所有物品
+        window.outboundAllItems = function(orderId) {
+            if (!confirm('确认该订单所有物品已出库？')) return;
+            
+            const storeOrders = JSON.parse(localStorage.getItem('store_orders') || '[]');
+            const orders = JSON.parse(localStorage.getItem('orders') || '[]');
+            const allOrders = [...storeOrders, ...orders];
+            
+            const order = allOrders.find(o => (o.orderId || o.id || o._id) === orderId);
+            if (order) {
+                const items = order.items || order.services || [];
+                items.forEach((item, index) => {
+                    _updateItemStatusCore(orderId, index, 'out');
+                });
+                
+                // 重新读取更新后的物品数据
+                const updatedStoreOrders = JSON.parse(localStorage.getItem('store_orders') || '[]');
+                const updatedOrder = updatedStoreOrders.find(o => 
+                    o.orderId === orderId || o._id === orderId || o.orderNo === orderId || o.id === orderId
+                );
+                const updatedItems = updatedOrder ? (updatedOrder.items || updatedOrder.services || []) : items;
+                
+                _syncItemStatusToAPI(orderId, 'completed', updatedItems);
+            }
+            
+            clearOrderLamps(orderId);
+            
+            // 清理对应的 light_request 缓存键
+            try {
+                for (let i = localStorage.length - 1; i >= 0; i--) {
+                    const key = localStorage.key(i);
+                    if (key && key.startsWith('light_request_') && key.includes(orderId)) {
+                        localStorage.removeItem(key);
+                    }
+                }
+                const storeReq = localStorage.getItem('store_light_request');
+                if (storeReq) {
+                    try { const p = JSON.parse(storeReq); if (p.orderId === orderId) localStorage.removeItem('store_light_request'); } catch(e) {}
+                }
+            } catch(e) {}
+            
+            _updateOrderStatusLocal(orderId, 'completed');
+            
+            showToast('订单所有物品已出库，订单已完成', 'success');
+        };
+
+        // 手动更新订单状态（带确认框和API同步）
+        window.updateOrderStatus = async function(orderId, newStatus) {
+            const statusText = ORDER_STATUS[newStatus]?.text || newStatus;
+            if (!confirm(`确定将订单状态更新为「${statusText}」吗？`)) return;
+            
+            try {
+                const storeUser = JSON.parse(localStorage.getItem('storeUser') || '{}');
+                const response = await fetch(`http://localhost:3000/api/cleaning/orders/${orderId}/status`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        status: newStatus,
+                        note: statusText,
+                        userId: storeUser.staffId || storeUser.storeId || 'store_staff'
+                    })
+                });
+                
+                if (!response.ok) {
+                    const errBody = await response.text();
+                    console.error(`[updateOrderStatus] \u274C API返回错误(${response.status}): ${errBody}`);
+                    showToast('状态更新失败: ' + (JSON.parse(errBody).error || '未知错误'), 'error');
+                    return;
+                }
+                
+                // 更新本地数据
+                _updateOrderStatusLocal(orderId, newStatus);
+                
+                showToast(`订单已更新为「${statusText}」`, 'success');
+                
+                // 刷新订单详情弹窗
+                setTimeout(() => openOrderDetail(orderId), 300);
+                // 刷新订单列表
+                setTimeout(() => renderOrders(), 500);
+                
+                // 通知C端
+                localStorage.setItem('store_light_response', JSON.stringify({
+                    action: 'order_status_changed',
+                    orderId: orderId,
+                    status: newStatus,
+                    timestamp: Date.now()
+                }));
+                
+                sendCustomerNotification(orderId, newStatus, `订单状态已更新为「${statusText}」`);
+            } catch(e) {
+                console.error('[updateOrderStatus] 网络错误:', e.message);
+                showToast('网络错误，请重试', 'error');
+            }
+        };
+
+        // UI版本 — 物品状态手动更新（带确认框）
+        window.updateItemStatus = async function(orderId, itemIndex, newStatus, opts = {}) {
+            const statusLabels = { 
+                'pending': '待入库', 
+                'received': '已入库',
+                'cleaning': '清洗中', 
+                'cleaned': '清洗完成', 
+                'ready': '待取件',
+                'checked_out': '已出库',
+                'customer_picked_up': '用户已取件',
+                'out': '已出库',
+                'completed': '已完成' 
+            };
+            
+            if (!opts.skipConfirm && !confirm(`确定将物品状态更新为「${statusLabels[newStatus]}」吗？`)) {
+                return;
+            }
+            
+            const updatedOrder = _updateItemStatusCore(orderId, itemIndex, newStatus);
+            if (!updatedOrder) { showToast('未找到订单', 'error'); return; }
+            
+            if (!opts.skipToast) {
+                showToast(`物品状态已更新为「${statusLabels[newStatus]}」`, 'success');
+            }
+            
+            // 根据物品状态自动计算并更新订单状态
+            const items = updatedOrder.items || updatedOrder.services || [];
+            updateOrderStatusByItems(orderId, items);
+            
+            if (!opts.skipAPISync) {
+                _syncItemStatusToAPI(orderId, updatedOrder.status, items);
+            }
+            
+            // 刷新订单详情弹窗
+            if (!opts.skipModalRefresh) {
+                setTimeout(() => {
+                    openOrderDetail(orderId);
+                }, 300);
+            }
+            
+            // 刷新订单列表
+            if (!opts.skipListRefresh) {
+                setTimeout(() => renderOrders(), 500);
+            }
+        };
+
+        // 关闭订单详情弹窗
+        window.closeOrderDetail = function() {
+            const modal = document.getElementById('order-detail-modal');
+            if (modal) {
+                modal.style.display = 'none';
+                modal.classList.add('hidden');
+            }
+        };
+
+        // ============ 订单详情弹窗（查看/编辑） ============
+        // 渲染订单物品列表
+        function _renderOrderItems(order) {
+            const items = order.items || order.services || [];
+            if (!items || items.length === 0) {
+                return '<p style="color: #6b7280; font-size: 13px;">暂无物品信息</p>';
+            }
+            return items.map((item, index) => {
+                const name = item.name || item.serviceName || '未知物品';
+                const price = item.price || 0;
+                const quantity = item.quantity || 1;
+                return `
+                    <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid #e5e7eb;">
+                        <div>
+                            <span style="color: #1f2937; font-weight: 500;">${name}</span>
+                            ${quantity > 1 ? '<span style="color: #6b7280; font-size: 12px; margin-left: 8px;">x' + quantity + '</span>' : ''}
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <span style="color: #6b7280; font-size: 13px;">¥${price.toFixed(2)}</span>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // 渲染物品状态管理器（订单详情内编辑状态 — 带快捷按钮）
+        function _renderItemStatusManager(order) {
+            const items = order.items || order.services || [];
+            if (!items || items.length === 0) return '';
+            
+            items.forEach((item, idx) => {
+                if (!item.status) item.status = item.itemStatus || order.status || 'pending';
+                if (!item.barcode) item.barcode = generateItemBarcode(order.orderId || order.id, idx);
+            });
+            
+            const statusLabels = {
+                'pending': '待入库', 'received': '已入库', 'cleaning': '清洗中',
+                'cleaned': '已清洗', 'ready': '待取件', 'out': '已出库',
+                'checked_out': '已出库', 'customer_picked_up': '用户已取件', 'completed': '已完成'
+            };
+            
+            const oid = order.orderId || order.id;
+            
+            return items.map((item, index) => {
+                const name = item.name || item.serviceName || '物品' + (index + 1);
+                const itemStatus = item.status || 'pending';
+                const itemBarcode = item.barcode || generateItemBarcode(oid, index);
+                
+                // 基于当前状态生成操作按钮
+                let actionBtn = '';
+                if (itemStatus === 'pending') {
+                    actionBtn = `<button onclick="window.updateItemStatus('${oid}', ${index}, 'received', {skipConfirm: false, skipToast: false})" 
+                        style="padding: 6px 12px; background: #3b82f6; color: white; border: none; border-radius: 6px; font-size: 12px; cursor: pointer; margin-left: 8px;">
+                        <i class="fa fa-sign-in"></i> 入库</button>`;
+                } else if (itemStatus === 'received') {
+                    actionBtn = `<button onclick="window.updateItemStatus('${oid}', ${index}, 'cleaning', {skipConfirm: false, skipToast: false})" 
+                        style="padding: 6px 12px; background: #f59e0b; color: white; border: none; border-radius: 6px; font-size: 12px; cursor: pointer; margin-left: 8px;">
+                        开始清洗</button>`;
+                } else if (itemStatus === 'cleaning') {
+                    actionBtn = `<button onclick="window.updateItemStatus('${oid}', ${index}, 'cleaned', {skipConfirm: false, skipToast: false})" 
+                        style="padding: 6px 12px; background: #8b5cf6; color: white; border: none; border-radius: 6px; font-size: 12px; cursor: pointer; margin-left: 8px;">
+                        完成清洗</button>`;
+                } else if (itemStatus === 'cleaned') {
+                    actionBtn = `<button onclick="window.updateItemStatus('${oid}', ${index}, 'ready', {skipConfirm: false, skipToast: false})" 
+                        style="padding: 6px 12px; background: #10b981; color: white; border: none; border-radius: 6px; font-size: 12px; cursor: pointer; margin-left: 8px;">
+                        上架待取</button>`;
+                } else if (itemStatus === 'ready') {
+                    actionBtn = `<button onclick="window.updateItemStatus('${oid}', ${index}, 'out', {skipConfirm: false, skipToast: false})" 
+                        style="padding: 6px 12px; background: #06b6d4; color: white; border: none; border-radius: 6px; font-size: 12px; cursor: pointer; margin-left: 8px;">
+                        确认出库</button>`;
+                } else {
+                    actionBtn = `<span style="font-size: 11px; color: #6b7280; margin-left: 8px;">${statusLabels[itemStatus] || ''}</span>`;
+                }
+                
+                return `
+                    <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px; background: white; border-radius: 6px; margin-bottom: 8px; border: 1px solid #e5e7eb; ${getItemStatusStyle(itemStatus)}">
+                        <div style="flex: 1; min-width: 0;">
+                            <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 4px;">
+                                <span style="font-weight: 500; color: #1f2937;">${name}</span>
+                                <span class="px-2 py-0.5 rounded text-xs font-semibold" style="display: inline-block; background: ${itemStatus === 'cleaning' ? '#fef3c7' : itemStatus === 'cleaned' ? '#ede9fe' : itemStatus === 'ready' ? '#ffedd5' : itemStatus === 'out' || itemStatus === 'checked_out' || itemStatus === 'customer_picked_up' ? '#dcfce7' : itemStatus === 'completed' ? '#d1fae5' : itemStatus === 'received' ? '#dbeafe' : '#f3f4f6'}; color: ${itemStatus === 'cleaning' ? '#92400e' : itemStatus === 'cleaned' ? '#5b21b6' : itemStatus === 'ready' ? '#9a3412' : itemStatus === 'out' || itemStatus === 'checked_out' || itemStatus === 'customer_picked_up' ? '#166534' : itemStatus === 'completed' ? '#065f46' : itemStatus === 'received' ? '#1e40af' : '#374151'}">
+                                    ${getItemStatusText(itemStatus)}
+                                </span>
+                            </div>
+                            <div style="font-size: 11px; color: #9ca3af; margin-top: 2px;">条码: ${itemBarcode}</div>
+                        </div>
+                        <div style="display: flex; align-items: center; flex-shrink: 0;">
+                            ${actionBtn}
+                            <select onchange="window.updateItemStatus('${oid}', ${index}, this.value, {skipConfirm: false, skipToast: false})" 
+                                    style="padding: 6px 10px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 11px; cursor: pointer; margin-left: 6px; max-width: 90px;">
+                                ${Object.entries(statusLabels).map(([k, v]) => `<option value="${k}" ${itemStatus === k ? 'selected' : ''}>${v}</option>`).join('')}
+                            </select>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // 渲染订单状态更新按钮（物品感知版本）
+        function _renderOrderStatusButtons(order) {
+            const currentStatus = order.status;
+            const oid = order.orderId || order.id;
+            const items = order.items || order.services || [];
+            const deliveryMethod = order.deliveryMethod || 'pickup';
+            
+            if (currentStatus === 'completed' || currentStatus === 'cancelled') {
+                return '<p style="color: #6b7280; font-size: 13px;">订单已结束，无法更新状态</p>';
+            }
+            
+            const flowButtons = [];
+            
+            // 检查物品状态
+            const allItemsReceived = items.length > 0 && items.every(i => i.status !== 'pending');
+            const allItemsCleaning = items.length > 0 && items.every(i => ['cleaning','cleaned','ready','out','checked_out','customer_picked_up','completed'].includes(i.status));
+            const allItemsCleaned = items.length > 0 && items.every(i => ['cleaned','ready','out','checked_out','customer_picked_up','completed'].includes(i.status));
+            const allItemsReady = items.length > 0 && items.every(i => ['ready','out','checked_out','customer_picked_up','completed'].includes(i.status));
+            
+            // 如果有物品，优先显示"物品管理"按钮
+            if (items.length > 0 && !allItemsReady) {
+                flowButtons.push({ action: 'manageItems', text: '📋 物品管理', color: '#f59e0b' });
+            }
+            
+            // 订单状态流转（同时检查物品状态，确保不跳过阶段）
+            if (currentStatus === 'pending' || currentStatus === 'paid') {
+                if (items.length === 0 || allItemsReceived) {
+                    flowButtons.push({ status: 'received', text: '确认入库', color: '#3b82f6' });
+                }
+            }
+            if (['pending', 'paid', 'received'].includes(currentStatus)) {
+                if (items.length === 0 || allItemsCleaning) {
+                    flowButtons.push({ status: 'cleaning', text: '开始清洗', color: '#f59e0b' });
+                }
+            }
+            if (currentStatus === 'cleaning') {
+                if (items.length === 0 || allItemsCleaned) {
+                    flowButtons.push({ status: 'cleaned', text: '清洗完成', color: '#8b5cf6' });
+                }
+            }
+            if (currentStatus === 'cleaned') {
+                if (items.length === 0 || allItemsReady) {
+                    flowButtons.push({ status: 'ready', text: '通知取件', color: '#f97316' });
+                }
+            }
+            if (currentStatus === 'ready') {
+                flowButtons.push({ status: 'completed', text: '确认取件', color: '#10b981' });
+            }
+            
+            if (flowButtons.length === 0) {
+                if (items.length > 0 && !allItemsReady) {
+                    return '<p style="color: #92400e; font-size: 13px;">请先通过「物品管理」推进物品状态，订单状态将自动更新</p>';
+                }
+                return '<p style="color: #6b7280; font-size: 13px;">请先完成物品状态推进</p>';
+            }
+            
+            return flowButtons.map(btn => {
+                let onclick = '';
+                if (btn.action === 'manageItems') {
+                    onclick = `manageOrderItems('${oid}'); return false;`;
+                } else {
+                    onclick = `window.updateOrderStatus('${oid}', '${btn.status}');`;
+                }
+                return `
+                    <button onclick="${onclick}"
+                            style="padding: 10px 16px; background-color: ${btn.color}; color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 13px; font-weight: 500;">
+                        ${btn.text}
+                    </button>
+                `;
+            }).join('');
+        }
+
+        // 查看/编辑订单详情
+        function openOrderDetail(orderId) {
+            const storeOrders = JSON.parse(localStorage.getItem('store_orders') || '[]');
+            const userOrders = JSON.parse(localStorage.getItem('orders') || '[]');
+            const order = [...storeOrders, ...userOrders].find(o => 
+                o.orderId === orderId || o.id === orderId || o._id === orderId || o.orderNo === orderId
+            );
+            
+            if (!order) { alert('未找到订单:' + orderId); return; }
+            
+            const statusInfo = ORDER_STATUS[order.status] || ORDER_STATUS.pending;
+            
+            const html = `
+                <div style="padding: 20px; max-height: 80vh; overflow-y: auto;">
+                    <!-- 头部 -->
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                        <div>
+                            <h3 style="font-size: 18px; font-weight: bold; color: #1f2937; margin-bottom: 4px;">订单详情</h3>
+                            <p style="font-size: 12px; color: #6b7280;">${order.orderId || order.id}</p>
+                        </div>
+                        <span class="px-3 py-1 rounded-full text-sm font-semibold ${statusInfo.bgClass} ${statusInfo.textClass}" style="display: inline-block;">
+                            ${statusInfo.text}
+                        </span>
+                    </div>
+                    
+                    <!-- 基本信息 -->
+                    <div style="background-color: #f9fafb; border-radius: 8px; padding: 16px; margin-bottom: 16px;">
+                        <h4 style="font-size: 14px; font-weight: 600; color: #1f2937; margin-bottom: 12px;">
+                            <i class="fa fa-info-circle" style="margin-right: 6px;"></i>基本信息
+                        </h4>
+                        <div style="font-size: 13px; color: #6b7280; display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                            <div><span style="font-weight: 500;">客户姓名：</span><span style="color: #1f2937;">${order.customerName || order.contact?.name || '未知'}</span></div>
+                            <div><span style="font-weight: 500;">联系电话：</span><span style="color: #1f2937;">${order.customerPhone || order.contact?.phone || '无'}</span></div>
+                            <div style="grid-column: 1 / -1;"><span style="font-weight: 500;">取件地址：</span><span style="color: #1f2937;">${order.pickupAddress || order.address || '到店自取'}</span></div>
+                            <div style="grid-column: 1 / -1;"><span style="font-weight: 500;">下单时间：</span><span style="color: #1f2937;">${order.createdAt ? new Date(order.createdAt).toLocaleString('zh-CN') : order.createTime || '未知'}</span></div>
+                            ${order.updatedAt ? '<div style="grid-column: 1 / -1;"><span style="font-weight: 500;">更新时间：</span><span style="color: #1f2937;">' + new Date(order.updatedAt).toLocaleString('zh-CN') + '</span></div>' : ''}
+                        </div>
+                    </div>
+                    
+                    <!-- 物品清单 -->
+                    <div style="background-color: #f9fafb; border-radius: 8px; padding: 16px; margin-bottom: 16px;">
+                        <h4 style="font-size: 14px; font-weight: 600; color: #1f2937; margin-bottom: 12px;">
+                            <i class="fa fa-list" style="margin-right: 6px;"></i>物品/服务清单
+                        </h4>
+                        ${_renderOrderItems(order)}
+                        <div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid #e5e7eb; text-align: right;">
+                            <span style="font-size: 16px; font-weight: bold; color: #1e40af;">
+                                合计：¥${order.totalPrice || order.total || order.amounts?.total || order.fees?.total || calculateOrderTotal(order) || 0}
+                            </span>
+                        </div>
+                    </div>
+                    
+                    <!-- 物品状态管理 -->
+                    <div style="background-color: #f9fafb; border-radius: 8px; padding: 16px; margin-bottom: 16px;">
+                        <h4 style="font-size: 14px; font-weight: 600; color: #1f2937; margin-bottom: 12px;">
+                            <i class="fa fa-edit" style="margin-right: 6px;"></i>物品状态管理
+                        </h4>
+                        ${_renderItemStatusManager(order)}
+                    </div>
+                    
+                    <!-- 订单状态更新 -->
+                    <div style="background-color: #eff6ff; border-radius: 8px; padding: 16px; margin-bottom: 16px;">
+                        <h4 style="font-size: 14px; font-weight: 600; color: #1f2937; margin-bottom: 12px;">
+                            <i class="fa fa-exchange" style="margin-right: 6px;"></i>订单状态更新
+                        </h4>
+                        <div style="display: flex; flex-wrap: wrap; gap: 8px;">
+                            ${_renderOrderStatusButtons(order)}
+                        </div>
+                    </div>
+                    
+                    <!-- 操作 -->
+                    <div style="display: flex; gap: 10px;">
+                        <button onclick="window.closeOrderDetail()" 
+                                style="flex: 1; padding: 12px; background-color: #f3f4f6; color: #374151; border: none; border-radius: 8px; cursor: pointer; font-size: 14px;">
+                            关闭
+                        </button>
+                        <button onclick="window.deleteOrder('${order.orderId || order.id}')"
+                                style="flex: 1; padding: 12px; background-color: #fee2e2; color: #dc2626; border: none; border-radius: 8px; cursor: pointer; font-size: 14px;">
+                            <i class="fa fa-trash mr-1"></i>删除订单
+                        </button>
+                    </div>
+                </div>
+            `;
+            
+            // 创建或更新模态框
+            let modal = document.getElementById('order-detail-modal');
+            if (!modal) {
+                modal = document.createElement('div');
+                modal.id = 'order-detail-modal';
+                modal.style.cssText = 'position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); z-index: 9999; display: flex; align-items: center; justify-content: center; padding: 20px;';
+                modal.onclick = function(e) { if (e.target === modal) window.closeOrderDetail(); };
+                document.body.appendChild(modal);
+            }
+            
+            const modalContent = document.createElement('div');
+            modalContent.style.cssText = 'background: white; border-radius: 16px; max-width: 600px; width: 100%; max-height: 90vh; overflow: hidden; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);';
+            modalContent.innerHTML = html;
+            modal.innerHTML = '';
+            modal.appendChild(modalContent);
+            modal.classList.remove('hidden');
+            modal.style.display = 'flex';
+        }
+
+        // ============ 物品管理弹窗（独立于订单详情弹窗） ============
+        
+        // 管理物品状态（从订单状态按钮调用，打开物品管理弹窗）
+        window.manageOrderItems = function(orderId) {
+            const storeOrders = JSON.parse(localStorage.getItem('store_orders') || '[]');
+            const cOrders = JSON.parse(localStorage.getItem('orders') || '[]');
+            
+            const findOrderById = (list, id) => list.find(o => 
+                (o.orderId || o.id || o._id || o.orderNo) === id);
+            
+            let order = findOrderById(storeOrders, orderId);
+            if (!order) {
+                order = findOrderById(cOrders, orderId);
+                if (order) {
+                    storeOrders.push(order);
+                    localStorage.setItem('store_orders', JSON.stringify(storeOrders));
+                }
+            }
+            
+            if (!order) { alert('订单不存在'); return; }
+            
+            // 关闭订单详情弹窗
+            window.closeOrderDetail();
+            // 打开物品管理弹窗
+            setTimeout(() => showItemManagementModal(order), 100);
+        };
+        
+        // 显示物品管理弹窗
+        function showItemManagementModal(order) {
+            const orderId = order?.orderId || order?.id || order?._id || order?.orderNo;
+            
+            // 始终从 localStorage 重新读取最新数据
+            const storeOrders = JSON.parse(localStorage.getItem('store_orders') || '[]');
+            const cOrders = JSON.parse(localStorage.getItem('orders') || '[]');
+            const findById = (list, id) => list.find(o =>
+                (o.orderId || o.id || o._id || o.orderNo) === id);
+            
+            let freshOrder = findById(storeOrders, orderId) || findById(cOrders, orderId) || order;
+            let items = freshOrder.items || freshOrder.services || [];
+            items = items.map(item => ({...item})); // 浅拷贝
+            
+            // 智能设置物品默认状态
+            const orderStatus = freshOrder.status || '';
+            const validStatuses = ['pending','received','cleaning','cleaned','ready','out','checked_out','customer_picked_up','completed'];
+            items.forEach((item, index) => {
+                if (!item.barcode) item.barcode = generateItemBarcode(orderId, index);
+                if (!item.status || !validStatuses.includes(item.status)) {
+                    if (['cleaning','processing','in_progress'].includes(orderStatus)) item.status = 'received';
+                    else if (orderStatus === 'cleaned') item.status = 'cleaning';
+                    else if (orderStatus === 'ready') item.status = 'cleaned';
+                    else if (orderStatus === 'completed') item.status = 'ready';
+                    else item.status = 'pending';
+                }
+            });
+            
+            const allReceived = items.length > 0 && items.every(i => i.status !== 'pending');
+            
+            const itemsHtml = items.map((item, index) => {
+                const itemStatus = item.status || 'pending';
+                let actionBtnHtml = '';
+                if (itemStatus === 'pending') {
+                    actionBtnHtml = `<button onclick="window.receiveItemAndPrint('${orderId}', ${index})" 
+                        style="padding: 6px 12px; background: #3b82f6; color: white; border: none; border-radius: 6px; font-size: 12px; cursor: pointer;">
+                        <i class="fa fa-sign-in"></i> 入库并打印</button>`;
+                } else if (itemStatus === 'received') {
+                    actionBtnHtml = `<button onclick="window.updateItemStatus('${orderId}', ${index}, 'cleaning', {skipConfirm: true, skipModalRefresh: true})" 
+                        style="padding: 6px 12px; background: #f59e0b; color: white; border: none; border-radius: 6px; font-size: 12px; cursor: pointer;">
+                        开始清洗</button>`;
+                } else if (itemStatus === 'cleaning') {
+                    actionBtnHtml = `<button onclick="window.updateItemStatus('${orderId}', ${index}, 'cleaned', {skipConfirm: true, skipModalRefresh: true})" 
+                        style="padding: 6px 12px; background: #8b5cf6; color: white; border: none; border-radius: 6px; font-size: 12px; cursor: pointer;">
+                        完成清洗</button>`;
+                } else if (itemStatus === 'cleaned') {
+                    actionBtnHtml = `<button onclick="window.updateItemStatus('${orderId}', ${index}, 'ready', {skipConfirm: true, skipModalRefresh: true})" 
+                        style="padding: 6px 12px; background: #10b981; color: white; border: none; border-radius: 6px; font-size: 12px; cursor: pointer;">
+                        上架待取</button>`;
+                } else if (itemStatus === 'ready') {
+                    actionBtnHtml = `<span style="color: #10b981; font-size: 12px; margin-left: 8px;"><i class="fa fa-check"></i> 待取件</span>`;
+                } else {
+                    actionBtnHtml = `<span style="color: #6b7280; font-size: 12px; margin-left: 8px;">${getItemStatusText(itemStatus)}</span>`;
+                }
+                
+                return `
+                    <div style="border: 1px solid #e5e7eb; border-radius: 8px; padding: 12px; margin-bottom: 8px; ${getItemStatusStyle(itemStatus)}">
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <div>
+                                <div style="font-weight: 500;">${item.name || item.serviceName || '未知物品'}</div>
+                                <div style="font-size: 12px; color: #6b7280; margin-top: 4px;">
+                                    条码: ${item.barcode || generateItemBarcode(orderId, index)}
+                                </div>
+                                <div style="font-size: 12px; margin-top: 4px;">
+                                    状态: <span style="font-weight: 600;">${getItemStatusText(itemStatus)}</span>
+                                </div>
+                            </div>
+                            <div>${actionBtnHtml}</div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+            
+            const modalHtml = `
+                <div id="item-management-modal-inner" style="overflow-y: auto; flex: 1; padding: 16px 20px;">
+                    <p style="color: #6b7280; font-size: 13px; margin-bottom: 12px;">
+                        <i class="fa fa-info-circle" style="margin-right: 6px;"></i>请先入库打印标签，然后逐步更新物品状态
+                    </p>
+                    <div style="margin-bottom: 16px;">${itemsHtml}</div>
+                    <div style="background: #f3f4f6; padding: 12px; border-radius: 8px;">
+                        <div style="font-size: 13px; color: #374151; margin-bottom: 8px;">快捷操作</div>
+                        <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                            <button onclick="window.printItemLabels('${orderId}')" 
+                                style="padding: 8px 16px; background: #3b82f6; color: white; border: none; border-radius: 6px; font-size: 13px; cursor: pointer;">
+                                <i class="fa fa-print"></i> 打印所有标签
+                            </button>
+                            ${!allReceived ? `
+                                <button onclick="window.receiveAllItems('${orderId}')" 
+                                    style="padding: 8px 16px; background: #f59e0b; color: white; border: none; border-radius: 6px; font-size: 13px; cursor: pointer;">
+                                    <i class="fa fa-sign-in"></i> 一键入库
+                                </button>
+                            ` : ''}
+                            <button onclick="window.openOrderDetailFromItems('${orderId}')" 
+                                style="padding: 8px 16px; background: #6b7280; color: white; border: none; border-radius: 6px; font-size: 13px; cursor: pointer;">
+                                <i class="fa fa-eye"></i> 查看订单详情
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            // 创建或更新物品管理模态框
+            let modal = document.getElementById('item-management-modal');
+            if (!modal) {
+                modal = document.createElement('div');
+                modal.id = 'item-management-modal';
+                modal.style.cssText = 'position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 10000; display: flex; align-items: center; justify-content: center;';
+                modal.onclick = function(e) { if (e.target === modal) closeItemManagementModal(); };
+                document.body.appendChild(modal);
+            }
+            
+            modal.innerHTML = `
+                <div style="background: white; border-radius: 16px; width: 90%; max-width: 500px; max-height: 80vh; overflow: hidden; display: flex; flex-direction: column; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1);">
+                    <div style="padding: 16px 20px; border-bottom: 1px solid #e5e7eb; display: flex; justify-content: space-between; align-items: center;">
+                        <h3 style="font-size: 18px; font-weight: 600; margin: 0;">物品管理 - ${orderId}</h3>
+                        <button onclick="window.closeItemManagementModal()" style="background: none; border: none; font-size: 24px; cursor: pointer; line-height: 1;">&times;</button>
+                    </div>
+                    ${modalHtml}
+                    <div style="padding: 16px 20px; border-top: 1px solid #e5e7eb;">
+                        <button onclick="window.closeItemManagementModal()" style="width: 100%; padding: 12px; background: #f3f4f6; border: none; border-radius: 8px; cursor: pointer; font-size: 14px;">关闭</button>
+                    </div>
+                </div>
+            `;
+            modal.style.display = 'flex';
+        }
+        
+        // 关闭物品管理弹窗（同时刷新订单列表）
+        window.closeItemManagementModal = function() {
+            const modal = document.getElementById('item-management-modal');
+            if (modal) modal.style.display = 'none';
+            setTimeout(() => renderOrders(), 300);
+        };
+        
+        // 从物品管理弹窗跳转回订单详情
+        window.openOrderDetailFromItems = function(orderId) {
+            closeItemManagementModal();
+            setTimeout(() => openOrderDetail(orderId), 200);
+        };
+        
+        // 入库物品并打印标签
+        window.receiveItemAndPrint = async function(orderId, itemIndex) {
+            // 先更新物品状态为已入库
+            const updatedOrder = _updateItemStatusCore(orderId, itemIndex, 'received');
+            if (!updatedOrder) { alert('未找到订单，入库失败'); return; }
+            
+            const items = updatedOrder.items || updatedOrder.services || [];
+            updateOrderStatusByItems(orderId, items);
+            syncItemsToCEnd(orderId, items);
+            
+            // 调用后端API
+            try {
+                const storeUser = JSON.parse(localStorage.getItem('storeUser') || '{}');
+                await fetch(`http://localhost:3000/api/cleaning/orders/${orderId}/receive`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ storeId: storeUser.storeId, note: `物品 ${itemIndex} 已入库` })
+                });
+            } catch(e) { console.warn('[入库] API调用失败:', e.message); }
+            
+            showToast(`物品 #${itemIndex + 1} 已入库`, 'success');
+            
+            // 刷新物品管理弹窗
+            showItemManagementModal(updatedOrder);
+        };
+        
+        // 一键入库所有物品
+        window.receiveAllItems = async function(orderId) {
+            if (!confirm('确定要将所有物品入库吗？入库后将自动打印所有标签。')) return;
+            
+            const storeOrders = JSON.parse(localStorage.getItem('store_orders') || '[]');
+            const findById = (list, id) => list.findIndex(o =>
+                (o.orderId || o.id || o._id || o.orderNo) === id);
+            const idx = findById(storeOrders, orderId);
+            if (idx === -1) return;
+            
+            const items = storeOrders[idx].items || storeOrders[idx].services || [];
+            items.forEach(item => {
+                if (item.status === 'pending') {
+                    item.status = 'received';
+                    item.statusUpdatedAt = new Date().toISOString();
+                    item.receivedAt = new Date().toISOString();
+                }
+            });
+            storeOrders[idx].items = items;
+            storeOrders[idx].services = items;
+            localStorage.setItem('store_orders', JSON.stringify(storeOrders));
+            
+            updateOrderStatusByItems(orderId, items);
+            syncItemsToCEnd(orderId, items);
+            
+            // 调用后端API
+            try {
+                const storeUser = JSON.parse(localStorage.getItem('storeUser') || '{}');
+                await fetch(`http://localhost:3000/api/cleaning/orders/${orderId}/receive`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ storeId: storeUser.storeId, note: '全部物品已入库' })
+                });
+            } catch(e) { console.warn('[入库] API调用失败:', e.message); }
+            
+            showToast('所有物品已入库', 'success');
+            window.printItemLabels(orderId);
+            showItemManagementModal(storeOrders[idx]);
+        };
+        
+        // 打印所有物品标签
+        window.printItemLabels = function(orderId) {
+            const storeOrders = JSON.parse(localStorage.getItem('store_orders') || '[]');
+            const order = storeOrders.find(o => (o.orderId || o.id || o._id || o.orderNo) === orderId);
+            if (!order) return;
+            
+            const items = order.items || order.services || [];
+            let printContent = `<div style="font-family: monospace; padding: 20px;">
+                <h2 style="text-align: center; margin-bottom: 20px;">物品标签 - ${orderId}</h2>`;
+            
+            items.forEach((item, index) => {
+                const itemName = item.name || item.serviceName || '未知物品';
+                const itemBarcode = item.barcode || generateItemBarcode(orderId, index);
+                printContent += `
+                    <div style="border: 2px dashed #333; padding: 15px; margin-bottom: 15px; page-break-inside: avoid;">
+                        <div style="font-size: 18px; font-weight: bold; margin-bottom: 10px;">${itemName}</div>
+                        <div style="font-size: 14px; margin-bottom: 5px;">订单: ${orderId}</div>
+                        <div style="font-size: 14px; margin-bottom: 10px;">条码: ${itemBarcode}</div>
+                        <div style="text-align: center; padding: 10px; background: #f3f4f6;">
+                            <div style="font-family: monospace; font-size: 24px; letter-spacing: 4px;">*${itemBarcode}*</div>
+                        </div>
+                    </div>`;
+            });
+            printContent += '</div>';
+            
+            const pw = window.open('', '_blank');
+            pw.document.write(`<html><head><title>物品标签 - ${orderId}</title>
+                <style>@media print { body { margin: 0; } .no-print { display: none; } }</style></head>
+                <body>${printContent}
+                <div class="no-print" style="text-align: center; margin-top: 20px; padding: 20px;">
+                    <button onclick="window.print()" style="padding: 10px 20px; font-size: 16px;">打印标签</button>
+                    <button onclick="window.close()" style="padding: 10px 20px; font-size: 16px; margin-left: 10px;">关闭</button>
+                </div></body></html>`);
+            pw.document.close();
+        };
+
+        // 删除订单
+        window.deleteOrder = function(orderId) {
+            if (!confirm('确定要删除订单「' + orderId + '」吗？此操作不可撤销。')) return;
+            
+            ['store_orders', 'orders', 'admin_orders', 'all_orders'].forEach(key => {
+                let list = JSON.parse(localStorage.getItem(key) || '[]');
+                const idx = list.findIndex(o => 
+                    (o.orderId || o.id || o._id || o.orderNo) === orderId
+                );
+                if (idx > -1) {
+                    list.splice(idx, 1);
+                    localStorage.setItem(key, JSON.stringify(list));
+                }
+            });
+            
+            window.closeOrderDetail();
+            showToast('订单已删除', 'success');
+            
+            // 刷新订单列表
+            if (typeof loadOrders === 'function') {
+                setTimeout(loadOrders, 300);
+            }
+        };
+
+        console.log('[系统] 核心业务逻辑已从M端同步完成');
     </script>
 </body>
 </html>

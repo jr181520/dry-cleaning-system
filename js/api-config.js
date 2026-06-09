@@ -28,7 +28,7 @@ const API_CONFIG = {
         // 订单相关
         orders: '/cleaning/orders',
         adminOrders: '/admin/orders',
-        storeOrders: (storeId) => `/admin/store/${storeId}/orders`,
+        storeOrders: (storeId) => `/cleaning/store/${storeId}/orders`,
         
         // 支付相关
         payment: '/payment',
