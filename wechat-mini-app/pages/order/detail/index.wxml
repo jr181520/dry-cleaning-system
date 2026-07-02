@@ -80,20 +80,53 @@
     </view>
   </view>
 
-  <!-- 进度条 -->
+  <!-- 跑腿配送跟踪（仅跑腿订单显示，实时更新，已送达自动收起） -->
+  <view class="courier-track-section {{courierInfo.status === 'delivered' ? 'collapsing' : ''}}" wx:if="{{showCourierTracker && courierInfo}}">
+    <view class="track-header">
+      <text class="track-title">🏃 配送跟踪</text>
+      <view class="track-status {{courierInfo.statusClass}}">
+        <text>{{courierInfo.statusText}}</text>
+      </view>
+    </view>
+    <view class="track-courier">
+      <view class="track-avatar">🧑‍✈️</view>
+      <view class="track-detail">
+        <text class="track-name">{{courierInfo.name}}</text>
+        <text class="track-meta">{{courierInfo.distance}} · 预计{{courierInfo.eta}}后到达</text>
+      </view>
+    </view>
+    <view class="track-progress">
+      <view class="track-bar-bg">
+        <view class="track-bar-fill" style="width: {{courierInfo.progress}}%"></view>
+      </view>
+      <view class="track-steps">
+        <text class="{{courierInfo.progress >= 0 ? 'active' : ''}}">已取件</text>
+        <text class="{{courierInfo.progress >= 50 ? 'active' : ''}}">配送中</text>
+        <text class="{{courierInfo.progress >= 100 ? 'active' : ''}}">已送达</text>
+      </view>
+    </view>
+    <!-- 实时更新指示点 -->
+    <view class="live-indicator" wx:if="{{courierInfo.status !== 'delivered'}}">
+      <view class="live-dot"></view>
+      <text class="live-text">实时跟踪中</text>
+    </view>
+  </view>
+
+  <!-- 进度条 — 与C端一致：固定紫色渐变 + active/current class 控制 -->
   <view class="progress-section">
     <view class="info-title">订单进度</view>
     <view class="progress-steps">
       <view class="progress-line"></view>
-      <view class="progress-line-fill" style="width: {{(currentStep / (steps.length - 1)) * 100}}%"></view>
+      <view class="progress-line-fill" style="width: {{progressPercent}}%;"></view>
       
       <view class="progress-step {{step.active ? 'active' : ''}} {{step.current ? 'current' : ''}}" 
             wx:for="{{steps}}" 
+            wx:for-item="step"
             wx:key="key">
         <view class="step-icon">
           <text class="iconfont icon-{{step.icon}}"></text>
         </view>
-        <span class="step-label">{{step.text}}</span>
+        <text class="step-label">{{step.text}}</text>
       </view>
     </view>
   </view>
@@ -167,6 +200,88 @@
       </view>
     </view>
   </view>
+
+  <!-- 跑腿服务商选择面板 -->
+  <view class="courier-panel {{showCourierPanel ? 'show' : ''}}">
+    <view class="courier-panel-header">
+      <view class="courier-panel-title">选择跑腿服务</view>
+      <view class="courier-panel-close" bindtap="onCloseCourierPanel">
+        <text class="iconfont icon-close"></text>
+      </view>
+    </view>
+
+    <!-- 配送模式切换 -->
+    <view class="courier-mode-tabs">
+      <view class="courier-mode-tab {{deliveryMode === 'solo' ? 'active' : ''}}"
+            data-mode="solo" bindtap="onSwitchDeliveryMode">
+        <text class="courier-mode-name">一对一专送</text>
+        <text class="courier-mode-sub">专属骑手 · 最快送达</text>
+      </view>
+      <view class="courier-mode-tab {{deliveryMode === 'shared' ? 'active' : ''}}"
+            data-mode="shared" bindtap="onSwitchDeliveryMode">
+        <text class="courier-mode-name">拼单配送</text>
+        <text class="courier-mode-sub">多人分摊 · 更省钱</text>
+      </view>
+    </view>
+
+    <!-- 报价加载中 -->
+    <view class="courier-loading" wx:if="{{courierLoading}}">
+      <view class="courier-spinner"></view>
+      <text>正在获取报价...</text>
+    </view>
+
+    <!-- 服务商列表 -->
+    <view class="courier-providers" wx:if="{{!courierLoading}}">
+      <view class="courier-provider {{selectedCourier === item.id ? 'selected' : ''}}"
+            wx:for="{{courierProviders}}" wx:key="id"
+            data-provider="{{item.id}}" bindtap="onSelectCourier">
+        <view class="cp-header">
+          <view class="cp-icon">{{item.icon}}</view>
+          <view class="cp-info">
+            <text class="cp-name">{{item.name}}</text>
+            <text class="cp-meta">⭐ {{item.rating}} · {{item.estimatedTime}} · {{item.distance}}km</text>
+          </view>
+          <view class="cp-check" wx:if="{{selectedCourier === item.id}}">✓</view>
+          <view class="cp-discount" wx:elif="{{item.hasDiscount}}">{{item.discountInfo}}</view>
+        </view>
+        <view class="cp-pricing">
+          <view class="cp-price-item">
+            <text class="cp-price-label">配送费</text>
+            <text class="cp-price-value">¥{{deliveryMode === 'shared' ? item.pricing.shared.actualFee : item.pricing.solo.actualFee}}</text>
+            <text class="cp-price-original" wx:if="{{deliveryMode === 'solo' ? item.pricing.solo.discount > 0 : item.pricing.shared.discount > 0}}">
+              ¥{{deliveryMode === 'solo' ? item.pricing.solo.originalFee : item.pricing.shared.originalFee}}
+            </text>
+          </view>
+          <view class="cp-price-item" wx:if="{{selectedCourier === item.id && (deliveryMode === 'solo' ? item.pricing.solo.discount > 0 : item.pricing.shared.discount > 0)}}">
+            <text class="cp-price-label">优惠</text>
+            <text class="cp-price-value cp-discount-green">
+              -¥{{deliveryMode === 'solo' ? item.pricing.solo.discount : item.pricing.shared.discount}}
+            </text>
+          </view>
+        </view>
+      </view>
+
+      <!-- 空状态 -->
+      <view class="courier-empty" wx:if="{{courierProviders.length === 0}}">
+        <text class="courier-empty-icon">🚫</text>
+        <text>暂无可用服务商</text>
+      </view>
+    </view>
+
+    <!-- 底部确认 -->
+    <view class="courier-footer">
+      <view class="courier-total">
+        <text class="courier-total-label">配送费用</text>
+        <text class="courier-total-fee">¥{{courierFee}}</text>
+      </view>
+      <button class="courier-confirm-btn {{selectedCourier ? '' : 'disabled'}}" 
+              bindtap="onConfirmCourier"
+              disabled="{{!selectedCourier}}">
+        确认并支付
+      </button>
+    </view>
+  </view>
+  <view class="courier-overlay {{showCourierPanel ? 'show' : ''}}" bindtap="onCloseCourierPanel"></view>
 
   <!-- 物品清单 -->
   <view class="info-section">
@@ -329,11 +444,11 @@
               wx:if="{{showPickupMethod && selectedPickupMethod === 'store_pickup'}}">
         📱 扫码取件
       </button>
-      <!-- 可取件状态 & 配送到家 → 确认配送 -->
+      <!-- 可取件状态 & 配送到家 → 选择跑腿服务 -->
       <button class="btn-action btn-success" 
               bindtap="onHandleMainAction" 
               wx:if="{{showPickupMethod && selectedPickupMethod === 'home_delivery'}}">
-        确认配送
+        🚀 选择跑腿
       </button>
       <button class="btn-action btn-outline"
               bindtap="onRemind"

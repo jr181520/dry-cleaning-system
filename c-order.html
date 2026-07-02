@@ -348,6 +348,53 @@
         .home-back-btn:hover {
             background: rgba(255, 255, 255, 0.3);
         }
+        
+        /* 寄养弹窗 */
+        .boarding-modal-overlay {
+            position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.5); z-index: 200;
+            display: flex; align-items: flex-end; justify-content: center;
+        }
+        .boarding-modal {
+            background: #fff; width: 100%; max-width: 500px;
+            border-radius: 24rpx 24rpx 0 0; padding: 32rpx;
+            animation: slideUp 0.3s ease;
+        }
+        @keyframes slideUp {
+            from { transform: translateY(100%); }
+            to { transform: translateY(0); }
+        }
+        .pet-type-card {
+            padding: 20rpx; border-radius: 16rpx; border: 2rpx solid #e5e7eb;
+            text-align: center; cursor: pointer; transition: all 0.2s;
+        }
+        .pet-type-card.selected {
+            border-color: #10b981; background: #ecfdf5;
+            box-shadow: 0 2rpx 12rpx rgba(16,185,129,0.15);
+        }
+        .food-option {
+            padding: 20rpx 24rpx; border-radius: 16rpx; border: 2rpx solid #e5e7eb;
+            cursor: pointer; transition: all 0.2s;
+            display: flex; align-items: center; gap: 16rpx;
+        }
+        .food-option.selected {
+            border-color: #10b981; background: #ecfdf5;
+        }
+        .boarding-days-input {
+            width: 100%; text-align: center; font-size: 48rpx; font-weight: 700;
+            border: 2rpx solid #e5e7eb; border-radius: 16rpx; padding: 16rpx;
+            outline: none; color: #1e293b;
+        }
+        .boarding-days-input:focus { border-color: #10b981; }
+        .boarding-confirm-btn {
+            width: 100%; padding: 28rpx; border-radius: 16rpx;
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            color: white; font-size: 32rpx; font-weight: 700;
+            border: none; cursor: pointer; transition: all 0.2s;
+        }
+        .boarding-confirm-btn:disabled {
+            background: #d1d5db; cursor: not-allowed;
+        }
     </style>
 </head>
 <body class="bg-gray-100 min-h-screen pb-52">
@@ -398,20 +445,20 @@
                 </div>
             </div>
             
-            <!-- 排序筛选 -->
+            <!-- 🧠 智慧大脑推荐标签 -->
             <div class="flex justify-between items-center mb-4 overflow-x-auto">
                 <div class="flex gap-2 pb-2">
-                    <div class="sort-item active cursor-pointer whitespace-nowrap" onclick="sortStores('recommended')">
-                        <span class="text-lg">⭐</span>
-                        <span class="sort-label text-sm font-medium text-gray-700">推荐</span>
+                    <div id="tab-comprehensive" class="sort-item active cursor-pointer whitespace-nowrap" onclick="switchRecommendTab('comprehensive')">
+                        <span class="text-lg">🧠</span>
+                        <span class="sort-label text-sm font-medium text-gray-700">综合推荐</span>
                     </div>
-                    <div class="sort-item cursor-pointer whitespace-nowrap" onclick="sortStores('price')">
-                        <span class="text-lg">💰</span>
-                        <span class="sort-label text-sm font-medium text-gray-700">价格最优</span>
-                    </div>
-                    <div class="sort-item cursor-pointer whitespace-nowrap" onclick="sortStores('distance')">
+                    <div id="tab-nearby" class="sort-item cursor-pointer whitespace-nowrap" onclick="switchRecommendTab('nearby')">
                         <span class="text-lg">📍</span>
-                        <span class="sort-label text-sm font-medium text-gray-700">距离最近</span>
+                        <span class="sort-label text-sm font-medium text-gray-700">附近推荐</span>
+                    </div>
+                    <div id="tab-bestPrice" class="sort-item cursor-pointer whitespace-nowrap" onclick="switchRecommendTab('bestPrice')">
+                        <span class="text-lg">💰</span>
+                        <span class="sort-label text-sm font-medium text-gray-700">价优推荐</span>
                     </div>
                 </div>
                 <label class="flex items-center gap-2 whitespace-nowrap flex-shrink-0">
@@ -523,12 +570,19 @@
                         <span id="fee-original" class="text-gray-400 line-through">¥0</span>
                     </div>
                     <div id="fee-discount-row" class="flex justify-between hidden">
-                        <span class="text-green-500">自取折扣</span>
-                        <span class="text-green-500">-¥0</span>
+                        <span id="fee-discount-label" class="text-green-500">优惠折扣</span>
+                        <span class="text-green-500" id="fee-discount-value">-¥0</span>
                     </div>
                     <div id="fee-delivery-row" class="flex justify-between hidden">
-                        <span class="text-gray-500">配送费</span>
-                        <span id="fee-delivery" class="text-gray-800">¥0</span>
+                        <span id="fee-delivery-label" class="text-gray-500">配送费</span>
+                        <div class="text-right">
+                            <span id="fee-delivery-original" class="text-gray-400 line-through text-sm mr-1 hidden">¥0</span>
+                            <span id="fee-delivery" class="text-gray-800">¥0</span>
+                        </div>
+                    </div>
+                    <div id="fee-delivery-discount-row" class="flex justify-between hidden">
+                        <span class="text-green-500">配送优惠</span>
+                        <span id="fee-delivery-discount" class="text-green-500">-¥0</span>
                     </div>
                     <div class="fee-divider"></div>
                     <div class="flex justify-between items-center">
@@ -568,6 +622,96 @@
         </section>
     </main>
 
+    <!-- 寄养服务弹窗 -->
+    <div id="boarding-modal-overlay" class="boarding-modal-overlay hidden">
+        <div class="boarding-modal">
+            <div class="flex items-center justify-between mb-4">
+                <h2 class="text-xl font-bold text-gray-800">🏠 宠物寄养</h2>
+                <button onclick="closeBoardingModal()" class="text-gray-400 hover:text-gray-600 text-2xl">&times;</button>
+            </div>
+            
+            <!-- 宠物类别 -->
+            <div class="mb-4">
+                <p class="text-sm font-semibold text-gray-600 mb-2">选择宠物类别</p>
+                <div class="grid grid-cols-2 gap-2" id="pet-type-grid">
+                    <div class="pet-type-card" onclick="selectPetType('small_dog')" data-type="small_dog">
+                        <div class="text-2xl mb-1">🐕</div>
+                        <div class="text-sm font-bold text-gray-700">小型犬</div>
+                        <div class="text-xs text-gray-400">¥30/天</div>
+                    </div>
+                    <div class="pet-type-card" onclick="selectPetType('medium_dog')" data-type="medium_dog">
+                        <div class="text-2xl mb-1">🐕‍🦺</div>
+                        <div class="text-sm font-bold text-gray-700">中型犬</div>
+                        <div class="text-xs text-gray-400">¥50/天</div>
+                    </div>
+                    <div class="pet-type-card" onclick="selectPetType('large_dog')" data-type="large_dog">
+                        <div class="text-2xl mb-1">🐩</div>
+                        <div class="text-sm font-bold text-gray-700">大型犬</div>
+                        <div class="text-xs text-gray-400">¥80/天</div>
+                    </div>
+                    <div class="pet-type-card" onclick="selectPetType('cat')" data-type="cat">
+                        <div class="text-2xl mb-1">🐱</div>
+                        <div class="text-sm font-bold text-gray-700">猫咪</div>
+                        <div class="text-xs text-gray-400">¥40/天</div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 寄养天数 -->
+            <div class="mb-4">
+                <p class="text-sm font-semibold text-gray-600 mb-2">寄养天数</p>
+                <div class="flex items-center gap-3">
+                    <button onclick="adjustBoardingDays(-1)" class="w-12 h-12 rounded-full bg-gray-100 text-gray-600 text-xl font-bold flex items-center justify-center hover:bg-gray-200 transition-colors">−</button>
+                    <input type="number" id="boarding-days" class="boarding-days-input flex-1" value="1" min="1" max="90" onchange="updateBoardingPrice()" oninput="updateBoardingPrice()">
+                    <button onclick="adjustBoardingDays(1)" class="w-12 h-12 rounded-full bg-gray-100 text-gray-600 text-xl font-bold flex items-center justify-center hover:bg-gray-200 transition-colors">+</button>
+                </div>
+            </div>
+            
+            <!-- 粮食选择 -->
+            <div class="mb-4">
+                <p class="text-sm font-semibold text-gray-600 mb-2">宠物粮食</p>
+                <div class="space-y-2">
+                    <div class="food-option selected" onclick="selectFoodOption('self')" data-food="self">
+                        <span class="text-2xl">🎒</span>
+                        <div class="flex-1">
+                            <div class="text-sm font-bold text-gray-700">自己提供粮食</div>
+                            <div class="text-xs text-gray-400">不额外收费</div>
+                        </div>
+                        <span class="text-xs text-green-500 font-semibold">+¥0/天</span>
+                    </div>
+                    <div class="food-option" onclick="selectFoodOption('store')" data-food="store">
+                        <span class="text-2xl">🍖</span>
+                        <div class="flex-1">
+                            <div class="text-sm font-bold text-gray-700">门店提供粮食</div>
+                            <div class="text-xs text-gray-400">优质宠粮,营养均衡</div>
+                        </div>
+                        <span class="text-xs text-orange-500 font-semibold">+¥15/天</span>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 费用预览 -->
+            <div class="bg-gray-50 rounded-xl p-4 mb-4">
+                <div class="flex justify-between text-sm mb-1">
+                    <span class="text-gray-500" id="boarding-price-label">小型犬 · 1天</span>
+                    <span class="text-gray-800 font-semibold" id="boarding-base-price">¥30</span>
+                </div>
+                <div class="flex justify-between text-sm mb-2" id="boarding-food-row">
+                    <span class="text-gray-500">粮食费</span>
+                    <span class="text-green-500" id="boarding-food-price">+¥0</span>
+                </div>
+                <div class="border-t border-gray-200 pt-2 flex justify-between">
+                    <span class="font-bold text-gray-800">寄养费总计</span>
+                    <span class="text-xl font-bold text-red-500" id="boarding-total-price">¥30</span>
+                </div>
+            </div>
+            
+            <button class="boarding-confirm-btn" onclick="confirmBoarding()">
+                确认寄养 - <span id="boarding-confirm-price">¥30</span>
+            </button>
+        </div>
+    </div>
+
     <!-- 底部操作栏 -->
     <div class="bottom-bar">
         <div class="flex items-center gap-4 w-full">
@@ -591,6 +735,10 @@
 
     <!-- API引用 -->
     <script src="api/delivery-api.js"></script>
+    <!-- 店面配置 -->
+    <script src="js/store-config.js"></script>
+    <!-- 多品类管理 -->
+    <script src="js/category-manager.js"></script>
     <script>
         // 订单数据
         let orderData = {
@@ -601,30 +749,87 @@
             selectedProvider: null,
             deliveryType: 'solo', // solo: 一对一, shared: 拼单
             selectedTime: null,
-            totalPrice: 0
+            totalPrice: 0,
+            boardingDetail: null  // 寄养详情: { petType, petName, days, foodOption, price }
         };
 
-        // 服务数据
-        const services = [
-            { id: 1, icon: '👔', name: '西装干洗', desc: '专业熨烫定型', price: 50, category: '衣物清洗' },
-            { id: 2, icon: '👕', name: '衬衫清洗', desc: '轻柔手洗护理', price: 30, category: '衣物清洗' },
-            { id: 3, icon: '🧥', name: '羽绒服清洗', desc: '杀菌除螨护理', price: 80, category: '衣物清洗' },
-            { id: 4, icon: '👟', name: '运动鞋清洗', desc: '深度清洁保养', price: 40, category: '鞋子护理' },
-            { id: 5, icon: '👞', name: '皮鞋护理', desc: '真皮保养上光', price: 45, category: '鞋子护理' },
-            { id: 6, icon: '👜', name: '皮包护理', desc: '奢侈品级养护', price: 100, category: '箱包洗护' },
-            { id: 7, icon: '🛏️', name: '床单被罩', desc: '高温杀菌洗涤', price: 60, category: '家纺清洗' },
-            { id: 8, icon: '🛋️', name: '沙发清洗', desc: '深度除螨清洁', price: 120, category: '家纺清洗' }
-        ];
+        // 服务数据 — 从店面配置加载，如无配置则使用品类默认
+        let services = [];
+        // 当前品类上下文（从 URL 参数读取，用于切换服务列表）
+        let currentCategoryId = null;
+        let currentCategory = null;
+        function loadStoreServices(storeId) {
+            storeId = storeId || (orderData.selectedStore ? orderData.selectedStore.id : 'ST001');
+            // ★ 优先从品类管理器加载当前品类的服务（URL参数 > 当前品类 > 默认干洗）
+            try {
+                if (typeof window.CategoryManager !== 'undefined') {
+                    var catId = currentCategoryId || (new URLSearchParams(window.location.search).get('category')) || 'cleaning';
+                    var catServices = window.CategoryManager.getServices(catId);
+                    if (catServices && catServices.length > 0) {
+                        services = catServices.map(function(s, idx) {
+                            return {
+                                id: s.id || String(idx + 1),
+                                icon: s.icon || '📦',
+                                name: s.name,
+                                desc: s.desc || '',
+                                price: s.price || 0,
+                                unit: s.unit || '',
+                                deposit: s.deposit || 0,
+                                isBoarding: s.isBoarding || false,
+                                category: (window.CategoryManager.getCategory(catId) || {}).name || ''
+                            };
+                        });
+                        console.log('[C端] ✔ 已从品类管理器加载服务:', services.length, '项, 品类:', catId);
+                        return;
+                    }
+                }
+            } catch(e) {
+                console.warn('[C端] 品类管理器不可用:', e);
+            }
+            // 兜底：店面配置服务（仅限干洗等传统品类）
+            try {
+                if (typeof StoreConfig !== 'undefined' && StoreConfig.getPublicServices) {
+                    var svcs = StoreConfig.getPublicServices(storeId);
+                    if (svcs && svcs.length > 0) {
+                        services = svcs.map(function(s) {
+                            return {
+                                id: String(s.id || ('svc_' + Math.random())),
+                                icon: s.icon || '📦',
+                                name: s.name,
+                                desc: s.desc || '',
+                                price: s.price,
+                                category: s.category || '其他'
+                            };
+                        });
+                        console.log('[C端] 已加载店面配置服务:', services.length, '项, 门店:', storeId);
+                        return;
+                    }
+                }
+            } catch (e) {
+                console.warn('[C端] 加载店面服务失败:', e);
+            }
+            // 终极兜底（硬编码干洗）
+            services = [
+                { id: '1', icon: '👔', name: '西装干洗', desc: '专业熨烫定型', price: 50, category: '衣物清洗' },
+                { id: '2', icon: '👕', name: '衬衫清洗', desc: '轻柔手洗护理', price: 30, category: '衣物清洗' },
+                { id: '3', icon: '🧥', name: '羽绒服清洗', desc: '杀菌除螨护理', price: 80, category: '衣物清洗' },
+                { id: '4', icon: '👟', name: '运动鞋清洗', desc: '深度清洁保养', price: 40, category: '鞋子护理' },
+                { id: '5', icon: '👞', name: '皮鞋护理', desc: '真皮保养上光', price: 45, category: '鞋子护理' },
+                { id: '6', icon: '👜', name: '皮包护理', desc: '奢侈品级养护', price: 100, category: '箱包洗护' },
+                { id: '7', icon: '🛏️', name: '床单被罩', desc: '高温杀菌洗涤', price: 60, category: '家纺清洗' },
+                { id: '8', icon: '🛋️', name: '沙发清洗', desc: '深度除螨清洁', price: 120, category: '家纺清洗' }
+            ];
+        }
+        // 初始化时先加载默认，等选店后再刷新
+        loadStoreServices();
 
-        // 门店数据
-        let stores = [
-            { id: 'ST001', name: '干洗店旗舰店', address: '朝阳区建国路88号', distance: '1.2km', isOnline: true, isPromotion: true, isRecommended: true, serviceCount: 12, minPrice: 30, rating: 4.8, baseDeliveryFee: 10 },
-            { id: 'ST002', name: '干洗店中心店', address: '海淀区中关村大街1号', distance: '2.5km', isOnline: true, isPromotion: false, isRecommended: true, serviceCount: 10, minPrice: 35, rating: 4.6, baseDeliveryFee: 12 },
-            { id: 'ST003', name: '干洗店东门店', address: '东城区王府井大街5号', distance: '3.8km', isOnline: false, isPromotion: false, isRecommended: false, serviceCount: 8, minPrice: 40, rating: 4.5, baseDeliveryFee: 15 }
-        ];
-        
+        // 门店数据（从推荐API动态加载）
+        let stores = [];
         // 原始门店数据备份（用于筛选恢复）
         const allStores = [...stores];
+        // 🧠 智慧推荐数据
+        let recommendationData = { comprehensive: [], nearby: [], bestPrice: [] };
+        let currentRecommendTab = 'comprehensive';  // 'comprehensive' | 'nearby' | 'bestPrice'
 
         // 配送服务商
         let deliveryProviders = [];
@@ -643,6 +848,19 @@
             if (!localStorage.getItem('userToken')) {
                 window.location.href = 'c-login.html';
                 return;
+            }
+            
+            // 读取URL品类参数，设置当前品类上下文
+            var urlParams = new URLSearchParams(window.location.search);
+            currentCategoryId = urlParams.get('category') || 'cleaning';
+            if (typeof window.CategoryManager !== 'undefined') {
+                currentCategory = window.CategoryManager.getCategory(currentCategoryId);
+            }
+            console.log('[下单页] 当前品类:', currentCategoryId, currentCategory);
+            
+            // 更新页面标题
+            if (currentCategory) {
+                document.title = '下单 - ' + currentCategory.name + '服务';
             }
             
             // 检查是否有预选服务
@@ -669,29 +887,55 @@
             loadProviders();
             goToStep(1);
         });
+        
+        // 页面重新显示时（从bfcache恢复/切回标签页）重新加载服务配置
+        window.addEventListener('pageshow', function(e) {
+            if (e.persisted || document.visibilityState === 'visible') {
+                loadStoreServices();
+                loadServices();
+                if (orderData.step === 2) {
+                    loadRecommendations();
+                    updateSelectedServicesSummary();
+                }
+                updateUI();
+            }
+        });
+        
+        // 监听其他标签页（M端/桌面端）的配置变更，自动刷新服务列表
+        window.addEventListener('storage', function(e) {
+            if (e.key && e.key.indexOf('store_') === 0 && e.key.indexOf('_config') > 0) {
+                console.log('[C端] 检测到门店配置变更，刷新服务列表');
+                loadStoreServices();
+                loadServices();
+                if (orderData.step === 2) {
+                    loadRecommendations();
+                    updateSelectedServicesSummary();
+                }
+                updateUI();
+            }
+        });
 
-        // 加载服务列表
+        // 加载服务列表（步骤1：仅展示服务项目，不显示价格，价格由门店决定）
         function loadServices() {
             const container = document.getElementById('services-list');
             container.innerHTML = services.map(service => {
-                const isSelected = orderData.selectedServices.some(s => s.id === service.id);
+                const isSelected = orderData.selectedServices.some(s => String(s.id) === String(service.id));
+                var extraClass = service.isBoarding ? 'border-2 border-dashed border-green-300 bg-green-50' : '';
+                var priceHtml = service.isBoarding 
+                    ? '<span class="text-xs text-green-600 font-medium">按天计费</span>'
+                    : '';
                 return `
-                    <div class="service-card ${isSelected ? 'selected' : ''} cursor-pointer" onclick="toggleService(${service.id})">
-                        <div class="flex items-start gap-4">
-                            <div class="flex-1">
-                                <div class="flex items-center gap-3 mb-2">
-                                    <span class="text-4xl">${service.icon}</span>
-                                    <div>
-                                        <span class="font-bold text-gray-800">${service.name}</span>
-                                        <span class="text-sm text-gray-500 ml-2">${service.desc}</span>
-                                    </div>
-                                </div>
+                    <div class="service-card ${isSelected ? 'selected' : ''} ${extraClass} cursor-pointer" onclick="toggleService('${service.id}')">
+                        <div class="flex items-center gap-4">
+                            <span class="text-4xl flex-shrink-0">${service.icon}</span>
+                            <div class="flex-1 min-w-0">
+                                <span class="font-bold text-gray-800 block">${service.name}</span>
+                                <span class="text-sm text-gray-500">${service.desc}</span>
+                                ${service.isBoarding ? '<span class="inline-block mt-1 text-xs bg-green-100 text-green-600 px-2 py-0.5 rounded">选择天数·宠物类别</span>' : ''}
+                                ${!service.isBoarding && service.category ? `<span class="inline-block mt-1 text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded">${service.category}</span>` : ''}
                             </div>
-                            <div class="flex flex-col items-end gap-2">
-                                <span class="text-xl font-bold text-red-500">¥${service.price}</span>
-                                <div class="checkbox-wrapper ${isSelected ? 'checked' : ''}">
-                                    ${isSelected ? '<span class="text-white font-bold">✓</span>' : ''}
-                                </div>
+                            <div class="checkbox-wrapper flex-shrink-0 ${isSelected ? 'checked' : ''}">
+                                ${isSelected ? '<span class="text-white font-bold">✓</span>' : ''}
                             </div>
                         </div>
                     </div>
@@ -701,10 +945,17 @@
 
         // 切换服务选择
         function toggleService(serviceId) {
-            const service = services.find(s => s.id === serviceId);
+            var sid = String(serviceId);
+            const service = services.find(s => String(s.id) === sid);
             if (!service) return;
             
-            const index = orderData.selectedServices.findIndex(s => s.id === serviceId);
+            // ★ 寄养服务：打开专用弹窗
+            if (service.isBoarding) {
+                openBoardingModal();
+                return;
+            }
+            
+            const index = orderData.selectedServices.findIndex(s => String(s.id) === sid);
             if (index > -1) {
                 orderData.selectedServices.splice(index, 1);
             } else {
@@ -716,17 +967,364 @@
             updateSelectedServicesSummary();
         }
 
-        // 加载门店列表
+        // =====================================================
+        // 寄养服务弹窗逻辑（SaaS模式：价格由商家设定，从API获取）
+        // =====================================================
+        let boardingState = {
+            petType: 'small_dog',
+            petName: '',
+            days: 1,
+            foodOption: 'self'  // 'self' | 'store'
+        };
+
+        // 寄养定价（从后端API加载，商家可自定义）
+        let boardingPrices = {
+            small_dog:  { name: '小型犬', icon: '🐕',  basePrice: 30 },
+            medium_dog: { name: '中型犬', icon: '🐕‍🦺', basePrice: 50 },
+            large_dog:  { name: '大型犬', icon: '🐩',  basePrice: 80 },
+            cat:        { name: '猫咪',   icon: '🐱',  basePrice: 40 }
+        };
+        let foodPricePerDay = 15;
+
+        // 从后端加载寄养定价配置
+        async function loadBoardingPrices(storeId) {
+            try {
+                var url = storeId 
+                    ? 'http://localhost:3000/api/cleaning/boarding/config/' + storeId
+                    : 'http://localhost:3000/api/cleaning/boarding/defaults';
+                var resp = await fetch(url);
+                var data = await resp.json();
+                if (data.success && data.data) {
+                    if (data.data.small_dog && typeof data.data.small_dog === 'object') {
+                        // defaults 格式: { small_dog: { name, icon, basePrice }, ... }
+                        boardingPrices = data.data;
+                        foodPricePerDay = data.data.foodPerDay || 15;
+                        delete boardingPrices.foodPerDay;
+                    } else if (data.data.small_dog !== undefined) {
+                        // config 格式: { small_dog: 30, medium_dog: 50, ... }
+                        boardingPrices = {
+                            small_dog:  { name: '小型犬', icon: '🐕',  basePrice: data.data.small_dog || 30 },
+                            medium_dog: { name: '中型犬', icon: '🐕‍🦺', basePrice: data.data.medium_dog || 50 },
+                            large_dog:  { name: '大型犬', icon: '🐩',  basePrice: data.data.large_dog || 80 },
+                            cat:        { name: '猫咪',   icon: '🐱',  basePrice: data.data.cat || 40 }
+                        };
+                        foodPricePerDay = data.data.foodPerDay || 15;
+                    }
+                    console.log('[寄养] 定价已加载:', boardingPrices, '粮食费/天:', foodPricePerDay);
+                }
+            } catch (e) {
+                console.warn('[寄养] 加载定价失败，使用默认:', e.message);
+            }
+            // 更新弹窗中的价格显示
+            updateBoardingModalPrices();
+        }
+
+        function updateBoardingModalPrices() {
+            var petCards = document.querySelectorAll('#pet-type-grid .pet-type-card');
+            petCards.forEach(function(card) {
+                var type = card.dataset.type;
+                var pet = boardingPrices[type];
+                if (pet) {
+                    var priceEl = card.querySelector('.text-xs.text-gray-400');
+                    if (priceEl) priceEl.textContent = '¥' + pet.basePrice + '/天';
+                }
+            });
+            var foodStoreEl = document.querySelector('.food-option[data-food="store"] .text-xs.text-orange-500');
+            if (foodStoreEl) foodStoreEl.textContent = '+¥' + foodPricePerDay + '/天';
+        }
+
+        function openBoardingModal() {
+            // 重置状态
+            boardingState = { petType: 'small_dog', petName: '', days: 1, foodOption: 'self' };
+            
+            // 显示弹窗
+            document.getElementById('boarding-modal-overlay').classList.remove('hidden');
+            
+            // 先加载定价（使用当前已选门店或系统默认）
+            loadBoardingPrices(orderData.selectedStore ? orderData.selectedStore.id : null).then(function() {
+                // 重置UI选择
+                document.querySelectorAll('#pet-type-grid .pet-type-card').forEach(c => c.classList.remove('selected'));
+                var firstCard = document.querySelector('#pet-type-grid .pet-type-card[data-type="small_dog"]');
+                if (firstCard) firstCard.classList.add('selected');
+                
+                document.querySelectorAll('.food-option').forEach(o => o.classList.remove('selected'));
+                var selfFood = document.querySelector('.food-option[data-food="self"]');
+                if (selfFood) selfFood.classList.add('selected');
+                
+                document.getElementById('boarding-days').value = 1;
+                updateBoardingPrice();
+            });
+        }
+
+        function closeBoardingModal() {
+            document.getElementById('boarding-modal-overlay').classList.add('hidden');
+        }
+
+        function selectPetType(type) {
+            boardingState.petType = type;
+            document.querySelectorAll('#pet-type-grid .pet-type-card').forEach(c => {
+                c.classList.toggle('selected', c.dataset.type === type);
+            });
+            updateBoardingPrice();
+        }
+
+        function selectFoodOption(option) {
+            boardingState.foodOption = option;
+            document.querySelectorAll('.food-option').forEach(o => {
+                o.classList.toggle('selected', o.dataset.food === option);
+            });
+            updateBoardingPrice();
+        }
+
+        function adjustBoardingDays(delta) {
+            var input = document.getElementById('boarding-days');
+            var newVal = Math.max(1, Math.min(90, boardingState.days + delta));
+            boardingState.days = newVal;
+            input.value = newVal;
+            updateBoardingPrice();
+        }
+
+        function updateBoardingPrice() {
+            var input = document.getElementById('boarding-days');
+            if (input) boardingState.days = parseInt(input.value) || 1;
+            
+            var pet = boardingPrices[boardingState.petType] || boardingPrices.small_dog;
+            var baseTotal = pet.basePrice * boardingState.days;
+            var foodTotal = boardingState.foodOption === 'store' ? foodPricePerDay * boardingState.days : 0;
+            var grandTotal = baseTotal + foodTotal;
+            
+            document.getElementById('boarding-price-label').textContent = pet.icon + ' ' + pet.name + ' · ' + boardingState.days + '天';
+            document.getElementById('boarding-base-price').textContent = '¥' + baseTotal;
+            document.getElementById('boarding-food-price').textContent = boardingState.foodOption === 'store' ? '+¥' + foodTotal : '+¥0';
+            document.getElementById('boarding-food-price').className = boardingState.foodOption === 'store' ? 'text-orange-500' : 'text-green-500';
+            document.getElementById('boarding-total-price').textContent = '¥' + grandTotal;
+            document.getElementById('boarding-confirm-price').textContent = '¥' + grandTotal;
+        }
+
+        function confirmBoarding() {
+            var pet = boardingPrices[boardingState.petType] || boardingPrices.small_dog;
+            var baseTotal = pet.basePrice * boardingState.days;
+            var foodTotal = boardingState.foodOption === 'store' ? foodPricePerDay * boardingState.days : 0;
+            var grandTotal = baseTotal + foodTotal;
+            
+            // 保存寄养详情
+            orderData.boardingDetail = {
+                petType: boardingState.petType,
+                petName: pet.name,
+                petIcon: pet.icon,
+                days: boardingState.days,
+                foodOption: boardingState.foodOption,
+                foodLabel: boardingState.foodOption === 'store' ? '门店供粮' : '自备粮食',
+                basePrice: pet.basePrice,
+                foodPricePerDay: boardingState.foodOption === 'store' ? foodPricePerDay : 0,
+                baseTotal: baseTotal,
+                foodTotal: foodTotal,
+                totalPrice: grandTotal
+            };
+            
+            // 从 selectedServices 中移除旧的 boarding（如果有）
+            orderData.selectedServices = orderData.selectedServices.filter(function(s) {
+                return s.id !== 'boarding';
+            });
+            
+            // 添加寄养服务到已选列表
+            orderData.selectedServices.push({
+                id: 'boarding',
+                icon: '🏠',
+                name: '宠物寄养',
+                desc: pet.icon + ' ' + pet.name + ' · ' + boardingState.days + '天 · ' + (boardingState.foodOption === 'store' ? '门店供粮' : '自备粮食'),
+                price: grandTotal,
+                unit: '天',
+                category: '宠物服务',
+                isBoarding: true
+            });
+            
+            closeBoardingModal();
+            loadServices();
+            updateUI();
+            updateSelectedServicesSummary();
+        }
+
+
+        // 获取某门店针对用户已选服务的实际报价（含促销折扣）
+        function getStorePricing(storeId) {
+            var storeSvcs = [];
+            // 尝试从店面配置加载该门店的服务价格
+            try {
+                if (typeof StoreConfig !== 'undefined' && StoreConfig.getPublicServices) {
+                    storeSvcs = StoreConfig.getPublicServices(storeId);
+                }
+            } catch(e) {}
+            
+            // 如果没有配置，使用默认服务列表
+            if (!storeSvcs || storeSvcs.length === 0) {
+                storeSvcs = [
+                    { name: '西装干洗', price: 50 }, { name: '衬衫清洗', price: 30 },
+                    { name: '羽绒服清洗', price: 80 }, { name: '运动鞋清洗', price: 40 },
+                    { name: '皮鞋护理', price: 45 }, { name: '皮包护理', price: 100 },
+                    { name: '床单被罩', price: 60 }, { name: '沙发清洗', price: 120 }
+                ];
+            }
+            
+            // 按服务名称匹配用户已选服务，计算该门店的总价
+            var totalServicePrice = 0;
+            var matchedItems = [];
+            var matchCount = 0;
+            
+            orderData.selectedServices.forEach(function(selSvc) {
+                var storeSvc = storeSvcs.find(function(s) { return s.name === selSvc.name; });
+                if (storeSvc) {
+                    totalServicePrice += storeSvc.price;
+                    matchCount++;
+                    matchedItems.push({
+                        name: storeSvc.name,
+                        price: storeSvc.price,
+                        icon: selSvc.icon || '📦'
+                    });
+                }
+            });
+            
+            // 计算该门店的促销折扣
+            var discount = 0;
+            var appliedPromos = [];
+            try {
+                if (typeof StoreConfig !== 'undefined' && StoreConfig.calculatePromotionDiscount) {
+                    var result = StoreConfig.calculatePromotionDiscount(storeId, totalServicePrice, 'pickup', false);
+                    discount = result.totalDiscount || 0;
+                    appliedPromos = result.appliedPromos || [];
+                }
+            } catch(e) {}
+            
+            return {
+                storeId: storeId,
+                serviceTotal: totalServicePrice,
+                discount: discount,
+                finalPrice: Math.max(0, totalServicePrice - discount),
+                matchedItems: matchedItems,
+                matchCount: matchCount,
+                appliedPromos: appliedPromos
+            };
+        }
+
+        // 🧠 智慧大脑：根据已选服务从平台聚合门店报价
+        async function loadRecommendations() {
+            var container = document.getElementById('stores-list');
+            if (!container) return;
+            container.innerHTML = '<div class="text-center py-8 text-gray-400"><div class="animate-spin inline-block w-8 h-8 border-4 border-blue-200 border-t-blue-500 rounded-full mb-3"></div><div>正在分析门店报价...</div></div>';
+
+            // 收集已选服务ID列表
+            var serviceIds = orderData.selectedServices.map(function(s) { return s.id; });
+            if (serviceIds.length === 0) {
+                container.innerHTML = '<div class="text-center py-8 text-gray-400">请先选择服务项目</div>';
+                return;
+            }
+
+            try {
+                var body = {
+                    categoryId: currentCategoryId || 'cleaning',
+                    serviceIds: serviceIds,
+                    boardingDetail: orderData.boardingDetail || undefined
+                };
+
+                var resp = await fetch('http://localhost:3000/api/cleaning/stores/recommend', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body)
+                });
+                var result = await resp.json();
+
+                if (result.success && result.data) {
+                    recommendationData = result.data;
+                    // 转换为stores格式
+                    stores = recommendationData[currentRecommendTab] || recommendationData.comprehensive || [];
+                    console.log('[智慧推荐] 综合推荐:', (recommendationData.comprehensive||[]).length, '家, 附近:', (recommendationData.nearby||[]).length, '家, 价优:', (recommendationData.bestPrice||[]).length, '家');
+                }
+            } catch (e) {
+                console.warn('[智慧推荐] API不可用，使用本地兜底:', e.message);
+                // 兜底：使用本地硬编码门店
+                stores = [
+                    { storeId: 'ST001', storeName: '干洗店旗舰店', address: '朝阳区建国路88号', distance: 1.2, isOnline: true, rating: 4.8, matchedServices: [], serviceTotal: 0, discount: 0, finalPrice: 0 },
+                    { storeId: 'ST002', storeName: '干洗店中心店', address: '海淀区中关村大街1号', distance: 2.5, isOnline: true, rating: 4.6, matchedServices: [], serviceTotal: 0, discount: 0, finalPrice: 0 },
+                    { storeId: 'ST003', storeName: '干洗店东门店', address: '东城区王府井大街5号', distance: 3.8, isOnline: false, rating: 4.5, matchedServices: [], serviceTotal: 0, discount: 0, finalPrice: 0 }
+                ];
+                // 兜底：为每个门店计算本地报价
+                stores.forEach(function(s) {
+                    var p = getStorePricing(s.storeId);
+                    s.serviceTotal = p.serviceTotal;
+                    s.discount = p.discount;
+                    s.finalPrice = p.finalPrice;
+                    s.matchedServices = p.matchedItems;
+                });
+                recommendationData = { comprehensive: stores, nearby: stores, bestPrice: stores };
+            }
+
+            loadStores();
+        }
+
+        // 切换推荐标签
+        function switchRecommendTab(tab) {
+            currentRecommendTab = tab;
+            stores = recommendationData[tab] || recommendationData.comprehensive || [];
+
+            // 更新标签样式
+            ['comprehensive', 'nearby', 'bestPrice'].forEach(function(t) {
+                var tabEl = document.getElementById('tab-' + t);
+                if (tabEl) {
+                    if (t === tab) {
+                        tabEl.classList.add('active');
+                    } else {
+                        tabEl.classList.remove('active');
+                    }
+                }
+            });
+
+            loadStores();
+        }
+
+        // 加载门店列表（步骤2：显示智慧推荐结果）
         function loadStores() {
             const container = document.getElementById('stores-list');
+            if (!container) return;
+
+            if (!stores || stores.length === 0) {
+                container.innerHTML = '<div class="text-center py-10 text-gray-400"><span class="text-4xl block mb-3">🏪</span><p>暂无匹配的门店</p><p class="text-xs mt-1">请尝试选择其他服务</p></div>';
+                return;
+            }
+
             container.innerHTML = stores.map(store => {
-                const isSelected = orderData.selectedStore && orderData.selectedStore.id === store.id;
+                const isSelected = orderData.selectedStore && orderData.selectedStore.id === store.storeId;
+                var p = store;
+                var hasPromo = (p.discount || 0) > 0;
+                var matchedCount = (p.matchedServices || []).length;
+
+                // 促销标签
+                var promoTags = '';
+                if (p.promotions && p.promotions.length > 0) {
+                    promoTags = p.promotions.map(function(pr) {
+                        return '<span class="tag promotion"><span>🏷️</span><span>' + pr.name + '</span></span>';
+                    }).join('');
+                }
+                if (p.isRecommended || store.isRecommended) {
+                    promoTags += '<span class="tag recommended"><span>⭐</span><span>推荐</span></span>';
+                }
+
+                // 服务明细行
+                var serviceRows = '';
+                if (p.matchedServices && p.matchedServices.length > 0) {
+                    serviceRows = p.matchedServices.map(function(item) {
+                        var label = item.isBoarding
+                            ? (item.icon || '🏠') + ' ' + (item.boardingDetail ? (item.boardingDetail.petName || '寄养') + '·' + item.boardingDetail.days + '天' : '寄养')
+                            : item.icon + ' ' + item.name;
+                        return '<div class="flex justify-between text-sm"><span class="text-gray-600">' + label + '</span><span class="text-gray-700">¥' + item.price + '</span></div>';
+                    }).join('');
+                }
+
                 return `
-                    <div class="store-card ${isSelected ? 'selected' : ''} cursor-pointer" onclick="selectStore('${store.id}')">
+                    <div class="store-card ${isSelected ? 'selected' : ''} cursor-pointer" onclick="selectStoreByRecommend('${store.storeId}')">
                         <div class="flex justify-between items-start mb-3">
                             <div>
                                 <div class="flex items-center gap-2 mb-1">
-                                    <span class="font-bold text-gray-800">${store.name}</span>
+                                    <span class="font-bold text-gray-800">${store.storeName || store.name || '门店'}</span>
                                     <span class="store-status ${store.isOnline ? 'online' : 'offline'}">
                                         <span class="w-2 h-2 rounded-full ${store.isOnline ? 'bg-green-500' : 'bg-gray-400'}"></span>
                                         ${store.isOnline ? '营业中' : '休息中'}
@@ -734,25 +1332,41 @@
                                 </div>
                                 <div class="flex items-center gap-1 text-sm text-gray-500 mb-1">
                                     <span>📍</span>
-                                    <span>${store.distance}</span>
+                                    <span>${store.distance || '?'}km</span>
+                                    <span class="mx-1">·</span>
+                                    <span>⭐ ${store.rating || '4.5'}</span>
+                                    ${store.hasPromotion ? '<span class="mx-1">·</span><span class="text-red-500">🔥促销</span>' : ''}
                                 </div>
-                                <div class="text-sm text-gray-500">${store.address}</div>
+                                <div class="text-sm text-gray-500">${store.address || ''}</div>
                             </div>
                         </div>
                         
                         <div class="flex flex-wrap gap-2 mb-3">
-                            ${store.isPromotion ? '<span class="tag promotion"><span>🔥</span><span>促销中</span></span>' : ''}
-                            ${store.isRecommended ? '<span class="tag recommended"><span>⭐</span><span>推荐</span></span>' : ''}
+                            ${promoTags}
                         </div>
+                        
+                        <!-- 服务明细 -->
+                        ${serviceRows ? `
+                        <div class="bg-gray-50 rounded-xl p-3 mb-3">
+                            <div class="text-xs text-gray-500 mb-2">您选择的 ${matchedCount} 项服务</div>
+                            <div class="space-y-1">
+                                ${serviceRows}
+                            </div>
+                            ${hasPromo ? '<div class="flex justify-between text-sm mt-1 pt-1 border-t border-gray-200"><span class="text-green-600">促销优惠</span><span class="text-green-600">-¥' + p.discount + '</span></div>' : ''}
+                            <div class="flex justify-between font-bold mt-1 pt-1 border-t border-gray-200">
+                                <span class="text-gray-700">服务费小计</span>
+                                <span class="text-red-500">¥${p.finalPrice}</span>
+                            </div>
+                        </div>` : ''}
                         
                         <div class="flex justify-between items-center pt-3 border-t border-gray-100">
                             <div>
-                                <span class="text-xs text-gray-500">基础配送费</span>
-                                <span class="text-sm font-semibold text-gray-700 ml-2">¥${store.baseDeliveryFee}</span>
+                                <span class="text-xs text-gray-500">配送费</span>
+                                <span class="text-sm text-gray-400 ml-2">选择配送方式后计算</span>
                             </div>
                             <div>
-                                <span class="text-xs text-gray-500">预计费用</span>
-                                <span class="text-lg font-bold text-red-500 ml-2">¥${calculateServiceTotal() + store.baseDeliveryFee}</span>
+                                <span class="text-xs text-gray-500">服务总价</span>
+                                <span class="text-lg font-bold text-red-500 ml-2">¥${p.finalPrice || '?'}</span>
                             </div>
                         </div>
                     </div>
@@ -760,9 +1374,60 @@
             }).join('');
         }
 
-        // 选择门店
+        // 选择推荐的门店
+        function selectStoreByRecommend(storeId) {
+            var storeInfo = stores.find(function(s) { return s.storeId === storeId; });
+            if (!storeInfo) return;
+
+            orderData.selectedStore = {
+                id: storeId,
+                name: storeInfo.storeName || storeInfo.name,
+                address: storeInfo.address || '',
+                distance: (storeInfo.distance || 0) + 'km',
+                isOnline: storeInfo.isOnline,
+                rating: storeInfo.rating || 4.5,
+                hasPromotion: storeInfo.hasPromotion
+            };
+
+            // 用推荐结果的价格更新已选服务
+            if (storeInfo.matchedServices && storeInfo.matchedServices.length > 0) {
+                orderData.selectedServices = orderData.selectedServices.map(function(selSvc, idx) {
+                    var matched = storeInfo.matchedServices[idx];
+                    if (matched) {
+                        selSvc.price = matched.price;
+                    }
+                    return selSvc;
+                });
+            }
+
+            loadStores();
+            updateUI();
+            updateSelectedServicesSummary();
+        }
+
+        // 选择门店：同步该门店的实际服务价格到已选服务
         function selectStore(storeId) {
             orderData.selectedStore = stores.find(s => s.id === storeId);
+            
+            // 加载该门店的服务配置获取实际价格
+            var storeSvcs = [];
+            try {
+                if (typeof StoreConfig !== 'undefined' && StoreConfig.getPublicServices) {
+                    storeSvcs = StoreConfig.getPublicServices(storeId);
+                }
+            } catch(e) {}
+            
+            // 用该门店的价格更新已选服务列表中对应服务的价格
+            orderData.selectedServices = orderData.selectedServices.map(function(selSvc) {
+                var storeSvc = storeSvcs.find(function(s) { return s.name === selSvc.name; });
+                if (storeSvc) {
+                    selSvc.price = storeSvc.price;
+                    selSvc.storePrice = storeSvc.price;
+                }
+                return selSvc;
+            });
+            
+            loadStoreServices(storeId);
             loadStores();
             updateUI();
         }
@@ -793,7 +1458,12 @@
                     stores.sort((a, b) => (b.isRecommended ? 1 : 0) - (a.isRecommended ? 1 : 0));
                     break;
                 case 'price':
-                    stores.sort((a, b) => a.minPrice - b.minPrice);
+                    // 按服务报价排序（不含配送费，配送方式由用户在步骤3选择）
+                    stores.sort((a, b) => {
+                        var pa = a._pricing ? a._pricing.finalPrice : 9999;
+                        var pb = b._pricing ? b._pricing.finalPrice : 9999;
+                        return pa - pb;
+                    });
                     break;
                 case 'distance':
                     stores.sort((a, b) => parseFloat(a.distance) - parseFloat(b.distance));
@@ -805,10 +1475,11 @@
         // 筛选门店
         function filterStores() {
             const showOnlineOnly = document.getElementById('filter-online').checked;
+            var sourceList = recommendationData[currentRecommendTab] || recommendationData.comprehensive || [];
             if (showOnlineOnly) {
-                stores = allStores.filter(s => s.isOnline);
+                stores = sourceList.filter(function(s) { return s.isOnline; });
             } else {
-                stores = [...allStores];
+                stores = sourceList;
             }
             loadStores();
         }
@@ -850,25 +1521,70 @@
             updateUI();
         }
 
-        // 加载服务商
-        function loadProviders() {
-            deliveryProviders = [
-                { id: 'meituan', name: '美团跑腿', icon: '🛵', rating: 4.9, estimatedTime: '30-45分钟', fee: 15, hasDiscount: true, discountInfo: '新用户首单立减3元', actualFee: 12 },
-                { id: 'jd', name: '京东秒送', icon: '🚚', rating: 4.8, estimatedTime: '35-50分钟', fee: 18, hasDiscount: false, discountInfo: '', actualFee: 18 },
-                { id: 'sf', name: '顺丰跑腿', icon: '✈️', rating: 4.9, estimatedTime: '40-60分钟', fee: 20, hasDiscount: true, discountInfo: '满50元减5元', actualFee: 15 },
-                { id: 'taobao', name: '淘宝闪购', icon: '🛒', rating: 4.7, estimatedTime: '30-50分钟', fee: 16, hasDiscount: true, discountInfo: '限时优惠', actualFee: 16 }
-            ];
+        // 加载服务商（从后端获取实时报价）
+        async function loadProviders() {
+            const container = document.getElementById('providers-list');
+            if (!container) return;
             
-            // 默认不选择任何服务商，让用户自己选择
-            if (!orderData.selectedProvider) {
+            // 显示加载状态
+            container.innerHTML = '<div class="text-center py-4 text-gray-400 text-sm">正在获取实时报价...</div>';
+            
+            try {
+                // 获取配送距离（从已选门店获取，或使用默认值）
+                let distanceKm = 3; // 默认3km
+                if (orderData.selectedStore) {
+                    var distStr = (orderData.selectedStore.distance || '3km').replace(/[^0-9.]/g, '');
+                    var d = parseFloat(distStr);
+                    if (!isNaN(d) && d > 0) distanceKm = d;
+                }
+                
+                var serviceTotal = calculateServiceTotal();
+                var isNewUser = !localStorage.getItem('hasOrderedBefore');
+                
+                var apiUrl = 'http://localhost:3000/api/delivery/quotes';
+                var resp = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        distance: distanceKm,
+                        serviceTotal: serviceTotal,
+                        isNewUser: isNewUser
+                    })
+                });
+                var data = await resp.json();
+                
+                if (data.success && data.data && data.data.length > 0) {
+                    deliveryProviders = data.data;
+                } else {
+                    throw new Error('后端返回数据为空');
+                }
+            } catch (e) {
+                console.warn('[C端] 获取配送报价失败，使用默认:', e.message);
+                // 离线兜底：使用本地默认服务商
+                deliveryProviders = [
+                    { id: 'meituan', name: '美团跑腿', icon: '🛵', rating: 4.9, estimatedTime: '30-45分钟', pricing: { solo: { originalFee: 15, discount: 3, actualFee: 12 }, shared: { originalFee: 9.75, discount: 6.75, actualFee: 8.25 } } },
+                    { id: 'jd', name: '京东秒送', icon: '🚚', rating: 4.8, estimatedTime: '35-50分钟', pricing: { solo: { originalFee: 18, discount: 0, actualFee: 18 }, shared: { originalFee: 10.8, discount: 7.2, actualFee: 10.8 } } },
+                    { id: 'sf', name: '顺丰跑腿', icon: '✈️', rating: 4.9, estimatedTime: '40-60分钟', pricing: { solo: { originalFee: 20, discount: 5, actualFee: 15 }, shared: { originalFee: 14, discount: 9, actualFee: 10 } } },
+                    { id: 'taobao', name: '淘宝闪购', icon: '🛒', rating: 4.7, estimatedTime: '30-50分钟', pricing: { solo: { originalFee: 16, discount: 3, actualFee: 13 }, shared: { originalFee: 9.92, discount: 9.08, actualFee: 9.92 } } }
+                ];
+            }
+            
+            // 保持当前选中状态
+            if (orderData.selectedProvider && deliveryProviders.length > 0) {
+                var found = deliveryProviders.find(function(p) { return p.id === orderData.selectedProvider.id; });
+                orderData.selectedProvider = found || null;
+            } else {
                 orderData.selectedProvider = null;
             }
             
-            const container = document.getElementById('providers-list');
+            var deliveryType = orderData.deliveryType || 'solo';
             
-            const providersHtml = deliveryProviders.map(provider => {
-                const isSelected = orderData.selectedProvider && orderData.selectedProvider.id === provider.id;
-                const deliveryType = orderData.deliveryType || 'solo';
+            var providersHtml = deliveryProviders.map(function(provider) {
+                var isSelected = orderData.selectedProvider && orderData.selectedProvider.id === provider.id;
+                var soloP = provider.pricing.solo;
+                var sharedP = provider.pricing.shared;
+                var hasSoloDiscount = soloP.discount > 0;
+                var hasSharedDiscount = sharedP.discount > 0;
                 
                 return `
                     <div class="provider-card ${isSelected ? 'selected' : ''}">
@@ -881,6 +1597,7 @@
                                         <span>⭐</span>
                                         <span>${provider.rating}</span>
                                         <span class="text-gray-400">评分</span>
+                                        ${provider.distance ? '<span class="text-gray-300 mx-1">·</span><span class="text-gray-400">' + provider.distance + 'km</span>' : ''}
                                     </div>
                                 </div>
                                 <div class="provider-select-radio">
@@ -888,20 +1605,15 @@
                                 </div>
                             </div>
                             
-                            <div class="flex gap-4 mb-2">
+                            <div class="flex items-center gap-4 mb-2">
                                 <div class="flex items-center gap-1 text-sm text-gray-500">
                                     <span>⏱️</span>
-                                    <span>预计${provider.estimatedTime}</span>
-                                </div>
-                                <div class="flex items-center gap-1 text-sm">
-                                    <span class="text-gray-500">配送费</span>
-                                    <span class="font-semibold text-gray-800">¥${provider.fee}</span>
-                                    ${provider.hasDiscount ? `<span class="text-red-500">→ ¥${provider.actualFee}</span>` : ''}
+                                    <span>预计${provider.estimatedTime || '30-45分钟'}</span>
                                 </div>
                             </div>
                             
-                            ${provider.hasDiscount ? `
-                                <div class="pt-2 border-t border-gray-200">
+                            ${provider.discountInfo ? `
+                                <div class="mb-2">
                                     <span class="bg-amber-100 text-amber-700 text-xs font-semibold px-2 py-1 rounded">
                                         🎉 ${provider.discountInfo}
                                     </span>
@@ -910,15 +1622,25 @@
                         </div>
                         
                         <div class="mt-3 pt-3 border-t border-gray-100">
-                            <div class="text-xs text-gray-500 mb-2">选择配送方式</div>
+                            <div class="text-xs text-gray-500 mb-3">选择配送方式</div>
                             <div class="flex gap-2">
                                 <button onclick="selectDeliveryType('${provider.id}', 'solo')" 
-                                    class="flex-1 py-2 px-3 text-sm rounded-lg border ${deliveryType === 'solo' ? 'bg-blue-50 border-blue-500 text-blue-600' : 'bg-gray-50 border-gray-200 text-gray-600'}">
-                                    🚀 一对一
+                                    class="flex-1 py-2 px-2 text-sm rounded-lg border group ${deliveryType === 'solo' && isSelected ? 'bg-blue-50 border-blue-500' : 'bg-gray-50 border-gray-200 hover:border-blue-300'}">
+                                    <div class="text-xs ${deliveryType === 'solo' && isSelected ? 'text-blue-600 font-semibold' : 'text-gray-600'}">🚀 一对一</div>
+                                    <div class="mt-1">
+                                        ${hasSoloDiscount ? '<span class="text-xs text-gray-400 line-through mr-1">¥' + soloP.originalFee + '</span>' : ''}
+                                        <span class="text-sm font-bold ${deliveryType === 'solo' && isSelected ? 'text-blue-600' : 'text-gray-800'}">¥${soloP.actualFee}</span>
+                                    </div>
+                                    ${hasSoloDiscount ? '<div class="text-xs text-green-600 mt-0.5">省¥' + soloP.discount + '</div>' : ''}
                                 </button>
                                 <button onclick="selectDeliveryType('${provider.id}', 'shared')" 
-                                    class="flex-1 py-2 px-3 text-sm rounded-lg border ${deliveryType === 'shared' ? 'bg-green-50 border-green-500 text-green-600' : 'bg-gray-50 border-gray-200 text-gray-600'}">
-                                    👥 拼单
+                                    class="flex-1 py-2 px-2 text-sm rounded-lg border group ${deliveryType === 'shared' && isSelected ? 'bg-green-50 border-green-500' : 'bg-gray-50 border-gray-200 hover:border-green-300'}">
+                                    <div class="text-xs ${deliveryType === 'shared' && isSelected ? 'text-green-600 font-semibold' : 'text-gray-600'}">👥 拼单</div>
+                                    <div class="mt-1">
+                                        ${hasSharedDiscount ? '<span class="text-xs text-gray-400 line-through mr-1">¥' + sharedP.originalFee + '</span>' : ''}
+                                        <span class="text-sm font-bold ${deliveryType === 'shared' && isSelected ? 'text-green-600' : 'text-gray-800'}">¥${sharedP.actualFee}</span>
+                                    </div>
+                                    <div class="text-xs text-green-600 mt-0.5">省¥${sharedP.discount}</div>
                                 </button>
                             </div>
                         </div>
@@ -1017,33 +1739,74 @@
 
         // 计算服务总价
         function calculateServiceTotal() {
-            return orderData.selectedServices.reduce((sum, service) => sum + service.price, 0);
+            var sum = orderData.selectedServices.reduce((sum, service) => sum + (service.price || 0), 0);
+            // 寄养费用已包含在 service.price 中，但确保 boardingDetail 也正确
+            if (orderData.boardingDetail && orderData.boardingDetail.totalPrice) {
+                // 已通过 service.price 计入，此处不需要重复加
+            }
+            return sum;
         }
 
-        // 计算费用
+        // 计算费用（使用店面配置的促销规则）
         function calculateFees() {
             let serviceTotal = calculateServiceTotal();
             let deliveryFee = 0;
+            let deliveryOriginalFee = 0;
+            let deliveryDiscount = 0;
             let discount = 0;
             let originalPrice = serviceTotal;
+            let appliedPromotions = [];
             
-            if (orderData.deliveryMethod === 'pickup') {
-                // 自取9折
-                discount = Math.round(serviceTotal * 0.1);
-                serviceTotal = serviceTotal - discount;
-            } else if (orderData.deliveryMethod === 'courier' && orderData.selectedProvider) {
-                // 跑腿方式，且已选择服务商
-                deliveryFee = orderData.selectedProvider.actualFee || orderData.selectedProvider.fee;
+            // 使用店面配置的促销计算
+            var storeId = orderData.selectedStore ? orderData.selectedStore.id : 'ST001';
+            try {
+                if (typeof StoreConfig !== 'undefined' && StoreConfig.calculatePromotionDiscount) {
+                    var result = StoreConfig.calculatePromotionDiscount(
+                        storeId, serviceTotal,
+                        orderData.deliveryMethod || '',
+                        orderData.isFirstOrder || false
+                    );
+                    discount = result.totalDiscount;
+                    appliedPromotions = result.appliedPromos;
+                }
+            } catch (e) {
+                console.warn('[C端] 促销计算失败:', e);
             }
             
-            const total = serviceTotal + deliveryFee;
+            // 如果店面促销未匹配，回退硬编码的9折自取
+            if (discount === 0 && orderData.deliveryMethod === 'pickup') {
+                discount = Math.round(serviceTotal * 0.1);
+            }
+            
+            serviceTotal = serviceTotal - discount;
+            
+            // 配送费：根据服务商和配送方式（一对一/拼单）动态计算
+            if (orderData.deliveryMethod === 'courier' && orderData.selectedProvider) {
+                var dt = orderData.deliveryType || 'solo';
+                var p = orderData.selectedProvider;
+                // 兼容新旧数据结构
+                if (p.pricing && p.pricing[dt]) {
+                    deliveryFee = p.pricing[dt].actualFee;
+                    deliveryOriginalFee = p.pricing[dt].originalFee;
+                    deliveryDiscount = p.pricing[dt].discount;
+                } else if (p.actualFee) {
+                    deliveryFee = p.actualFee;
+                } else if (p.fee) {
+                    deliveryFee = p.fee;
+                }
+            }
+            
+            const total = Math.max(0, serviceTotal + deliveryFee);
             
             return {
                 serviceFee: serviceTotal + discount,
                 originalPrice: originalPrice,
                 discount: discount,
                 deliveryFee: deliveryFee,
-                total: total
+                deliveryOriginalFee: deliveryOriginalFee,
+                deliveryDiscount: deliveryDiscount,
+                total: total,
+                appliedPromotions: appliedPromotions
             };
         }
 
@@ -1061,9 +1824,26 @@
             document.getElementById('fee-discount-row').classList.toggle('hidden', fees.discount === 0);
             document.getElementById('fee-delivery-row').classList.toggle('hidden', fees.deliveryFee === 0);
             
-            // 更新折扣金额
+            // 配送费明细（显示原价→实际价 + 优惠）
+            var deliveryDiscountRow = document.getElementById('fee-delivery-discount-row');
+            if (fees.deliveryFee > 0 && fees.deliveryDiscount > 0) {
+                document.getElementById('fee-delivery-original').textContent = '¥' + fees.deliveryOriginalFee;
+                document.getElementById('fee-delivery-original').classList.remove('hidden');
+                document.getElementById('fee-delivery-discount').textContent = '-¥' + fees.deliveryDiscount;
+                deliveryDiscountRow.classList.remove('hidden');
+                var dtLabel = orderData.deliveryType === 'shared' ? '（拼单）' : '（一对一）';
+                document.getElementById('fee-delivery-label').textContent = '配送费' + dtLabel;
+            } else {
+                document.getElementById('fee-delivery-original').classList.add('hidden');
+                deliveryDiscountRow.classList.add('hidden');
+                document.getElementById('fee-delivery-label').textContent = '配送费';
+            }
+            
+            // 更新服务折扣标签与金额
             if (fees.discount > 0) {
-                document.querySelector('#fee-discount-row .text-green-500:last-child').textContent = `-¥${fees.discount}`;
+                document.getElementById('fee-discount-value').textContent = '-¥' + fees.discount;
+                var discLabel = orderData.deliveryMethod === 'pickup' ? '自取优惠' : '门店促销';
+                document.getElementById('fee-discount-label').textContent = discLabel;
             }
             
             // 更新积分
@@ -1082,8 +1862,11 @@
             let summaryText = `已选 ${orderData.selectedServices.length} 项服务`;
             let summaryPrice = fees.total;
             
-            // 如果是跑腿方式，显示配送费
-            if (orderData.deliveryMethod === 'courier' && orderData.selectedProvider) {
+            // 步骤2未选门店时，提示用户选择门店查看报价
+            if (orderData.step === 2 && !orderData.selectedStore) {
+                summaryText = `已选 ${orderData.selectedServices.length} 项 · 请选择门店`;
+                summaryPrice = 0;
+            } else if (orderData.deliveryMethod === 'courier' && orderData.selectedProvider) {
                 summaryPrice = fees.total;
                 summaryText += ` + ¥${fees.deliveryFee}配送费`;
             } else if (orderData.deliveryMethod === 'pickup') {
@@ -1091,7 +1874,7 @@
             }
             
             document.getElementById('summary-text').textContent = summaryText;
-            document.getElementById('summary-price').textContent = `¥${summaryPrice}`;
+            document.getElementById('summary-price').textContent = summaryPrice > 0 ? `¥${summaryPrice}` : '-';
             
             // 更新已选服务摘要（步骤2）
             document.getElementById('selected-count').textContent = `${orderData.selectedServices.length}项`;
@@ -1099,13 +1882,14 @@
             
             const tagsContainer = document.getElementById('selected-services-tags');
             if (tagsContainer) {
-                tagsContainer.innerHTML = orderData.selectedServices.map(service => `
-                    <span class="bg-blue-50 text-blue-600 text-xs font-semibold px-3 py-1 rounded-full flex items-center gap-1">
-                        <span>${service.icon}</span>
-                        <span>${service.name}</span>
-                        <span class="text-blue-400">¥${service.price}</span>
-                    </span>
-                `).join('');
+                tagsContainer.innerHTML = orderData.selectedServices.map(service => {
+                    var priceText = service.isBoarding ? '¥' + service.price : '¥' + service.price;
+                    return '<span class="bg-blue-50 text-blue-600 text-xs font-semibold px-3 py-1 rounded-full flex items-center gap-1">' +
+                        '<span>' + service.icon + '</span>' +
+                        '<span>' + service.name + '</span>' +
+                        '<span class="text-blue-400">' + priceText + '</span>' +
+                    '</span>';
+                }).join('');
             }
             
             // 更新步骤3摘要
@@ -1135,6 +1919,7 @@
         // 更新已选服务摘要（步骤2专用）
         function updateSelectedServicesSummary() {
             const serviceTotal = calculateServiceTotal();
+            const hasStore = orderData.selectedStore !== null;
             
             // 更新已选服务数量
             const selectedCountEl = document.getElementById('selected-count');
@@ -1142,10 +1927,18 @@
                 selectedCountEl.textContent = `${orderData.selectedServices.length}项`;
             }
             
-            // 更新服务费用合计
+            // 更新服务费用合计（未选门店时显示提示，选中后显示实际价格）
             const serviceTotalEl = document.getElementById('service-total');
             if (serviceTotalEl) {
-                serviceTotalEl.textContent = `¥${serviceTotal}`;
+                if (orderData.selectedServices.length === 0) {
+                    serviceTotalEl.textContent = '¥0';
+                } else if (!hasStore) {
+                    serviceTotalEl.textContent = '选择门店后报价';
+                    serviceTotalEl.className = 'text-sm text-gray-400';
+                } else {
+                    serviceTotalEl.textContent = `¥${serviceTotal}`;
+                    serviceTotalEl.className = 'text-xl font-bold text-red-500';
+                }
             }
             
             // 更新已选服务标签
@@ -1158,7 +1951,7 @@
                         <span class="bg-blue-50 text-blue-600 text-xs font-semibold px-3 py-1 rounded-full flex items-center gap-1">
                             <span>${service.icon}</span>
                             <span>${service.name}</span>
-                            <span class="text-blue-400">¥${service.price}</span>
+                            ${hasStore ? `<span class="text-blue-400">¥${service.price}</span>` : ''}
                         </span>
                     `).join('');
                 }
@@ -1244,9 +2037,9 @@
                 nextBtn.querySelector('span:first-child').textContent = btnTexts[step - 1];
             }
             
-            // 步骤2时重新加载门店
+            // 步骤2时加载智慧推荐
             if (step === 2) {
-                loadStores();
+                loadRecommendations();
                 updateSelectedServicesSummary();
             }
             
@@ -1263,8 +2056,15 @@
             window.scrollTo(0, 0);
         }
 
-        // 确认下单
+        // 确认下单（防重复提交）
+        let _isSubmitting = false;
         async function confirmOrder() {
+            // 防重复提交：提交中或已提交则忽略
+            if (_isSubmitting) {
+                console.log('[下单] 已有提交进行中，忽略重复点击');
+                return;
+            }
+            
             const contactName = document.getElementById('contact-name').value;
             const contactPhone = document.getElementById('contact-phone').value;
             const pickupAddress = document.getElementById('pickup-address').value;
@@ -1282,6 +2082,14 @@
             // 保存配送信息到本地存储
             saveDeliveryInfo();
             
+            // 防重复提交：锁定按钮
+            _isSubmitting = true;
+            const confirmBtn = document.getElementById('confirm-btn');
+            if (confirmBtn) {
+                confirmBtn.disabled = true;
+                confirmBtn.textContent = '提交中...';
+            }
+            
             const fees = calculateFees();
             
             // 获取用户ID（优先使用openid，兼容旧guest模式）
@@ -1296,21 +2104,38 @@
             console.log(`[下单] 使用${userIdType}作为用户ID:`, userId);
             
             // 准备订单数据
+            var categoryType = (currentCategory && currentCategory.type) ? currentCategory.type : 'service';
             const orderDataForAPI = {
                 userId: userId,
                 openid: localStorage.getItem('userOpenid') || userId, // 统一传递openid
                 storeId: orderData.selectedStore ? orderData.selectedStore.id : null,
+                categoryId: currentCategoryId || 'cleaning',
+                categoryType: categoryType,
                 items: orderData.selectedServices.map(s => ({
                     name: s.name,
                     price: s.price,
                     quantity: 1,
-                    serviceType: 'dry_clean'
+                    serviceType: currentCategoryId || 'dry_clean',
+                    itemType: currentCategoryId || 'dry_cleaning',
+                    isBoarding: s.isBoarding || false,
+                    boardingDetail: s.isBoarding ? orderData.boardingDetail : undefined
                 })),
                 deliveryMethod: orderData.deliveryMethod,
                 selectedProvider: orderData.selectedProvider ? {
                     id: orderData.selectedProvider.id,
                     name: orderData.selectedProvider.name,
                     icon: orderData.selectedProvider.icon
+                } : null,
+                courierTracking: orderData.deliveryMethod === 'courier' ? {
+                    name: orderData.selectedProvider ? 
+                        (orderData.selectedProvider.id === 'meituan' ? '张师傅' : 
+                         orderData.selectedProvider.id === 'jd' ? '王师傅' : '李师傅') : '配送员',
+                    phone: '138****1234',
+                    status: 'picking',
+                    progress: 0,
+                    distance: '1.5km',
+                    eta: '15分钟',
+                    assignedAt: new Date().toISOString()
                 } : null,
                 delivery: {
                     type: orderData.deliveryMethod === 'courier' ? 'delivery' : 'pickup',
@@ -1324,7 +2149,8 @@
                     discount: fees.discount,
                     deliveryFee: fees.deliveryFee,
                     total: fees.total
-                }
+                },
+                boardingDetail: orderData.boardingDetail || undefined
             };
             
             let serverOrder = null;
@@ -1382,8 +2208,10 @@
                         icon: s.icon,
                         price: s.price,
                         desc: s.desc,
-                        category: s.category
+                        category: s.category,
+                        isBoarding: s.isBoarding || false
                     })),
+                    boardingDetail: orderData.boardingDetail || null,
                     // 门店信息 - 确保有默认值
                     store: orderData.selectedStore ? {
                         id: orderData.selectedStore.id,

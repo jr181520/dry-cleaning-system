@@ -59,21 +59,20 @@
     </view>
   </view>
 
-  <!-- 配送服务商（仅跑腿方式显示） -->
+  <!-- 配送服务商（仅跑腿方式显示）— 含一对一/拼单两种模式 -->
   <view class="section" wx:if="{{selectedDeliveryMethod === 'courier'}}">
     <view class="section-header">
-      <text class="section-title">选择跑腿服务商</text>
-      <text class="section-subtitle">平台聚合多家配送服务</text>
+      <text class="section-title">选择配送服务商</text>
+      <text class="section-subtitle">实时报价 · 平台聚合多家配送服务</text>
     </view>
     <view class="providers-list">
       <view 
         class="provider-card {{selectedProvider.id === item.id ? 'selected' : ''}}"
         wx:for="{{deliveryProviders}}"
         wx:key="id"
-        bindtap="onSelectProvider"
-        data-id="{{item.id}}"
       >
-        <view class="provider-header">
+        <!-- 选择服务商 -->
+        <view class="provider-header" bindtap="onSelectProvider" data-id="{{item.id}}">
           <text class="provider-icon">{{item.icon}}</text>
           <view class="provider-info">
             <text class="provider-name">{{item.name}}</text>
@@ -81,6 +80,7 @@
               <text class="rating-star">⭐</text>
               <text class="rating-value">{{item.rating}}</text>
               <text class="rating-text">评分</text>
+              <text class="distance-text" wx:if="{{item.distance}}"> · {{item.distance}}km</text>
             </view>
           </view>
           <view class="provider-select">
@@ -95,19 +95,54 @@
         <view class="provider-details">
           <view class="detail-row">
             <text class="detail-icon">⏱️</text>
-            <text class="detail-text">预计{{item.estimatedTime}}</text>
-          </view>
-          <view class="detail-row">
-            <text class="detail-icon">💰</text>
-            <text class="detail-text">配送费 ¥{{item.fee}}</text>
-            <text class="detail-actual" wx:if="{{item.hasDiscount}}">→ ¥{{item.actualFee}}</text>
+            <text class="detail-text">预计{{item.estimatedTime || '30-45分钟'}}</text>
           </view>
         </view>
         
-        <view class="provider-footer" wx:if="{{item.hasDiscount}}">
+        <!-- 优惠信息 -->
+        <view class="provider-footer" wx:if="{{item.discountInfo}}">
           <view class="discount-badge">
             <text class="badge-icon">🎉</text>
             <text class="badge-text">{{item.discountInfo}}</text>
+          </view>
+        </view>
+        
+        <!-- 一对一 / 拼单 选择按钮 — 与C端一致 -->
+        <view class="delivery-type-selector">
+          <view class="type-label">选择配送方式</view>
+          <view class="type-buttons">
+            <view 
+              class="type-btn solo {{selectedProvider.id === item.id && deliveryType === 'solo' ? 'active-solo' : ''}}"
+              bindtap="onSelectDeliveryType"
+              data-provider-id="{{item.id}}"
+              data-type="solo"
+            >
+              <text class="type-btn-icon">🚀</text>
+              <view class="type-btn-info">
+                <text class="type-btn-title">一对一</text>
+                <view class="type-btn-price">
+                  <text class="price-original" wx:if="{{item.pricing.solo.discount > 0}}">¥{{item.pricing.solo.originalFee}}</text>
+                  <text class="price-actual">¥{{item.pricing.solo.actualFee}}</text>
+                </view>
+                <text class="price-save" wx:if="{{item.pricing.solo.discount > 0}}">省¥{{item.pricing.solo.discount}}</text>
+              </view>
+            </view>
+            <view 
+              class="type-btn shared {{selectedProvider.id === item.id && deliveryType === 'shared' ? 'active-shared' : ''}}"
+              bindtap="onSelectDeliveryType"
+              data-provider-id="{{item.id}}"
+              data-type="shared"
+            >
+              <text class="type-btn-icon">👥</text>
+              <view class="type-btn-info">
+                <text class="type-btn-title">拼单</text>
+                <view class="type-btn-price">
+                  <text class="price-original" wx:if="{{item.pricing.shared.discount > 0}}">¥{{item.pricing.shared.originalFee}}</text>
+                  <text class="price-actual">¥{{item.pricing.shared.actualFee}}</text>
+                </view>
+                <text class="price-save">省¥{{item.pricing.shared.discount}}</text>
+              </view>
+            </view>
           </view>
         </view>
       </view>
@@ -175,7 +210,7 @@
     </view>
   </view>
 
-  <!-- 费用明细 -->
+  <!-- 费用明细 — 与C端一致 -->
   <view class="fee-section">
     <view class="section-header">
       <text class="section-title">费用明细</text>
@@ -183,23 +218,26 @@
     <view class="fee-card">
       <view class="fee-row">
         <text class="fee-label">门店服务费</text>
-        <text class="fee-value">¥{{storeFee}}</text>
+        <text class="fee-value">¥{{storeFee + discount}}</text>
       </view>
-      <view class="fee-row" wx:if="{{originalPrice > storeFee}}">
+      <view class="fee-row" wx:if="{{discount > 0}}">
         <text class="fee-label">原价</text>
         <text class="fee-original">¥{{originalPrice}}</text>
       </view>
       <view class="fee-row discount" wx:if="{{discount > 0}}">
-        <text class="fee-label">自取折扣</text>
+        <text class="fee-label">{{selectedDeliveryMethod === 'pickup' ? '自取优惠' : '门店促销'}}</text>
         <text class="fee-discount">-¥{{discount}}</text>
       </view>
       <view class="fee-row" wx:if="{{deliveryFee > 0}}">
-        <text class="fee-label">配送费</text>
-        <text class="fee-value">¥{{deliveryFee}}</text>
+        <text class="fee-label">配送费{{selectedDeliveryMethod === 'courier' && deliveryType === 'shared' ? '（拼单）' : selectedDeliveryMethod === 'courier' ? '（一对一）' : ''}}</text>
+        <view class="fee-right">
+          <text class="fee-original" wx:if="{{deliveryOriginalFee > deliveryFee}}">¥{{deliveryOriginalFee}} </text>
+          <text class="fee-value">¥{{deliveryFee}}</text>
+        </view>
       </view>
-      <view class="fee-row discount-info" wx:if="{{selectedDeliveryMethod === 'courier' && selectedProvider.hasDiscount}}">
+      <view class="fee-row discount" wx:if="{{deliveryDiscount > 0}}">
         <text class="fee-label">配送优惠</text>
-        <text class="fee-discount">-¥{{selectedProvider.fee - selectedProvider.actualFee}}</text>
+        <text class="fee-discount">-¥{{deliveryDiscount}}</text>
       </view>
       <view class="fee-divider"></view>
       <view class="fee-row total">

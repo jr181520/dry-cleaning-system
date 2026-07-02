@@ -5,11 +5,10 @@ App({
     // 检查是否是扫码进入（小程序码场景）
     this.handleScanEntry(options);
     
-    // 加载模块配置（动态菜单）
-    this.loadModuleConfig();
-    
-    // 登录获取用户信息
-    this.login();
+    // 仅同步恢复缓存，onLaunch 必须极速返回
+    // 所有网络操作推迟到 onShow（框架已就绪）
+    this._restoreCache();
+    this._firstShow = true;
   },
   
   onShow(options) {
@@ -25,8 +24,20 @@ App({
       this.globalData.pendingPickupCode = options.query.code;
     }
     
-    // 每次回到前台时同步订单数据（实现跨平台数据同步）
-    this.syncOrders();
+    // 首次 onShow：执行延迟初始化（框架已完全就绪，不会 timeout）
+    if (this._firstShow) {
+      this._firstShow = false;
+      // 大延迟，确保所有页面 onLoad/onShow 已完成
+      setTimeout(() => {
+        this.loadModuleConfig().catch(() => {});
+        this.login();
+      }, 800);
+    }
+    
+    // 数据同步放在首次初始化之后
+    if (this.globalData.isLoggedIn) {
+      setTimeout(() => this.syncAllData(), 2000);
+    }
   },
   
   // 处理扫码进入
@@ -130,18 +141,29 @@ App({
   // 获取模块配置
   fetchModuleConfig() {
     return new Promise((resolve) => {
+      const resolved = { value: false };
+      const done = (val) => { if (!resolved.value) { resolved.value = true; resolve(val); } };
+      
       wx.request({
         url: this.globalData.apiBaseUrl + '/system/modules',
         method: 'GET',
+        timeout: 4000,
+        header: {
+          'content-type': 'application/json',
+          'Authorization': this.globalData.token ? `Bearer ${this.globalData.token}` : ''
+        },
         success: res => {
           if (res.data && res.data.success) {
-            resolve(res.data.data);
+            done(res.data.data);
           } else {
-            resolve(null);
+            done(null);
           }
         },
-        fail: () => resolve(null)
+        fail: () => done(null)
       });
+      
+      // 4秒安全兜底，防止 wx.request 永不回调
+      setTimeout(() => done(null), 4000);
     });
   },
   
@@ -200,10 +222,10 @@ App({
     currentOrder: null,    // 当前订单（用于支付页面）
     orders: [],           // 订单列表
     // API配置
-    apiBaseUrl: 'http://192.168.10.7:3000/api',
+    apiBaseUrl: 'http://localhost:3000/api',
     // 聚合配送API配置
     deliveryApi: {
-      baseUrl: 'http://192.168.10.7:3001/api',
+      baseUrl: 'http://localhost:3001/api',
       providers: ['meituan', 'dada', 'shunfeng']
     },
     // 模块配置（动态菜单）
@@ -211,28 +233,48 @@ App({
     enabledModules: []
   },
   
-  // 登录
-  login() {
-    // 先检查是否已有登录信息
+  // 同步恢复缓存（极快，不阻塞 onLaunch） — 供 onLaunch 和 login 复用
+  _restoreCache() {
     const savedUserInfo = wx.getStorageSync('userInfo');
     const savedToken = wx.getStorageSync('token');
-    
     if (savedUserInfo && savedUserInfo.openid) {
       this.globalData.userInfo = savedUserInfo;
       this.globalData.token = savedToken;
       this.globalData.isLoggedIn = true;
       console.log('[登录] 从缓存恢复登录状态，openid:', savedUserInfo.openid);
-      return;
+      return true;
     }
+    return false;
+  },
+
+  // 登录（运行时异步调用，不阻塞 onLaunch）
+  login() {
+    // 如果 _restoreCache 已恢复，不再重复
+    if (this.globalData.isLoggedIn) return;
+    
+    // 安全兜底：3秒后强制使用模拟登录（缩短等待时间）
+    let loginDone = false;
+    const forceMockTimeout = setTimeout(() => {
+      if (!loginDone) {
+        console.warn('[登录] wx.login 超时，强制使用模拟登录');
+        loginDone = true;
+        this.mockLogin();
+      }
+    }, 3000);
+    
+    const finishLogin = () => {
+      loginDone = true;
+      clearTimeout(forceMockTimeout);
+    };
     
     wx.login({
       success: res => {
         if (res.code) {
           console.log('[登录] 微信登录成功，code:', res.code);
-          // 发送 code 到后端获取 openid 并登录
           this.request('/auth/wxmini-login', {
             code: res.code
           }, 'POST').then(data => {
+            finishLogin();
             if (data.openid) {
               const userInfo = {
                 openid: data.openid,
@@ -243,7 +285,6 @@ App({
               this.globalData.token = data.token;
               this.globalData.isLoggedIn = true;
               
-              // 保存到本地存储
               wx.setStorageSync('userInfo', userInfo);
               wx.setStorageSync('token', data.token);
               
@@ -253,15 +294,15 @@ App({
               this.mockLogin();
             }
           }).catch(err => {
+            finishLogin();
             console.error('[登录] 请求失败:', err);
-            // 使用模拟登录作为后备
             this.mockLogin();
           });
         }
       },
       fail: err => {
+        finishLogin();
         console.error('[登录] wx.login失败:', err);
-        // 使用模拟登录作为后备
         this.mockLogin();
       }
     });
@@ -288,44 +329,105 @@ App({
     console.log('[登录] 模拟登录完成，openid:', mockOpenid);
   },
   
-  // 同步订单数据（从后端获取最新订单，支持跨平台数据一致性）
-  async syncOrders() {
+  // ============================================================
+  // 统一数据同步（跨平台数据一致性）
+  // 小程序每次 onShow 调用此方法，以后端为权威数据源
+  // ============================================================
+  async syncAllData() {
     if (!this.globalData.isLoggedIn) {
-      console.log('[同步] 未登录，跳过订单同步');
+      console.log('[同步] 未登录，跳过数据同步');
       return;
     }
     
+    const userInfo = this.globalData.userInfo || {};
+    const userId = userInfo._id || userInfo.id || userInfo.openid;
+    
+    if (!userId) {
+      console.log('[同步] 无用户标识，跳过同步');
+      return;
+    }
+    
+    // 获取已保存的手机号（用于跨平台匹配C端订单）
+    const deliveryInfo = wx.getStorageSync('userDeliveryInfo') || {};
+    const savedPhone = deliveryInfo.contactPhone || userInfo.phone || '';
+    console.log('[同步] 🔍 用户标识 userId:', userId, '手机号:', savedPhone, '来源:', {
+      deliveryPhone: deliveryInfo.contactPhone,
+      userPhone: userInfo.phone
+    });
+
     try {
-      const userInfo = this.globalData.userInfo || {};
-      const userId = userInfo.id || userInfo.openid || userInfo._id;
-      
-      if (!userId) {
-        console.log('[同步] 无用户标识，跳过同步');
-        return;
+      // 构建同步 URL，传入手机号用于跨平台订单匹配
+      let syncUrl = `/sync/all?types=user,orders,member,delivery`;
+      if (savedPhone) {
+        syncUrl += `&phone=${encodeURIComponent(savedPhone)}`;
       }
       
-      console.log('[同步] 开始同步订单，userId:', userId);
+      const data = await this.request(syncUrl, {}, 'GET');
       
-      const data = await this.request(`/cleaning/orders?userId=${encodeURIComponent(userId)}`, {}, 'GET');
+      if (!data || !data.success) return;
       
-      if (data && data.list) {
-        this.globalData.orders = data.list;
-        console.log(`[同步] 获取到 ${data.list.length} 条订单`);
-        
+      const serverData = data.data;
+      let syncedItems = [];
+      
+      // 1. 同步用户资料（后端数据覆盖本地）
+      if (serverData.user) {
+        const merged = {
+          ...wx.getStorageSync('userInfo') || {},
+          name: serverData.user.name || '',
+          nickname: serverData.user.name || serverData.user.nickname || '',
+          avatar: serverData.user.avatar || '',
+          phone: serverData.user.phone || '',
+          gender: serverData.user.gender !== undefined ? serverData.user.gender : 0,
+          birthday: serverData.user.birthday || '',
+          _id: serverData.user._id || '',
+          openid: serverData.user.openid || (wx.getStorageSync('userInfo') || {}).openid || '',
+          creditScore: serverData.user.creditScore,
+          userNo: serverData.user.userNo || ''
+        };
+        wx.setStorageSync('userInfo', merged);
+        this.globalData.userInfo = merged;
+        syncedItems.push('用户');
+      }
+      
+      // 2. 同步会员信息
+      if (serverData.member) {
+        wx.setStorageSync('memberInfo', serverData.member);
+        syncedItems.push('会员');
+      }
+      
+      // 3. 同步订单数据
+      if (serverData.orders) {
+        this.globalData.orders = serverData.orders;
+        wx.setStorageSync('orders', serverData.orders);
         // 通知当前页面刷新
         if (this.syncCallback) {
-          this.syncCallback(data.list);
+          this.syncCallback(serverData.orders);
         }
-      } else if (Array.isArray(data)) {
-        this.globalData.orders = data;
-        console.log(`[同步] 获取到 ${data.length} 条订单`);
-        if (this.syncCallback) {
-          this.syncCallback(data);
+        syncedItems.push(`订单(${serverData.orders.length})`);
+      }
+      
+      // 4. 同步配送信息
+      if (serverData.delivery) {
+        const dl = serverData.delivery.savedInfo || serverData.delivery.defaultAddress;
+        if (dl) {
+          const existing = wx.getStorageSync('userDeliveryInfo') || {};
+          wx.setStorageSync('userDeliveryInfo', { ...existing, ...dl });
+          syncedItems.push('配送');
         }
       }
+      
+      if (syncedItems.length > 0) {
+        console.log(`[同步] ✅ ${syncedItems.join('、')} 已同步`);
+      }
     } catch (error) {
-      console.warn('[同步] 订单同步失败:', error.message || error);
+      // 静默降级：网络失败时使用本地缓存
+      console.log('[同步] 跳过（使用本地数据）:', error && error.error || error);
     }
+  },
+  
+  // 兼容旧方法名
+  syncOrders() {
+    this.syncAllData();
   },
   
   // 监听同步完成（供页面注册回调）
@@ -333,41 +435,61 @@ App({
     this.syncCallback = callback;
   },
   
-  // 封装请求方法
+  // 封装请求方法（支持mock降级+硬超时保护）
   request(url, data = {}, method = 'GET') {
     const fullUrl = this.globalData.apiBaseUrl + url;
     console.log('[API请求]', method, fullUrl, data);
     
     return new Promise((resolve, reject) => {
+      let settled = false;
+      const finish = (action, value) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(hardTimeout);
+        action(value);
+      };
+      
+      // 硬超时兜底：3.5 秒后强制结束，防止 wx.request 不回调解锁 Promise
+      const hardTimeout = setTimeout(() => {
+        console.warn('[API硬超时] 强制结束', url);
+        const mockData = this.getMockResponse(url, data, method);
+        if (mockData) {
+          finish(resolve, mockData);
+        } else {
+          finish(resolve, { success: false, data: null, error: 'timeout' });
+        }
+      }, 3500);
+      
       wx.request({
         url: fullUrl,
         data: data,
         method: method,
-        timeout: 15000, // 15秒超时
+        timeout: 3000,
         header: {
           'content-type': 'application/json',
           'Authorization': this.globalData.token ? `Bearer ${this.globalData.token}` : ''
         },
         success: res => {
-          console.log('[API响应]', url, 'status:', res.statusCode, 'data:', JSON.stringify(res.data || {}).substring(0, 200));
+          console.log('[API响应]', url, 'status:', res.statusCode);
           if (res.statusCode === 200) {
-            resolve(res.data);
+            finish(resolve, res.data);
           } else if (res.statusCode === 401) {
-            // Token过期，重新登录
             console.warn('[API] Token过期，清除登录状态');
             wx.removeStorageSync('userInfo');
             wx.removeStorageSync('token');
-            reject({ success: false, error: '登录已过期，请重新打开小程序' });
+            finish(reject, { success: false, error: '登录已过期，请重新打开小程序' });
           } else {
-            reject(res.data || { success: false, error: '请求失败' });
+            finish(reject, res.data || { success: false, error: '请求失败' });
           }
         },
         fail: err => {
-          console.error('[API请求失败]', url, err);
-          if (err.errMsg && err.errMsg.includes('timeout')) {
-            reject({ success: false, error: '请求超时，请检查网络' });
+          console.warn('[API请求失败]', url, err.errMsg || err);
+          const mockData = this.getMockResponse(url, data, method);
+          if (mockData) {
+            console.log('[Mock降级] 使用模拟数据:', url);
+            finish(resolve, mockData);
           } else {
-            reject({ success: false, error: '网络请求失败' });
+            finish(reject, { success: false, error: err.errMsg || '网络请求失败' });
           }
         }
       });
@@ -623,81 +745,43 @@ App({
       return icons[provider] || '🛵';
     },
 
-    // 获取模拟服务商数据（与C端保持一致）
+    // 获取模拟服务商数据（与C端保持一致，含solo/shared双模式定价）
     getMockProviders() {
       return [
-        {
-          id: 'meituan',
-          name: '美团跑腿',
-          icon: '🛵',
-          estimatedTime: '30-45分钟',
-          fee: 12,
-          actualFee: 9,
-          rating: 4.9,
-          hasDiscount: true,
-          discountInfo: '新用户首单立减3元'
-        },
-        {
-          id: 'jd',
-          name: '京东秒送',
-          icon: '🚚',
-          estimatedTime: '35-50分钟',
-          fee: 15,
-          actualFee: 15,
-          rating: 4.8,
-          hasDiscount: false,
-          discountInfo: ''
-        },
-        {
-          id: 'shunfeng',
-          name: '顺丰跑腿',
-          icon: '✈️',
-          estimatedTime: '40-60分钟',
-          fee: 18,
-          actualFee: 13,
-          rating: 4.9,
-          hasDiscount: true,
-          discountInfo: '满50元减5元'
-        }
+        { id: 'meituan', name: '美团跑腿', icon: '🛵', rating: 4.9, estimatedTime: '30-45分钟', pricing: { solo: { originalFee: 15, discount: 3, actualFee: 12 }, shared: { originalFee: 9.75, discount: 6.75, actualFee: 8.25 } } },
+        { id: 'jd', name: '京东秒送', icon: '🚚', rating: 4.8, estimatedTime: '35-50分钟', pricing: { solo: { originalFee: 18, discount: 0, actualFee: 18 }, shared: { originalFee: 10.8, discount: 7.2, actualFee: 10.8 } } },
+        { id: 'sf', name: '顺丰跑腿', icon: '✈️', rating: 4.9, estimatedTime: '40-60分钟', pricing: { solo: { originalFee: 20, discount: 5, actualFee: 15 }, shared: { originalFee: 14, discount: 9, actualFee: 10 } } },
+        { id: 'taobao', name: '淘宝闪购', icon: '🛒', rating: 4.7, estimatedTime: '30-50分钟', pricing: { solo: { originalFee: 16, discount: 3, actualFee: 13 }, shared: { originalFee: 9.92, discount: 9.08, actualFee: 9.92 } } }
       ];
     },
 
-    // 查询配送服务商
+    // 查询配送服务商（使用后端 /api/delivery/quotes 获取实时报价）
     async queryProviders(params) {
       try {
-        const baseUrl = this.globalData.deliveryApi.baseUrl;
-        const res = await wx.request({
-          url: `${baseUrl}/delivery/query`,
-          method: 'GET',
-          data: {
-            pickupAddress: params.pickupAddress,
-            dropoffAddress: params.dropoffAddress,
-            weight: params.weight || 1,
-            cityName: params.cityName || '北京'
-          }
+        const baseUrl = this.globalData.apiBaseUrl;
+        const res = await new Promise((resolve) => {
+          wx.request({
+            url: `${baseUrl}/delivery/quotes`,
+            method: 'POST',
+            data: {
+              distance: params.distance || 3,
+              serviceTotal: params.serviceTotal || 0,
+              isNewUser: params.isNewUser || false
+            },
+            header: {
+              'content-type': 'application/json',
+              'Authorization': this.globalData.token ? `Bearer ${this.globalData.token}` : ''
+            },
+            success: r => resolve(r),
+            fail: () => resolve({ data: null })
+          });
         });
 
-        if (res.data && res.data.success) {
-          const providers = res.data.quotes.map(quote => ({
-            id: quote.provider,
-            name: quote.providerName,
-            icon: this.getProviderIcon(quote.provider),
-            price: quote.price,
-            actualFee: quote.price,
-            estimatedTime: `${quote.estimateTime}分钟`,
-            rating: 4.8,
-            hasDiscount: false,
-            discountInfo: '',
-            distance: quote.distance
-          }));
-
+        if (res.data && res.data.success && res.data.data && res.data.data.length > 0) {
           return {
             success: true,
-            providers: providers,
-            recommended: res.data.recommended ? {
-              id: res.data.recommended.provider,
-              name: res.data.recommended.providerName
-            } : null
+            providers: res.data.data,
+            recommended: null
           };
         } else {
           return {

@@ -28,40 +28,6 @@
     </swiper>
   </view>
 
-  <!-- 快捷入口 -->
-  <view class="quick-entry">
-    <view class="entry-grid">
-      <view class="entry-item enhanced" bindtap="onQuickOrder">
-        <view class="entry-icon-wrapper bg-gradient-green">
-          <text class="entry-icon">📦</text>
-        </view>
-        <text class="entry-text">线上下单</text>
-        <view class="entry-subtext">快速便捷</view>
-      </view>
-      <view class="entry-item enhanced" bindtap="onQuickPickup">
-        <view class="entry-icon-wrapper bg-gradient-blue">
-          <text class="entry-icon">📱</text>
-        </view>
-        <text class="entry-text">扫码取件</text>
-        <view class="entry-subtext">一扫即取</view>
-      </view>
-      <view class="entry-item enhanced" bindtap="onMyOrders">
-        <view class="entry-icon-wrapper bg-gradient-purple">
-          <text class="entry-icon">📋</text>
-        </view>
-        <text class="entry-text">我的订单</text>
-        <view class="entry-subtext">随时查看</view>
-      </view>
-      <view class="entry-item enhanced" bindtap="onMembership">
-        <view class="entry-icon-wrapper bg-gradient-orange">
-          <text class="entry-icon">👑</text>
-        </view>
-        <text class="entry-text">会员中心</text>
-        <view class="entry-subtext">专属权益</view>
-      </view>
-    </view>
-  </view>
-
   <!-- 待取件通知 -->
   <view class="pending-notice" wx:if="{{pendingOrders.length > 0}}">
     <view class="notice-card">
@@ -85,12 +51,27 @@
     </view>
   </view>
 
+  <!-- 服务类目双行网格（7类目全部可见，无需滑动） -->
+  <view class="category-section">
+    <view class="category-grid-title">服务类目</view>
+    <view class="category-grid">
+      <view class="category-tab {{activeCategory === item.id ? 'active' : ''}}" 
+            wx:for="{{categories}}" wx:key="id" 
+            bindtap="onSwitchCategory" data-id="{{item.id}}"
+            style="{{activeCategory === item.id ? 'background:' + item.color + ';color:#fff;border-color:' + item.color + ';' : ''}}">
+        <text class="tab-icon">{{item.icon}}</text>
+        <text class="tab-name">{{item.name}}</text>
+      </view>
+    </view>
+  </view>
+
   <!-- 服务项目 -->
   <view class="services">
     <view class="section-header">
       <view class="section-title-wrapper">
-        <text class="section-icon">✨</text>
-        <text class="section-title">热门服务</text>
+        <text class="section-icon">{{currentCategory.icon || '✨'}}</text>
+        <text class="section-title">{{currentCategory.name || '热门服务'}}</text>
+        <text class="price-hint">· 门店定价</text>
       </view>
       <view class="section-more" bindtap="onViewAllServices">
         <text class="more-text">查看全部</text>
@@ -98,7 +79,7 @@
       </view>
     </view>
     <view class="service-grid">
-      <view class="service-item" wx:for="{{services}}" wx:key="id" bindtap="onSelectService" data-id="{{item.id}}">
+      <view class="service-item" wx:for="{{services}}" wx:key="id" bindtap="onSelectService" data-id="{{item.id}}" data-cat="{{activeCategory}}">
         <view class="service-card">
           <view class="service-icon-wrapper">
             <text class="service-icon">{{item.icon}}</text>
@@ -108,7 +89,8 @@
             <text class="service-desc">{{item.desc}}</text>
           </view>
           <view class="service-footer">
-            <text class="service-price">¥{{item.price}}</text>
+            <text class="store-price">门店定价</text>
+            <text class="deposit-info" wx:if="{{item.deposit}}">押¥{{item.deposit}}</text>
             <view class="service-btn">
               <text class="btn-text">预约</text>
             </view>
@@ -163,7 +145,7 @@
             <view class="store-stats">
               <text class="stat-item">{{item.serviceCount}}项服务</text>
               <text class="stat-divider">|</text>
-              <text class="stat-item min-price">¥{{item.minPrice}}起</text>
+              <text class="stat-item store-pricing-label">门店定价</text>
             </view>
           </view>
         </view>

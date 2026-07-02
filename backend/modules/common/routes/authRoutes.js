@@ -259,8 +259,10 @@ router.get('/wechat/callback', async (req, res) => {
 });
 
 /**
- * 微信小程序商家登录（店员/店长通过账号密码登录切换为商家模式）
+ * 门店员工登录（index.html / m-index.html 门店管理端）
  * POST /api/auth/staff-login
+ * Body: { account, password }
+ * 返回: { token, user, store, permissions, menus }
  */
 router.post('/staff-login', async (req, res) => {
   try {
@@ -284,14 +286,89 @@ router.post('/staff-login', async (req, res) => {
       await authService.bindWechatToStaff(openid, user);
     }
     
-    // 生成带角色信息的token
+    // 更新登录信息
+    user.lastLoginAt = new Date();
+    user.loginCount = (user.loginCount || 0) + 1;
+    await user.save();
+    
+    // 生成token
     const token = authService.generateToken(user._id);
+    
+    // 获取门店详情
+    let storeInfo = null;
+    if (user.storeId) {
+      try {
+        const mongoose = require('mongoose');
+        const Store = mongoose.models.Store;
+        if (Store) {
+          const store = await Store.findOne({ 
+            $or: [
+              { _id: mongoose.Types.ObjectId.isValid(user.storeId) ? user.storeId : null },
+              { storeNo: user.storeId }
+            ]
+          }).lean();
+          if (store) {
+            storeInfo = {
+              id: store._id.toString(),
+              storeNo: store.storeNo,
+              name: store.name,
+              address: store.address,
+              phone: store.phone,
+              city: store.city,
+              district: store.district,
+              status: store.status,
+              businessHours: store.businessHours,
+              services: store.services
+            };
+          }
+        }
+      } catch (e) {
+        console.warn('[staff-login] 获取门店信息失败:', e.message);
+      }
+    }
+    
+    // 构建角色权限信息
+    const isOwner = user.roles.includes('store_owner');
+    const isStaff = user.roles.includes('store_staff');
+    const isAdmin = user.roles.includes('admin');
+    
+    const permissions = {
+      canManageStore: isOwner || isAdmin,           // 门店设置
+      canManagePrices: isOwner || isAdmin,           // 价格管理
+      canManageStaff: isOwner || isAdmin,            // 员工管理
+      canViewSettlement: isOwner || isAdmin,         // 结算中心
+      canProcessOrders: true,                        // 处理订单（所有店员）
+      canViewOrders: true,                           // 查看订单
+      canManageCustomers: true,                      // 客户管理
+      canViewStatistics: isOwner || isAdmin,         // 统计分析
+      canProcessRefund: isOwner || isAdmin,          // 退款
+      canConfigServices: isOwner || isAdmin,         // 服务配置
+      canManageInventory: isOwner || isAdmin,        // 库存管理
+      canExportData: isOwner || isAdmin,             // 数据导出
+    };
+    
+    // 构建可访问菜单
+    const menus = [
+      { id: 'dashboard', name: '仪表盘', icon: 'fa-dashboard', allowed: true },
+      { id: 'orders', name: '订单管理', icon: 'fa-file-text', allowed: true },
+      { id: 'customers', name: '客户管理', icon: 'fa-users', allowed: true },
+      { id: 'members', name: '会员管理', icon: 'fa-id-card', allowed: true },
+      { id: 'items', name: '物品管理', icon: 'fa-cube', allowed: true },
+      { id: 'light-system', name: '智能灯条', icon: 'fa-lightbulb-o', allowed: isOwner || isAdmin || isStaff },
+      { id: 'statistics', name: '统计分析', icon: 'fa-bar-chart', allowed: isOwner || isAdmin },
+      { id: 'settlement', name: '结算中心', icon: 'fa-cny', allowed: isOwner || isAdmin },
+      { id: 'messages', name: '消息中心', icon: 'fa-bell', allowed: true },
+      { id: 'store-settings', name: '门店设置', icon: 'fa-cog', allowed: isOwner || isAdmin },
+    ];
     
     res.json({
       success: true,
       data: {
         token,
         user: authService.sanitizeUser(user),
+        store: storeInfo,
+        permissions,
+        menus,
         openid: user.openid
       }
     });
@@ -457,7 +534,25 @@ router.get('/profile', authMiddleware, async (req, res) => {
 router.put('/profile', authMiddleware, async (req, res) => {
   try {
     const user = await authService.updateUser(req.user.id, req.body);
-    res.json({ success: true, data: user });
+    
+    // 如果发生了账户合并，返回新token
+    const responseData = {
+      success: true,
+      data: {
+        user: { ...user },  // 去掉 __merged 标记
+        __merged: user.__merged || false
+      }
+    };
+    
+    if (user.__merged && user._id) {
+      // 合并后的用户需要新 token
+      responseData.data.token = authService.generateToken(user._id);
+      responseData.data.__mergedFrom = user.__mergedFrom;
+      delete responseData.data.user.__merged;
+      delete responseData.data.user.__mergedFrom;
+    }
+    
+    res.json(responseData);
   } catch (error) {
     res.status(400).json({ success: false, error: error.message });
   }

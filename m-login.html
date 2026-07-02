@@ -369,42 +369,118 @@
             loginBtn.innerHTML = '<i class="fa fa-spinner fa-spin mr-2"></i>登录中...';
             
             try {
-                let loginData = {};
+                let account, password;
                 
                 if (loginType === 'phone') {
-                    loginData = {
-                        phone: document.getElementById('phone').value,
-                        password: document.getElementById('password').value
-                    };
+                    account = document.getElementById('phone').value.trim();
+                    password = document.getElementById('password').value;
                 } else {
-                    loginData = {
-                        storeId: document.getElementById('storeId').value,
-                        storePassword: document.getElementById('storePassword').value
-                    };
+                    account = document.getElementById('storeId').value.trim();
+                    password = document.getElementById('storePassword').value;
                 }
                 
-                console.log('开始登录，类型:', loginType, '数据:', loginData);
+                if (!account || !password) {
+                    throw new Error('请输入账号和密码');
+                }
                 
-                // TODO: 调用实际的登录API
-                // 模拟登录成功
-                setTimeout(() => {
-                    const accountData = {
-                        type: loginType,
-                        value: loginType === 'phone' ? loginData.phone : loginData.storeId,
-                        name: '门店用户',
+                // 调用后端真实认证API
+                const port = window.location.port || 3000;
+                const baseUrl = `http://localhost:${port}/api`;
+                
+                const resp = await fetch(`${baseUrl}/auth/staff-login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ account, password })
+                });
+                
+                const result = await resp.json();
+                
+                if (!result.success) {
+                    throw new Error(result.error || '登录失败');
+                }
+                
+                const { token, user, store, permissions, menus } = result.data;
+                
+                // 保存认证Token
+                localStorage.setItem('auth_token', token);
+                
+                // 保存用户信息（兼容index.html格式）
+                const storeUser = {
+                    userId: user._id,
+                    userNo: user.userNo,
+                    phone: user.phone,
+                    name: user.name,
+                    roles: user.roles,
+                    storeId: user.storeId,
+                    storeName: store ? store.name : (user.storeId || '未知门店'),
+                    permissions,
+                    loginTime: new Date().toISOString()
+                };
+                localStorage.setItem('storeUser', JSON.stringify(storeUser));
+                
+                // 保存currentStore
+                if (store) {
+                    localStorage.setItem('currentStore', JSON.stringify({
+                        storeId: store.id,
+                        storeNo: store.storeNo,
+                        storeName: store.name,
+                        name: store.name,
+                        address: store.address,
+                        phone: store.phone,
+                        city: store.city,
+                        district: store.district,
+                        status: store.status,
                         loginTime: new Date().toISOString()
-                    };
-                    
-                    localStorage.setItem('storeAccount', JSON.stringify(accountData));
-                    localStorage.setItem('storeToken', 'mock-token-' + Date.now());
-                    
-                    alert('登录成功！即将跳转到管理系统...');
-                    window.location.href = 'm-index.html';
-                }, 1000);
+                    }));
+                }
+                
+                // 保存菜单权限
+                if (menus) {
+                    localStorage.setItem('storeMenus', JSON.stringify(menus));
+                }
+                
+                // 保存登录账号信息
+                localStorage.setItem('storeAccount', JSON.stringify({
+                    type: loginType,
+                    value: account,
+                    name: user.name || account,
+                    roles: user.roles,
+                    loginTime: new Date().toISOString()
+                }));
+                
+                localStorage.removeItem('guestModeHandled');
+                
+                console.log('[移动端登录成功]', user.name, user.roles, store ? store.name : '');
+                
+                // 跳转到管理系统
+                window.location.href = 'm-index.html';
                 
             } catch (error) {
                 console.error('登录失败:', error);
-                alert('登录失败: ' + error.message);
+                
+                // 降级：后端不可用时使用本地模式
+                if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
+                    const account = loginType === 'phone' ? 
+                        document.getElementById('phone').value.trim() : 
+                        document.getElementById('storeId').value.trim();
+                    
+                    localStorage.setItem('storeUser', JSON.stringify({
+                        userId: 'local', phone: account, name: '本地用户',
+                        roles: ['store_owner'], storeId: 'ST002', storeName: '本地测试门店',
+                        permissions: {}, loginTime: new Date().toISOString()
+                    }));
+                    localStorage.setItem('currentStore', JSON.stringify({
+                        storeId: 'ST002', storeName: '本地测试门店', name: '本地测试门店',
+                        address: '本地测试地址', phone: '010-00000000', loginTime: new Date().toISOString()
+                    }));
+                    localStorage.removeItem('guestModeHandled');
+                    
+                    alert('后端服务不可用，已切换到本地测试模式。');
+                    window.location.href = 'm-index.html';
+                    return;
+                }
+                
+                alert('登录失败: ' + (error.message || '未知错误'));
             } finally {
                 loginBtn.disabled = false;
                 loginBtn.innerHTML = originalText;

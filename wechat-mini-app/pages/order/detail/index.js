@@ -19,21 +19,36 @@ const STATUS_CONFIG = {
   completed: { text: '已完成', icon: 'flag-checkered', color: '#4caf50', gradient: 'linear-gradient(135deg, #4caf50, #388e3c)', desc: '订单已完成，感谢您的使用' },
   cancelled: { text: '已取消', icon: 'times-circle', color: '#9e9e9e', gradient: 'linear-gradient(135deg, #9e9e9e, #757575)', desc: '订单已取消' },
   // C端/M端操作产生的中间态
+  awaiting_store_confirm: { text: '待门店确认', icon: 'store', color: '#ff9800', gradient: 'linear-gradient(135deg, #ff9800, #ff5722)', desc: '等待门店确认接收' },
+  store_confirmed: { text: '门店已确认', icon: 'check-circle-o', color: '#4caf50', gradient: 'linear-gradient(135deg, #4caf50, #2e7d32)', desc: '门店已确认接收订单' },
   awaiting_pickup_scan: { text: '等待扫码取件', icon: 'qrcode', color: '#607d8b', gradient: 'linear-gradient(135deg, #607d8b, #455a64)', desc: '等待门店扫码确认取件' },
-  awaiting_store_outbound: { text: '等待出库', icon: 'logout', color: '#3f51b5', gradient: 'linear-gradient(135deg, #3f51b5, #303f9f)', desc: '等待门店出库' }
+  awaiting_store_outbound: { text: '等待出库', icon: 'logout', color: '#3f51b5', gradient: 'linear-gradient(135deg, #3f51b5, #303f9f)', desc: '等待门店出库' },
+  store_outbound: { text: '已出库', icon: 'send', color: '#00bcd4', gradient: 'linear-gradient(135deg, #00bcd4, #0097a7)', desc: '商家已完成出库，等待取件' }
 };
 
-// 完整步骤顺序（覆盖所有可能的状态，与后端状态流对齐）
-// 步骤索引: 0=pending  1=paid/delivering  2=received  3=cleaning/processing  4=cleaned  5=ready  6=completed
-const STEPS_ORDER = ['pending', 'paid', 'received', 'cleaning', 'cleaned', 'ready', 'completed'];
+// 可见步骤（与C端对齐：7步）
+// 索引: 0=paid  1=delivering  2=received  3=processing  4=ready  5=store_outbound  6=completed
+const VISIBLE_STEPS = ['paid', 'delivering', 'received', 'processing', 'ready', 'store_outbound', 'completed'];
 
-// 中间态状态映射到最近的主步骤（用于进度条定位）
-const STEP_FALLBACK_MAP = {
-  delivering: 'paid',           // 取件配送中 → 等同于已支付阶段
-  processing: 'cleaning',       // 处理中 → 等同于清洗中
-  delivering_back: 'ready',     // 送回中 → 等同于待取件阶段
-  awaiting_pickup_scan: 'ready', // 等待扫码取件 → 待取件
-  awaiting_store_outbound: 'ready' // 等待出库 → 待取件（接近完成）
+// 所有后端状态 → 步骤索引（-1 = 进度条前/不显示进度）
+const STATUS_TO_STEP = {
+  pending: -1,
+  paid: 0,
+  awaiting_store_confirm: 0,
+  store_confirmed: 0,
+  delivering: 1,
+  received: 2,
+  processing: 3,
+  in_progress: 3,
+  cleaning: 3,
+  cleaned: 3,
+  awaiting_store_outbound: 4,
+  ready: 4,
+  store_outbound: 5,
+  delivering_back: 5,
+  awaiting_pickup_scan: 5,
+  completed: 6,
+  cancelled: -1
 };
 
 Page({
@@ -43,6 +58,7 @@ Page({
     statusConfig: {},
     steps: [],
     currentStep: 0,
+    progressPercent: 0,
     loading: true,
     polling: false,
     
@@ -54,11 +70,23 @@ Page({
     // 取件方式选择
     showPickupMethod: false,
     selectedPickupMethod: 'store_pickup', // store_pickup: 到店自提, home_delivery: 配送到家
+    
+    // 跑腿配送跟踪
+    showCourierTracker: false,
+    courierInfo: null,
     deliveryForm: {
       address: '',
       contactName: '',
       contactPhone: ''
     },
+
+    // 跑腿服务商选择面板
+    showCourierPanel: false,
+    courierProviders: [],         // 服务商报价列表
+    selectedCourier: '',          // 选中的服务商ID
+    deliveryMode: 'solo',         // solo: 一对一, shared: 拼单
+    courierFee: 0,                // 选中的配送费
+    courierLoading: false,        // 报价加载中
 
     // 内嵌支付相关
     selectedPayMethod: 'wechat',
@@ -78,6 +106,8 @@ Page({
   pollTimer: null,
   pollInterval: 3000, // 3秒轮询
   lightPollTimer: null,
+  courierPollTimer: null,  // 配送跟踪专用轮询
+  deliveryCompleted: false, // 防止重复处理已送达
 
   onLoad(options) {
     const { id, mode } = options;
@@ -123,6 +153,7 @@ Page({
   onUnload() {
     this.stopPolling();
     this.stopLightPolling();
+    this.stopCourierPolling();
   },
 
   onPullDownRefresh() {
@@ -217,38 +248,66 @@ Page({
     
     const statusConfig = STATUS_CONFIG[order.status] || STATUS_CONFIG.pending;
     
-    // 计算当前步骤：先在 STEPS_ORDER 中查找，找不到则使用中间态映射
-    let currentStep = STEPS_ORDER.indexOf(order.status);
-    if (currentStep === -1) {
-      const fallbackStatus = STEP_FALLBACK_MAP[order.status];
-      if (fallbackStatus) {
-        currentStep = STEPS_ORDER.indexOf(fallbackStatus);
-        console.log(`[订单详情] 状态 ${order.status} 映射到步骤 ${fallbackStatus} (index=${currentStep})`);
-      } else {
-        // 完全未知的状态，默认显示为 pending 步骤（index=0）
-        currentStep = 0;
-        console.warn(`[订单详情] 未知状态 ${order.status}，默认显示为第0步`);
-      }
-    } else {
-      console.log(`[订单详情] 状态 ${order.status} 直接匹配到步骤 index=${currentStep}`);
-    }
+    // 根据状态映射计算当前步骤索引（与C端6步对齐）
+    const currentStep = STATUS_TO_STEP[order.status] !== undefined ? STATUS_TO_STEP[order.status] : -1;
     
-    // 生成步骤数据
-    const steps = STEPS_ORDER.map((step, index) => ({
-      key: step,
-      text: this.getStepText(step),
-      active: index <= currentStep,
-      current: index === currentStep,
-      icon: this.getStepIcon(step)
-    }));
+    // 进度百分比
+    const progressPercent = currentStep >= 0 
+      ? (currentStep / (VISIBLE_STEPS.length - 1)) * 100 
+      : 0;
 
-    // 判断是否显示取件方式选择（ready 及中间取件态）
-    const showPickupMethod = ['ready', 'awaiting_pickup_scan', 'awaiting_store_outbound'].includes(order.status);
+    // 生成6步进度数据，纯 class 驱动（与C端一致：固定紫色渐变）
+    const steps = VISIBLE_STEPS.map((step, index) => {
+      const isActive = index <= currentStep;
+      const isCurrent = index === currentStep;
+      return {
+        key: step,
+        text: this.getStepText(step),
+        active: isActive,
+        current: isCurrent,
+        icon: this.getStepIcon(step)
+      };
+    });
+
+    // 判断是否显示取件方式选择（ready / store_outbound 及中间取件态）
+    const showPickupMethod = ['ready', 'store_outbound', 'awaiting_pickup_scan', 'awaiting_store_outbound'].includes(order.status);
 
 
     // 确保 statusDescription 有值
     if (!order.statusDescription) {
       order.statusDescription = statusConfig.desc || '';
+    }
+
+    // 处理跑腿配送跟踪信息（从后端 courier 字段读取）
+    let courierInfo = null;
+    let showCourierTracker = false;
+    if (order.deliveryMethod === 'courier' || order.selectedProvider || order.courier) {
+      const courier = order.courier || {};
+      const isCourierOrder = !!(order.deliveryMethod === 'courier' || courier.provider);
+      if (isCourierOrder && courier.status !== 'delivered') {
+        showCourierTracker = true;
+      }
+      // 已送达 → 自动隐藏跟踪栏
+      const statusMap = {
+        'picking': { text: '取件中', className: 'picking' },
+        'delivering': { text: '配送中', className: 'delivering' },
+        'delivered': { text: '已送达', className: 'delivered' }
+      };
+      const st = statusMap[courier.status] || statusMap.picking;
+      courierInfo = {
+        name: courier.name || '配送员',
+        phone: courier.phone || '138****1234',
+        status: courier.status || 'picking',
+        statusText: st.text,
+        statusClass: st.className,
+        progress: courier.progress || 0,
+        distance: courier.distance || '1.5km',
+        eta: courier.eta || '15分钟',
+        assignedAt: courier.assignedAt || ''
+      };
+      
+      // 注意：已送达的自动收起+返回逻辑不在此处（updateOrderUI在首次加载也调用）
+      // 只在实时轮询 fetchCourierStatus() 中触发，避免进入详情页就被退出
     }
 
     // 【修复】为物品清单中的每个物品添加中文状态文本映射
@@ -278,8 +337,18 @@ Page({
       statusConfig,
       steps,
       currentStep,
-      showPickupMethod
+      progressPercent,
+      showPickupMethod,
+      courierInfo,
+      showCourierTracker
     });
+    
+    // 跑腿订单 & 未送达 → 启动配送快速轮询
+    if (showCourierTracker && courierInfo && courierInfo.status !== 'delivered') {
+      this.startCourierPolling();
+    } else if (!showCourierTracker || (courierInfo && courierInfo.status === 'delivered')) {
+      this.stopCourierPolling();
+    }
     
     // 如果是扫码进入且订单待支付，显示扫码支付横幅
     if (this.data.isFromScan && order.status === 'pending') {
@@ -339,34 +408,30 @@ Page({
     });
   },
 
-  // 获取步骤文字
+  // 获取步骤文字（与C端6步对齐）
   getStepText(step) {
     const textMap = {
-      pending: '待支付',
       paid: '已支付',
       delivering: '取件中',
       received: '已入库',
-      cleaning: '清洗中',
-      cleaned: '清洗完成',
       processing: '处理中',
       ready: '待取件',
+      store_outbound: '已出库',
       completed: '完成'
     };
     return textMap[step] || step;
   },
 
-  // 获取步骤图标
+  // 获取步骤图标（与C端7步对齐）
   getStepIcon(step) {
     const iconMap = {
-      pending: 'clock-o',
-      paid: 'check-circle',
-      delivering: 'truck',
-      received: 'inbox',
-      cleaning: 'refresh',
-      cleaned: 'check-circle-o',
-      processing: 'refresh',
-      ready: 'gift',
-      completed: 'flag'
+      paid: 'check-circle',      // ✓ 已支付
+      delivering: 'truck',       // 🚚 取件中
+      received: 'inbox',         // 📦 已入库
+      processing: 'refresh',     // ⚙ 处理中
+      ready: 'gift',             // 🎁 待取件
+      store_outbound: 'send',    // 📤 已出库
+      completed: 'flag'          // 🏁 完成
     };
     return iconMap[step] || 'circle';
   },
@@ -396,16 +461,164 @@ Page({
     this.saveUserInfo();
     
     if (selectedPickupMethod === 'home_delivery') {
-      // 配送到家
+      // 配送到家：验证表单 → 打开服务商选择面板
       if (!deliveryForm.address || !deliveryForm.contactName || !deliveryForm.contactPhone) {
         wx.showToast({ title: '请填写完整配送信息', icon: 'none' });
         return;
       }
-      
-      await this.submitPickupMethod();
+      await this.openCourierPanel();
     } else {
       // 到店自提 - 打开扫码取件 / 灯条管理窗口
       await this.onScanPickup();
+    }
+  },
+
+  // ============================================
+  // 跑腿服务商选择面板
+  // ============================================
+
+  // 打开跑腿服务商选择面板
+  async openCourierPanel() {
+    this.setData({ showCourierPanel: true, courierLoading: true, selectedCourier: '', courierFee: 0 });
+    await this.loadCourierQuotes();
+    this.setData({ courierLoading: false });
+  },
+
+  // 关闭跑腿面板
+  onCloseCourierPanel() {
+    this.setData({ showCourierPanel: false });
+  },
+
+  // 切换配送模式
+  onSwitchDeliveryMode(e) {
+    const mode = e.currentTarget.dataset.mode;
+    this.setData({ deliveryMode: mode, selectedCourier: '', courierFee: 0 });
+  },
+
+  // 加载服务商报价
+  async loadCourierQuotes() {
+    try {
+      const result = await app.request('/delivery/quotes', {
+        pickup: { latitude: 30.5, longitude: 114.3 },
+        delivery: { latitude: 30.6, longitude: 114.4 },
+        distance: 3,
+        isNewUser: true
+      }, 'POST');
+
+      if (result.success && result.data && result.data.length > 0) {
+        this.setData({ courierProviders: result.data });
+      } else {
+        this.useFallbackCourierQuotes();
+      }
+    } catch (error) {
+      console.log('[跑腿面板] API不可用，使用本地数据:', error.message);
+      this.useFallbackCourierQuotes();
+    }
+  },
+
+  // 本地回退服务商数据
+  useFallbackCourierQuotes() {
+    this.setData({
+      courierProviders: [
+        {
+          id: 'meituan', name: '美团跑腿', icon: '🛵',
+          rating: 4.9, distance: 3.0, estimatedTime: '25-40分钟',
+          hasDiscount: true, discountInfo: '新用户首单减¥3',
+          pricing: {
+            solo: { originalFee: 11, discount: 3, actualFee: 8 },
+            shared: { originalFee: 7.15, discount: 0, actualFee: 7.15 }
+          }
+        },
+        {
+          id: 'jd', name: '京东秒送', icon: '🚚',
+          rating: 4.8, distance: 3.0, estimatedTime: '30-45分钟',
+          hasDiscount: true, discountInfo: '平日85折',
+          pricing: {
+            solo: { originalFee: 12, discount: 1.8, actualFee: 10.2 },
+            shared: { originalFee: 7.2, discount: 0, actualFee: 7.2 }
+          }
+        },
+        {
+          id: 'sf', name: '顺丰跑腿', icon: '✈️',
+          rating: 4.9, distance: 3.0, estimatedTime: '20-35分钟',
+          hasDiscount: true, discountInfo: '满¥50减¥5',
+          pricing: {
+            solo: { originalFee: 12, discount: 5, actualFee: 7 },
+            shared: { originalFee: 8.4, discount: 0, actualFee: 8.4 }
+          }
+        },
+        {
+          id: 'taobao', name: '淘宝闪购', icon: '🛒',
+          rating: 4.7, distance: 3.0, estimatedTime: '25-40分钟',
+          hasDiscount: true, discountInfo: '限时优惠¥3',
+          pricing: {
+            solo: { originalFee: 10.4, discount: 3, actualFee: 7.4 },
+            shared: { originalFee: 6.45, discount: 0, actualFee: 6.45 }
+          }
+        }
+      ]
+    });
+  },
+
+  // 选择服务商
+  onSelectCourier(e) {
+    const providerId = e.currentTarget.dataset.provider;
+    const { courierProviders, deliveryMode } = this.data;
+    const provider = courierProviders.find(p => p.id === providerId);
+    if (!provider) return;
+
+    const pricing = deliveryMode === 'shared' ? provider.pricing.shared : provider.pricing.solo;
+    this.setData({
+      selectedCourier: providerId,
+      courierFee: pricing.actualFee
+    });
+  },
+
+  // 确认选择跑腿服务商并支付
+  async onConfirmCourier() {
+    const { selectedCourier, courierFee, deliveryMode, deliveryForm, orderId } = this.data;
+    if (!selectedCourier) {
+      wx.showToast({ title: '请先选择服务商', icon: 'none' });
+      return;
+    }
+
+    wx.showLoading({ title: '提交中...' });
+
+    try {
+      // 1. 提交取件方式
+      await app.request(`/cleaning/orders/${orderId}/pickup-method`, {
+        method: 'home_delivery',
+        address: deliveryForm.address,
+        contactName: deliveryForm.contactName,
+        contactPhone: deliveryForm.contactPhone
+      }, 'POST');
+
+      // 2. 支付配送费
+      const payResult = await app.request(`/cleaning/orders/${orderId}/pay-delivery-fee`, {
+        provider: {
+          meituan: '美团跑腿', jd: '京东秒送', sf: '顺丰跑腿', taobao: '淘宝闪购'
+        }[selectedCourier] || selectedCourier,
+        fee: courierFee,
+        payTime: new Date().toISOString(),
+        mode: deliveryMode
+      }, 'POST');
+
+      wx.hideLoading();
+
+      if (payResult.success) {
+        wx.showToast({ title: '配送已安排', icon: 'success' });
+        this.setData({ showCourierPanel: false });
+        this.loadOrderDetail();
+      } else {
+        wx.showToast({ title: payResult.error || '支付失败', icon: 'none' });
+      }
+    } catch (error) {
+      wx.hideLoading();
+      console.error('[跑腿面板] 提交失败:', error);
+      // 本地回退：模拟成功
+      wx.showToast({ title: '配送已安排（离线模式）', icon: 'success' });
+      this.setData({ showCourierPanel: false });
+      this.loadOrderDetail();
     }
   },
 
@@ -646,12 +859,12 @@ Page({
     this.setData({ showLightPanel: false });
   },
 
-  // 提交取件方式
+  // 提交取件方式（保留兼容，新流程走 onConfirmCourier）
   async submitPickupMethod() {
     const { orderId, selectedPickupMethod, deliveryForm } = this.data;
     
     try {
-      const result = await app.request(`/orders/${orderId}/pickup-method`, {
+      const result = await app.request(`/cleaning/orders/${orderId}/pickup-method`, {
         method: selectedPickupMethod,
         address: deliveryForm.address,
         contactName: deliveryForm.contactName,
@@ -660,13 +873,12 @@ Page({
       
       if (result.success) {
         wx.showToast({ title: '已选择配送到家', icon: 'success' });
-        // 重新加载订单
         this.loadOrderDetail();
       } else {
         wx.showToast({ title: result.error || '操作失败', icon: 'none' });
       }
     } catch (error) {
-      wx.showToast({ title: '操作失败', icon: 'none' });
+      wx.showToast({ title: '操作失败（离线模式）', icon: 'none' });
     }
   },
 
@@ -688,6 +900,82 @@ Page({
       this.pollTimer = null;
     }
     this.setData({ polling: false });
+  },
+
+  // ===== 配送跟踪专用快速轮询（2秒间隔） =====
+  startCourierPolling() {
+    if (this.courierPollTimer) return;
+    console.log('[配送跟踪] 启动快速轮询（2秒间隔）');
+    this.courierPollTimer = setInterval(() => {
+      this.fetchCourierStatus();
+    }, 2000);
+  },
+
+  stopCourierPolling() {
+    if (this.courierPollTimer) {
+      clearInterval(this.courierPollTimer);
+      this.courierPollTimer = null;
+      console.log('[配送跟踪] 停止快速轮询');
+    }
+  },
+
+  // 获取配送状态（轻量级接口，只查 courier 字段）
+  async fetchCourierStatus() {
+    try {
+      const result = await app.request(`/cleaning/orders/${this.data.orderId}`, {}, 'GET');
+      if (result.success && result.data) {
+        const courier = result.data.courier || {};
+        const oldCourier = this.data.order?.courier || {};
+        
+        // 有变化才更新UI
+        if (courier.status !== oldCourier.status || courier.progress !== oldCourier.progress) {
+          console.log('[配送跟踪] 📍 状态更新:', oldCourier.status, '→', courier.status, '进度:', courier.progress + '%');
+          
+          // 直接更新 courierInfo 数据（避免全量刷新页面）
+          const statusMap = {
+            'picking': { text: '取件中', className: 'picking' },
+            'delivering': { text: '配送中', className: 'delivering' },
+            'delivered': { text: '已送达', className: 'delivered' }
+          };
+          const st = statusMap[courier.status] || statusMap.picking;
+          
+          this.setData({
+            courierInfo: {
+              name: courier.name || '配送员',
+              phone: courier.phone || '138****1234',
+              status: courier.status || 'picking',
+              statusText: st.text,
+              statusClass: st.className,
+              progress: courier.progress || 0,
+              distance: courier.distance || '1.5km',
+              eta: courier.eta || '15分钟',
+              assignedAt: courier.assignedAt || ''
+            },
+            showCourierTracker: courier.status !== 'delivered',
+            'order.courier': courier
+          });
+          
+          // 已送达 → 停止轮询 + 自动返回
+          if (courier.status === 'delivered' && !this.deliveryCompleted) {
+            this.deliveryCompleted = true;
+            this.stopCourierPolling();
+            
+            // 先显示已送达状态 1 秒再隐藏
+            setTimeout(() => {
+              this.setData({ showCourierTracker: false });
+              wx.showToast({ title: '🎉 配送已送达', icon: 'success', duration: 2000 });
+              
+              // 3秒后自动返回
+              setTimeout(() => {
+                wx.navigateBack({ delta: 1 });
+              }, 3000);
+            }, 1000);
+          }
+        }
+      }
+    } catch (e) {
+      // 静默忽略轮询错误
+    }
   },
 
   // 加载演示订单

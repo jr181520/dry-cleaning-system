@@ -19,14 +19,41 @@ Page({
   },
 
   loadUserInfo() {
-    // 获取用户信息
-    const userInfo = wx.getStorageSync('userInfo') || {};
-    this.setData({
-      userInfo: userInfo
-    });
+    // 先从本地缓存快速渲染
+    const cachedInfo = wx.getStorageSync('userInfo') || {};
+    this.setData({ userInfo: cachedInfo });
 
+    // 从后端同步最新数据（确保与C端一致）
+    this.syncUserProfile();
     // 获取会员信息
     this.loadMemberInfo();
+  },
+
+  // 同步用户资料（后端为权威数据源，确保与C端一致）
+  async syncUserProfile() {
+    try {
+      const res = await app.request('/auth/profile');
+      if (res && res.success && res.data) {
+        const serverUser = res.data;
+        // 用后端数据更新本地
+        const merged = {
+          ...wx.getStorageSync('userInfo') || {},
+          avatar: serverUser.avatar || '',
+          nickname: serverUser.name || serverUser.nickname || '',
+          phone: serverUser.phone || '',
+          gender: serverUser.gender !== undefined ? serverUser.gender : 0,
+          birthday: serverUser.birthday || ''
+        };
+        wx.setStorageSync('userInfo', merged);
+        if (app.globalData) {
+          app.globalData.userInfo = merged;
+        }
+        this.setData({ userInfo: merged });
+        console.log('[我的页面] 已从后端同步用户资料');
+      }
+    } catch (err) {
+      console.log('[我的页面] 后端同步跳过（使用本地数据）', err && err.error || err);
+    }
   },
 
   async loadMemberInfo() {
@@ -50,6 +77,13 @@ Page({
         }
       });
     }
+  },
+
+  // 编辑个人资料
+  onEditProfile() {
+    wx.navigateTo({
+      url: '/pages/profile/edit/index'
+    });
   },
 
   // 我的积分

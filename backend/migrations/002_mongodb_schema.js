@@ -11,11 +11,42 @@ const mongoose = require('mongoose');
 // 枚举常量
 // ============================================
 
-const ITEM_TYPES = ['dry_cleaning', 'recycle', 'rental'];
+// 物品类型（多品类）
+const ITEM_TYPES = [
+  'dry_cleaning', 'recycle', 'rental',
+  'pet_grooming',           // 宠物清洗
+  'electronics_repair',     // 电子产品维修
+  'luxury_care',            // 奢侈品护理
+  'shoe_care',              // 鞋类洗护
+  'rental_leisure'          // 小件耐用商品租赁
+];
+
 const OWNER_TYPES = ['user', 'store', 'brand', 'recycle_shop'];
-const ORDER_TYPES = ['cleaning', 'recycle', 'rental', 'deposit'];
-const USER_ROLES = ['customer', 'store_staff', 'store_owner', 'recycler', 'appraiser', 'brand_admin', 'admin'];
-const ORDER_STATUSES = ['pending', 'paid', 'delivering', 'delivering_back', 'received', 'processing', 'ready', 'in_progress', 'completed', 'cancelled', 'refunded', 'awaiting_pickup_scan', 'awaiting_store_outbound'];
+
+// 订单类型（多品类）-  双向跑腿配送通用适配
+const ORDER_TYPES = [
+  'cleaning',               // 干洗服务
+  'recycle',                // 旧物回收
+  'rental',                 // 服饰租赁  
+  'deposit',                // 押金
+  'pet_grooming',           // 宠物清洗
+  'electronics_repair',     // 电子产品维修
+  'luxury_care',            // 奢侈品护理
+  'shoe_care',              // 鞋类洗护
+  'rental_leisure'          // 小件耐用商品租赁
+];
+
+const USER_ROLES = ['customer', 'store_staff', 'store_owner', 'recycler', 'appraiser', 'brand_admin', 'chain_admin', 'admin'];
+
+const ORDER_STATUSES = [
+  'pending', 'paid',
+  'delivering', 'delivering_back',
+  'received', 'processing', 'ready', 'in_progress',
+  'completed', 'cancelled', 'refunded',
+  'awaiting_pickup_scan', 'awaiting_store_outbound', 'store_outbound',
+  // 租赁专用状态
+  'reserved', 'shipped', 'using', 'due', 'overdue', 'returned'
+];
 const PAYMENT_METHODS = ['wechat', 'alipay', 'unionpay', 'balance'];
 
 // ============================================

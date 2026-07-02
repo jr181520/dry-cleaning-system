@@ -24,8 +24,10 @@ const rentalRouter = require('./modules/rental/routes');
 const authRouter = require('./modules/common/routes/authRoutes');
 const storeRouter = require('./modules/cleaning/routes/storeRoutes');
 const paymentRouter = require('./modules/common/routes/paymentRoutes');
+const categoryRouter = require('./modules/common/routes/categoryRoutes');
 const deliveryRouter = require('./modules/common/routes/deliveryRoutes');
 const adminRouter = require('./modules/admin/routes/adminRoutes');
+const priceRouter = require('./modules/admin/routes/priceRoutes');
 const miniQRRouter = require('./modules/common/routes/miniQRRoutes');
 const { getEnabledModules, getModuleConfig } = require('./modules/common/middlewares/moduleGuard');
 
@@ -39,6 +41,12 @@ app.use(bodyParser.urlencoded({ extended: true }));
 
 // 静态文件服务
 app.use(express.static(path.join(__dirname, '..')));
+
+// Favicon（避免 404）
+app.get('/favicon.ico', (req, res) => {
+  res.type('image/svg+xml');
+  res.send('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="20" fill="#3b82f6"/><text x="50" y="72" font-size="65" text-anchor="middle">👕</text></svg>');
+});
 
 // ============================================
 // 系统接口（无需模块守卫）
@@ -97,8 +105,11 @@ app.use('/api/cleaning', cleaningRouter);
 // 回收模块（V2）
 app.use('/api/recycle', recycleRouter);
 
-// 租赁模块（V3）
+// 租赁模块
 app.use('/api/rental', rentalRouter);
+
+// 多品类公共API
+app.use('/api/categories', categoryRouter);
 
 // 支付模块
 app.use('/api/payments', paymentRouter);
@@ -109,8 +120,19 @@ app.use('/api/mini-qr', miniQRRouter);
 // 配送模块
 app.use('/api/delivery', deliveryRouter);
 
+// 会员信息模块
+const memberRouter = require('./modules/member/routes/memberRoutes');
+app.use('/api/member', memberRouter);
+
 // 管理员后台
 app.use('/api/admin', adminRouter);
+
+// 连锁后台（连锁管理员专用）
+const chainAdminRouter = require('./modules/admin/routes/chainAdminRoutes');
+app.use('/api/chain-admin', chainAdminRouter);
+
+// 门店价格管理（门店/管理员可访问）
+app.use('/api/store/prices', priceRouter);
 
 // 门店端公共API（无需认证）
 const publicRouter = require('./modules/store/routes/publicRoutes');
@@ -123,6 +145,251 @@ app.use('/api/store/order-light', orderLightRouter);
 // C端取件API
 const pickupRouter = require('./modules/store/routes/pickupRoutes');
 app.use('/api/store/pickup', pickupRouter);
+
+// 统一数据同步API（跨平台数据一致性）
+const syncRouter = require('./modules/common/routes/syncRoutes');
+app.use('/api/sync', syncRouter);
+
+// ============================================
+// 通知中心API（Admin端轮询获取实时通知）
+// ============================================
+const notificationHubService = require('./services/notificationHubService');
+const crossSyncService = require('./services/crossSyncService');
+const messageService = require('./services/messageService');
+
+// 获取门店通知列表
+app.get('/api/admin/notifications/:storeId', (req, res) => {
+  try {
+    const { storeId } = req.params;
+    const { limit, since } = req.query;
+    const result = notificationHubService.getNotifications(
+      storeId,
+      limit ? parseInt(limit) : 20,
+      since ? parseInt(since) : 0
+    );
+    res.json({ success: true, data: result });
+  } catch (error) {
+    console.error('[通知中心] 查询失败:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// 获取所有门店通知（汇总）
+app.get('/api/admin/notifications', (req, res) => {
+  try {
+    const { limit, since } = req.query;
+    const result = notificationHubService.getNotifications(
+      'ALL',
+      limit ? parseInt(limit) : 30,
+      since ? parseInt(since) : 0
+    );
+    res.json({ success: true, data: result });
+  } catch (error) {
+    console.error('[通知中心] 查询所有通知失败:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// 标记通知为已读
+app.post('/api/admin/notifications/:storeId/mark-read', (req, res) => {
+  try {
+    const { storeId } = req.params;
+    const { notificationIds } = req.body;
+    if (!notificationIds || !Array.isArray(notificationIds)) {
+      return res.status(400).json({ success: false, error: '缺少 notificationIds 参数' });
+    }
+    const result = notificationHubService.markAsRead(storeId, notificationIds);
+    res.json({ success: true, data: result });
+  } catch (error) {
+    console.error('[通知中心] 标记已读失败:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// ============================================
+// 跨系统数据同步API（index ↔ m-index 双向同步）
+// ============================================
+
+// 获取同步状态（各前端可轮询检测对方是否在线）
+app.get('/api/sync/status', (req, res) => {
+  try {
+    const status = crossSyncService.getSyncStatus();
+    res.json({ success: true, data: status });
+  } catch (error) {
+    console.error('[跨端同步] 获取状态失败:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// 注册客户端（页面加载时调用，告知后端自己在线的身份）
+app.post('/api/sync/register', (req, res) => {
+  try {
+    const { clientId, clientType, storeId, userAgent } = req.body;
+    if (!clientId || !clientType) {
+      return res.status(400).json({ success: false, error: '缺少 clientId 或 clientType' });
+    }
+    crossSyncService.registerClient(clientId, { type: clientType, storeId, userAgent });
+    res.json({ success: true, data: { registered: true } });
+  } catch (error) {
+    console.error('[跨端同步] 注册失败:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// 更新心跳（前端定期发送）
+app.post('/api/sync/heartbeat', (req, res) => {
+  try {
+    const { clientId } = req.body;
+    if (!clientId) {
+      return res.status(400).json({ success: false, error: '缺少 clientId' });
+    }
+    crossSyncService.updateHeartbeat(clientId);
+    res.json({ success: true, serverTime: Date.now() });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// 注销客户端（页面关闭时调用）
+app.post('/api/sync/unregister', (req, res) => {
+  try {
+    const { clientId } = req.body;
+    if (!clientId) {
+      return res.status(400).json({ success: false, error: '缺少 clientId' });
+    }
+    crossSyncService.unregisterClient(clientId);
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// 获取操作历史（用于同步检查）
+app.get('/api/sync/operations', (req, res) => {
+  try {
+    const { source, limit, since } = req.query;
+    const ops = crossSyncService.getOperations(
+      source || null,
+      limit ? parseInt(limit) : 50,
+      since ? parseInt(since) : 0
+    );
+    res.json({ success: true, data: { operations: ops, total: ops.length } });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// 前端操作通知（index/m-index执行操作后通知后端，后端广播给另一端）
+app.post('/api/sync/notify-operation', (req, res) => {
+  try {
+    const { source, clientId, operation } = req.body;
+    if (!source || !operation) {
+      return res.status(400).json({ success: false, error: '缺少 source 或 operation' });
+    }
+    const record = crossSyncService.recordOperation(source, {
+      ...operation,
+      clientId
+    });
+    res.json({ success: true, data: { syncId: record.id } });
+  } catch (error) {
+    console.error('[跨端同步] 通知操作失败:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// ============================================
+// 消息中心API（客户消息 + 账户通讯）
+// ============================================
+
+// 获取消息线程列表（消息中心左侧列表）
+app.get('/api/messages/threads', (req, res) => {
+  try {
+    const { storeId } = req.query;
+    const result = messageService.getThreads(storeId || 'ALL');
+    res.json({ success: true, data: result });
+  } catch (error) {
+    console.error('[消息中心] 获取线程列表失败:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// 获取消息列表
+app.get('/api/messages', (req, res) => {
+  try {
+    const { storeId, type, threadId, limit, since } = req.query;
+    const result = messageService.getMessages({
+      storeId: storeId || 'ALL',
+      type: type || null,
+      threadId: threadId || null,
+      limit: limit ? parseInt(limit) : 50,
+      since: since ? parseInt(since) : 0
+    });
+    res.json({ success: true, data: result });
+  } catch (error) {
+    console.error('[消息中心] 获取消息失败:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// 获取未读消息数
+app.get('/api/messages/unread-count', (req, res) => {
+  try {
+    const { storeId } = req.query;
+    const result = messageService.getMessages({
+      storeId: storeId || 'ALL',
+      limit: 200
+    });
+    res.json({ success: true, data: { count: result.unreadCount } });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// 发送消息（Admin/Store 之间的通讯）
+app.post('/api/messages', (req, res) => {
+  try {
+    const { threadId, fromType, fromId, fromName, toType, toId, type, subject, content, orderNo, storeId } = req.body;
+    if (!content) {
+      return res.status(400).json({ success: false, error: '消息内容不能为空' });
+    }
+    const msg = messageService.addMessage({
+      threadId: threadId || `direct_${Date.now()}`,
+      fromType: fromType || 'admin',
+      fromId: fromId || '',
+      fromName: fromName || '管理员',
+      toType: toType || 'store',
+      toId: toId || '',
+      type: type || 'direct_message',
+      subject: subject || '',
+      content,
+      orderNo: orderNo || null,
+      storeId: storeId || null
+    });
+    res.json({ success: true, data: msg });
+  } catch (error) {
+    console.error('[消息中心] 发送消息失败:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// 标记消息为已读
+app.post('/api/messages/read', (req, res) => {
+  try {
+    const { messageIds, threadId } = req.body;
+    let result;
+    if (threadId) {
+      result = messageService.markThreadAsRead(threadId);
+    } else if (messageIds && Array.isArray(messageIds)) {
+      result = messageService.markAsRead(messageIds);
+    } else {
+      return res.status(400).json({ success: false, error: '需要 messageIds 或 threadId' });
+    }
+    res.json({ success: true, data: result });
+  } catch (error) {
+    console.error('[消息中心] 标记已读失败:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
 
 // ============================================
 // 合并支付系统API（从api/payment-server迁移）

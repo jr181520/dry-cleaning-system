@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>连锁企业管理平台 - API测试</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; padding: 20px; background: #f3f4f6; }
+        .container { max-width: 800px; margin: 0 auto; background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        h1 { color: #374151; margin-bottom: 24px; }
+        .api-test { margin-bottom: 20px; padding: 16px; border: 1px solid #e5e7eb; border-radius: 8px; }
+        .api-title { font-weight: 600; color: #1f2937; margin-bottom: 8px; }
+        .api-url { font-family: monospace; background: #f9fafb; padding: 6px 10px; border-radius: 4px; font-size: 12px; color: #6b7280; margin-bottom: 10px; display: inline-block; }
+        .btn { background: #6366f1; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 14px; margin-right: 10px; }
+        .btn:hover { background: #4f46e5; }
+        .btn-success { background: #10b981; }
+        .btn-danger { background: #ef4444; }
+        .result { margin-top: 10px; padding: 12px; border-radius: 6px; font-family: monospace; font-size: 12px; max-height: 200px; overflow-y: auto; }
+        .success { background: #d1fae5; color: #065f46; border: 1px solid #a7f3d0; }
+        .error { background: #fee2e2; color: #991b1b; border: 1px solid #fecaca; }
+        .loading { background: #fef3c7; color: #92400e; border: 1px solid #fde68a; }
+        .status { display: inline-block; padding: 4px 8px; border-radius: 4px; font-size: 11px; margin-left: 10px; }
+        .status-success { background: #10b981; color: white; }
+        .status-error { background: #ef4444; color: white; }
+        .status-pending { background: #f59e0b; color: white; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>连锁企业管理平台 - API测试</h1>
+        
+        <div class="api-test">
+            <div class="api-title">1. 登录测试</div>
+            <div class="api-url">POST /api/auth/staff-login</div>
+            <button class="btn" onclick="testLogin()">测试登录</button>
+            <div id="login-result" class="result"></div>
+        </div>
+        
+        <div class="api-test">
+            <div class="api-title">2. 连锁信息</div>
+            <div class="api-url">GET /api/chain-admin/info</div>
+            <button class="btn" onclick="testChainInfo()">测试连锁信息</button>
+            <div id="chain-info-result" class="result"></div>
+        </div>
+        
+        <div class="api-test">
+            <div class="api-title">3. 结算概览</div>
+            <div class="api-url">GET /api/chain-admin/settlement/overview</div>
+            <button class="btn" onclick="testSettlementOverview()">测试结算概览</button>
+            <div id="settlement-overview-result" class="result"></div>
+        </div>
+        
+        <div class="api-test">
+            <div class="api-title">4. 结算单列表</div>
+            <div class="api-url">GET /api/chain-admin/settlements</div>
+            <button class="btn" onclick="testSettlements()">测试结算单列表</button>
+            <div id="settlements-result" class="result"></div>
+        </div>
+        
+        <div class="api-test">
+            <div class="api-title">5. 门店结算权限</div>
+            <div class="api-url">GET /api/chain-admin/settlement/stores</div>
+            <button class="btn" onclick="testSettlementStores()">测试门店结算权限</button>
+            <div id="settlement-stores-result" class="result"></div>
+        </div>
+        
+        <div class="api-test">
+            <div class="api-title">6. 创建结算单</div>
+            <div class="api-url">POST /api/chain-admin/settlements/create</div>
+            <div>
+                <label>周期:</label>
+                <select id="period">
+                    <option value="daily">日结</option>
+                    <option value="weekly">周结</option>
+                    <option value="monthly" selected>月结</option>
+                </select>
+                <label>结算比例 (%):</label>
+                <input type="number" id="ratio" value="70" min="1" max="100">
+                <button class="btn btn-success" onclick="testCreateSettlement()">测试创建结算单</button>
+            </div>
+            <div id="create-settlement-result" class="result"></div>
+        </div>
+        
+        <div class="api-test">
+            <div class="api-title">7. 连锁仪表盘</div>
+            <div class="api-url">GET /api/chain-admin/dashboard</div>
+            <button class="btn" onclick="testDashboard()">测试仪表盘</button>
+            <div id="dashboard-result" class="result"></div>
+        </div>
+        
+        <div class="api-test">
+            <div class="api-title">8. 门店管理</div>
+            <div class="api-url">GET /api/chain-admin/stores</div>
+            <button class="btn" onclick="testStores()">测试门店管理</button>
+            <div id="stores-result" class="result"></div>
+        </div>
+        
+        <div class="api-test">
+            <div class="api-title">9. 订单管理</div>
+            <div class="api-url">GET /api/chain-admin/orders</div>
+            <button class="btn" onclick="testOrders()">测试订单管理</button>
+            <div id="orders-result" class="result"></div>
+        </div>
+        
+        <div class="api-test">
+            <div class="api-title">10. 资金管理</div>
+            <div class="api-url">GET /api/chain-admin/finance/overview</div>
+            <button class="btn" onclick="testFinance()">测试资金管理</button>
+            <div id="finance-result" class="result"></div>
+        </div>
+        
+        <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #e5e7eb;">
+            <h3>完整页面测试</h3>
+            <p>点击下面的链接打开完整的连锁企业管理平台：</p>
+            <a href="chain-admin.html" target="_blank" style="display: inline-block; background: #6366f1; color: white; padding: 10px 20px; border-radius: 6px; text-decoration: none; margin-top: 10px;">打开连锁企业管理平台</a>
+        </div>
+    </div>
+    
+    <script>
+        const API_BASE = 'http://localhost:3000/api';
+        let authToken = localStorage.getItem('test_auth_token') || '';
+        
+        function showResult(elementId, result, isError = false) {
+            const element = document.getElementById(elementId);
+            element.className = `result ${isError ? 'error' : 'success'}`;
+            element.textContent = typeof result === 'string' ? result : JSON.stringify(result, null, 2);
+        }
+        
+        function showLoading(elementId, message = '加载中...') {
+            const element = document.getElementById(elementId);
+            element.className = 'result loading';
+            element.textContent = message;
+        }
+        
+        async function testLogin() {
+            showLoading('login-result', '正在登录...');
+            try {
+                const response = await fetch(`${API_BASE}/auth/staff-login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        username: 'admin',
+                        password: 'admin123'
+                    })
+                });
+                const result = await response.json();
+                if (result.success) {
+                    authToken = result.token;
+                    localStorage.setItem('test_auth_token', authToken);
+                    showResult('login-result', {
+                        success: true,
+                        message: '登录成功',
+                        user: result.user
+                    });
+                } else {
+                    showResult('login-result', {
+                        success: false,
+                        error: result.error || '登录失败'
+                    }, true);
+                }
+            } catch (error) {
+                showResult('login-result', {
+                    success: false,
+                    error: error.message,
+                    note: '请确保后端服务器正在运行 (localhost:3000)'
+                }, true);
+            }
+        }
+        
+        async function testChainInfo() {
+            if (!authToken) {
+                showResult('chain-info-result', { error: '请先登录' }, true);
+                return;
+            }
+            showLoading('chain-info-result');
+            try {
+                const response = await fetch(`${API_BASE}/chain-admin/info`, {
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+                const result = await response.json();
+                showResult('chain-info-result', result);
+            } catch (error) {
+                showResult('chain-info-result', { error: error.message }, true);
+            }
+        }
+        
+        async function testSettlementOverview() {
+            if (!authToken) {
+                showResult('settlement-overview-result', { error: '请先登录' }, true);
+                return;
+            }
+            showLoading('settlement-overview-result');
+            try {
+                const response = await fetch(`${API_BASE}/chain-admin/settlement/overview`, {
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+                const result = await response.json();
+                showResult('settlement-overview-result', result);
+            } catch (error) {
+                showResult('settlement-overview-result', { error: error.message }, true);
+            }
+        }
+        
+        async function testSettlements() {
+            if (!authToken) {
+                showResult('settlements-result', { error: '请先登录' }, true);
+                return;
+            }
+            showLoading('settlements-result');
+            try {
+                const response = await fetch(`${API_BASE}/chain-admin/settlements?page=1&pageSize=5`, {
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+                const result = await response.json();
+                showResult('settlements-result', result);
+            } catch (error) {
+                showResult('settlements-result', { error: error.message }, true);
+            }
+        }
+        
+        async function testSettlementStores() {
+            if (!authToken) {
+                showResult('settlement-stores-result', { error: '请先登录' }, true);
+                return;
+            }
+            showLoading('settlement-stores-result');
+            try {
+                const response = await fetch(`${API_BASE}/chain-admin/settlement/stores?page=1&pageSize=5`, {
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+                const result = await response.json();
+                showResult('settlement-stores-result', result);
+            } catch (error) {
+                showResult('settlement-stores-result', { error: error.message }, true);
+            }
+        }
+        
+        async function testCreateSettlement() {
+            if (!authToken) {
+                showResult('create-settlement-result', { error: '请先登录' }, true);
+                return;
+            }
+            showLoading('create-settlement-result', '正在创建结算单...');
+            try {
+                const period = document.getElementById('period').value;
+                const ratio = parseFloat(document.getElementById('ratio').value) / 100;
+                
+                const response = await fetch(`${API_BASE}/chain-admin/settlements/create`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${authToken}`
+                    },
+                    body: JSON.stringify({
+                        period,
+                        ratio,
+                        remark: `测试结算单 - ${period}`
+                    })
+                });
+                const result = await response.json();
+                showResult('create-settlement-result', result);
+            } catch (error) {
+                showResult('create-settlement-result', { error: error.message }, true);
+            }
+        }
+        
+        async function testDashboard() {
+            if (!authToken) {
+                showResult('dashboard-result', { error: '请先登录' }, true);
+                return;
+            }
+            showLoading('dashboard-result');
+            try {
+                const response = await fetch(`${API_BASE}/chain-admin/dashboard`, {
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+                const result = await response.json();
+                showResult('dashboard-result', result);
+            } catch (error) {
+                showResult('dashboard-result', { error: error.message }, true);
+            }
+        }
+        
+        async function testStores() {
+            if (!authToken) {
+                showResult('stores-result', { error: '请先登录' }, true);
+                return;
+            }
+            showLoading('stores-result');
+            try {
+                const response = await fetch(`${API_BASE}/chain-admin/stores?page=1&pageSize=5`, {
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+                const result = await response.json();
+                showResult('stores-result', result);
+            } catch (error) {
+                showResult('stores-result', { error: error.message }, true);
+            }
+        }
+        
+        async function testOrders() {
+            if (!authToken) {
+                showResult('orders-result', { error: '请先登录' }, true);
+                return;
+            }
+            showLoading('orders-result');
+            try {
+                const response = await fetch(`${API_BASE}/chain-admin/orders?page=1&pageSize=5`, {
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+                const result = await response.json();
+                showResult('orders-result', result);
+            } catch (error) {
+                showResult('orders-result', { error: error.message }, true);
+            }
+        }
+        
+        async function testFinance() {
+            if (!authToken) {
+                showResult('finance-result', { error: '请先登录' }, true);
+                return;
+            }
+            showLoading('finance-result');
+            try {
+                const response = await fetch(`${API_BASE}/chain-admin/finance/overview`, {
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+                const result = await response.json();
+                showResult('finance-result', result);
+            } catch (error) {
+                showResult('finance-result', { error: error.message }, true);
+            }
+        }
+        
+        // 初始化时检查是否有token
+        if (authToken) {
+            document.querySelectorAll('.api-test').forEach(el => {
+                const resultDiv = el.querySelector('.result');
+                if (resultDiv) {
+                    resultDiv.textContent = '已登录，可以测试API';
+                    resultDiv.className = 'result success';
+                }
+            });
+        }
+    </script>
+</body>
+</html>

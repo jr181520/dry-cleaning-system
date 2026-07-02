@@ -1,54 +1,59 @@
 const app = getApp();
+const categoryUtil = require('../../../utils/category');
 
 Page({
   data: {
     service: null,
-    serviceId: null
+    serviceId: null,
+    categoryId: 'cleaning'
   },
 
   onLoad(options) {
-    if (options.id) {
-      this.setData({
-        serviceId: parseInt(options.id)
-      });
-      this.loadServiceDetail();
-    }
+    const serviceId = options.id;
+    const categoryId = options.category || 'cleaning';
+    
+    this.setData({ serviceId, categoryId });
+    this.loadServiceDetail(serviceId, categoryId);
   },
 
-  loadServiceDetail() {
-    const allServices = [
-      { id: 1, icon: '👔', name: '西装干洗', price: 88, desc: '含熨烫，3-5天取件' },
-      { id: 2, icon: '👕', name: '衬衫清洗', price: 25, desc: '含熨烫，2-3天取件' },
-      { id: 3, icon: '🧥', name: '羽绒服清洗', price: 68, desc: '专业清洗，5-7天取件' },
-      { id: 4, icon: '👖', name: '裤子清洗', price: 35, desc: '含熨烫，2-3天取件' },
-      { id: 5, icon: '👗', name: '连衣裙清洗', price: 58, desc: '专业护理，3-5天取件' },
-      { id: 6, icon: '👟', name: '鞋子清洗', price: 45, desc: '深度清洁，3-5天取件' },
-      { id: 7, icon: '👢', name: '靴子护理', price: 55, desc: '专业护理，3-5天取件' },
-      { id: 8, icon: '🎒', name: '背包清洗', price: 38, desc: '全面清洗，3-5天取件' },
-      { id: 9, icon: '🛍️', name: '手提包护理', price: 68, desc: '专业护理，5-7天取件' },
-      { id: 10, icon: '🛏️', name: '床单被套清洗', price: 58, desc: '大件清洗，5-7天取件' },
-      { id: 11, icon: '🧶', name: '毛毯清洗', price: 78, desc: '专业清洗，5-7天取件' },
-      { id: 12, icon: '💎', name: '奢侈品皮具', price: 188, desc: '顶级护理，7-10天取件' }
-    ];
+  loadServiceDetail(serviceId, categoryId) {
+    // 从品类工具获取服务定义
+    const services = categoryUtil.getServices(categoryId);
+    const service = services.find(s => String(s.id) === String(serviceId));
 
-    const service = allServices.find(s => s.id === this.data.serviceId);
     if (service) {
-      this.setData({
-        service: service
-      });
+      this.setData({ service });
+    } else {
+      // 跨品类查找兜底
+      const cats = categoryUtil.getAllCategories();
+      for (var i = 0; i < cats.length; i++) {
+        const svcs = categoryUtil.getServices(cats[i].id);
+        const found = svcs.find(s => String(s.id) === String(serviceId));
+        if (found) {
+          this.setData({ service: found, categoryId: cats[i].id });
+          return;
+        }
+      }
     }
   },
 
   onBookService() {
     // 将当前服务保存到全局数据
     if (this.data.service) {
-      app.globalData.pendingServiceFromDetail = this.data.service;
+      app.globalData.pendingServiceFromDetail = {
+        id: this.data.service.id,
+        icon: this.data.service.icon,
+        name: this.data.service.name,
+        desc: this.data.service.desc,
+        unit: this.data.service.unit,
+        isBoarding: this.data.service.isBoarding || false,
+        categoryId: this.data.categoryId
+      };
     }
     
     // 跳转到服务选择页面（订单创建页面）
-    // 传递 from=detail 参数，让 order/create 知道是从服务详情页跳转的
     wx.navigateTo({
-      url: '/pages/order/create/index?from=detail'
+      url: '/pages/order/create/index?from=detail&category=' + this.data.categoryId
     });
   }
 });

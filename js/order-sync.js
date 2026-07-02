@@ -116,9 +116,34 @@ const OrderSyncManager = {
                 endpoint = '/cleaning/orders';
                 const adminToken = localStorage.getItem('adminToken') || localStorage.getItem('adminAuthToken');
                 authHeader = adminToken ? `Bearer ${adminToken}` : '';
+            } else if (window.location.pathname.includes('index')) {
+                // 门店管理端（index.html）：按门店ID获取订单
+                const currentStore = JSON.parse(localStorage.getItem('currentStore') || '{}');
+                const storeUser = JSON.parse(localStorage.getItem('storeUser') || '{}');
+                const myStoreId = currentStore.storeId || storeUser.storeId || 'ST001';
+                endpoint = `/cleaning/store/${myStoreId}/orders`;
+                const storeToken = localStorage.getItem('storeToken') || localStorage.getItem('authToken');
+                authHeader = storeToken ? `Bearer ${storeToken}` : '';
+                this.log(`门店管理端同步，门店ID: ${myStoreId}`);
             } else {
                 // C端页面：获取用户订单
-                endpoint = '/cleaning/orders';
+                // 必须要有用户标识才能查询（否则会触发安全兜底，浪费请求）
+                const openid = localStorage.getItem('userOpenid');
+                const userId = openid || localStorage.getItem('userId');
+                const phone = localStorage.getItem('userPhone');
+                
+                if (!userId && !phone) {
+                    this.log('C端无用户标识，跳过同步', 'debug');
+                    return null;
+                }
+                
+                let endpointUrl = '/cleaning/orders';
+                const params = [];
+                if (userId) params.push(`userId=${encodeURIComponent(userId)}`);
+                if (phone) params.push(`phone=${encodeURIComponent(phone)}`);
+                if (params.length > 0) endpointUrl += '?' + params.join('&');
+                
+                endpoint = endpointUrl;
                 const userToken = localStorage.getItem('userToken') || localStorage.getItem('authToken');
                 authHeader = userToken ? `Bearer ${userToken}` : '';
             }
@@ -287,7 +312,9 @@ const OrderSyncManager = {
             'courier_picked_up': 'delivering',
             'courier_delivering': 'delivering',
             'customer_received': 'completed',
-            'customer_picked_up': 'completed'
+            'customer_picked_up': 'completed',
+            'awaiting_store_outbound': 'awaiting_store_outbound',
+            'store_outbound': 'store_outbound'
         };
         return statusMap[status?.toLowerCase()] || status || 'pending';
     },
@@ -308,11 +335,12 @@ const OrderSyncManager = {
     }
 };
 
-// 自动启动 - 页面加载时自动同步订单数据
-document.addEventListener('DOMContentLoaded', () => {
-    OrderSyncManager.start();
-    console.log('[同步] 已自动启动订单数据同步');
-});
+// ⚠️ 自动启动已禁用 — 改用 MQTT WebSocket 实时推送
+// 如果特定页面需要轮询，请在页面内显式调用 OrderSyncManager.start()
+// document.addEventListener('DOMContentLoaded', () => {
+//     OrderSyncManager.start();
+//     console.log('[同步] 已自动启动订单数据同步');
+// });
 
 // 监听页面可见性变化，在页面重新可见时同步
 document.addEventListener('visibilitychange', () => {

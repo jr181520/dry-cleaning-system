@@ -34,7 +34,15 @@ const userSchema = new mongoose.Schema({
     postalCode: String,
     isDefault: Boolean
   }],
-  createdFrom: { type: String, default: 'app' }
+  // 数据来源和层级关系
+  registrationSource: { 
+    type: String, 
+    enum: ['web_customer', 'wechat_mini', 'store_app', 'admin_system', 'unknown'],
+    default: 'unknown'
+  },  // 注册来源：C端网页、微信小程序、门店APP、后台系统
+  sourcePlatform: { type: String },  // 来源平台标识
+  chainId: { type: String, index: true },  // 所属连锁ID（通过门店关联）
+  createdFrom: { type: String, default: 'app' }  // 兼容旧字段
 }, { timestamps: true });
 
 userSchema.index({ roles: 1 });
@@ -72,6 +80,9 @@ class AuthService {
       name: userData.name || phone.slice(-4),
       roles: userData.roles || ['customer'],
       storeId: userData.storeId,
+      registrationSource: userData.registrationSource || 'unknown',
+      sourcePlatform: userData.sourcePlatform,
+      chainId: userData.chainId,
       createdFrom: userData.createdFrom || 'app'
     });
 
@@ -187,9 +198,19 @@ class AuthService {
   }
 
   /**
+   * 校验是否为合法 MongoDB ObjectId
+   */
+  _isValidObjectId(id) {
+    return mongoose.Types.ObjectId.isValid(id) && String(new mongoose.Types.ObjectId(id)) === id;
+  }
+
+  /**
    * 获取用户信息
    */
   async getUserById(userId) {
+    if (!this._isValidObjectId(userId)) {
+      throw new Error('用户不存在（无效ID格式）');
+    }
     const user = await User.findById(userId).lean();
     if (!user) throw new Error('用户不存在');
     return this.sanitizeUser(user);
@@ -199,10 +220,72 @@ class AuthService {
    * 更新用户信息
    */
   async updateUser(userId, updateData) {
+    // 非 ObjectId 格式的 userId（如开发模式 mock_token）不支持更新
+    if (!this._isValidObjectId(userId)) {
+      throw new Error('当前用户ID格式不支持更新，请使用正式账号');
+    }
     const user = await User.findById(userId);
     if (!user) throw new Error('用户不存在');
     
-    const allowedFields = ['name', 'avatar', 'gender', 'birthday', 'address'];
+    // 前端传 nickname → 映射为 name
+    if (updateData.nickname !== undefined && updateData.name === undefined) {
+      updateData.name = updateData.nickname;
+    }
+    
+    // ================================================================
+    // 跨平台身份合并：小程序填写手机号时自动绑定已有C端账户
+    // ================================================================
+    let mergedTarget = null;
+    if (updateData.phone && updateData.phone !== user.phone) {
+      // 查找是否有其他用户已注册此手机号（C端用户）
+      const existingUser = await User.findOne({ 
+        phone: updateData.phone, 
+        _id: { $ne: user._id }  // 排除自己
+      });
+      
+      if (existingUser) {
+        console.log('[用户合并] 发现同手机号用户:', {
+          currentId: user._id,
+          currentOpenid: user.openid,
+          currentCreatedFrom: user.createdFrom,
+          existingId: existingUser._id,
+          existingOpenid: existingUser.openid,
+          existingCreatedFrom: existingUser.createdFrom
+        });
+        
+        // 合并策略：将小程序的 openid 绑定到已有C端账户
+        if (!existingUser.openid && user.openid) {
+          // C端用户没有openid → 迁移openid到C端用户
+          existingUser.openid = user.openid;
+          await existingUser.save();
+          
+          // 更新所有订单的 userId（从小程序用户ID → C端用户ID）
+          const Order = require('mongoose').model('Order');
+          const updateResult = await Order.updateMany(
+            { userId: String(user._id) },
+            { $set: { userId: String(existingUser._id), _mergedFrom: String(user._id) } }
+          );
+          console.log('[用户合并] 订单迁移:', updateResult.modifiedCount, '条');
+          
+          // 标记原用户为已合并
+          user.status = 'merged';
+          user.mergedTo = existingUser._id;
+          await user.save();
+          
+          // 返回合并后的用户
+          mergedTarget = existingUser;
+          console.log('[用户合并] ✅ 手机号匹配，已合并账户');
+        } else if (existingUser.openid && user.openid && existingUser.openid !== user.openid) {
+          // 两者都有不同的 openid（异常情况），仅更新当前用户手机号
+          console.warn('[用户合并] ⚠️ 两个用户都有不同openid，不做合并，仅更新手机号');
+        } else {
+          // 其他情况：简单更新手机号
+          console.log('[用户合并] 不做合并，仅更新手机号');
+        }
+      }
+    }
+    
+    const allowedFields = ['name', 'avatar', 'gender', 'birthday', 'phone', 'address'];
     for (const field of allowedFields) {
       if (updateData[field] !== undefined) {
         user[field] = updateData[field];
@@ -210,6 +293,19 @@ class AuthService {
     }
     
     await user.save();
+    
+    // 如果发生了合并，返回合并后的用户信息
+    if (mergedTarget) {
+      mergedTarget.lastLoginAt = new Date();
+      mergedTarget.loginCount += 1;
+      await mergedTarget.save();
+      return {
+        ...this.sanitizeUser(mergedTarget),
+        __merged: true,
+        __mergedFrom: user._id
+      };
+    }
+    
     return this.sanitizeUser(user);
   }
 
@@ -217,6 +313,9 @@ class AuthService {
    * 修改密码
    */
   async changePassword(userId, oldPassword, newPassword) {
+    if (!this._isValidObjectId(userId)) {
+      throw new Error('当前用户ID格式不支持修改密码，请使用正式账号');
+    }
     const user = await User.findById(userId);
     if (!user) throw new Error('用户不存在');
     

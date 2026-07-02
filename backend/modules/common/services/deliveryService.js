@@ -1,429 +1,320 @@
 /**
- * 配送服务
- * 支持美团配送、达达、顺丰同城等
+ * 配送服务（v2 - 真实API对接版）
+ * 
+ * 架构：
+ *   deliveryService.js（本文件）
+ *     ├── 定价计算 + 报价排序（纯业务逻辑）
+ *     └── 调用 → deliveryProviders/（真实/模拟API层）
+ *           ├── meituan.js   美团跑腿
+ *           ├── jingdong.js  京东秒送（达达）
+ *           ├── taobao.js    淘宝闪送（蜂鸟）
+ *           └── shunfeng.js  顺丰同城
+ * 
+ * 模式：
+ *   - 已配置密钥 → 调用真实服务商API
+ *   - 未配置密钥 → 返回合理模拟数据
  */
 
-const https = require('https');
-const crypto = require('crypto');
+const deliveryProviders = require('../../../services/deliveryProviders');
 
-// 配送配置
-const DELIVERY_CONFIG = {
-  meituan: {
-    appId: process.env.MEITUAN_APP_ID || '',
-    appKey: process.env.MEITUAN_APP_KEY || '',
-    secret: process.env.MEITUAN_SECRET || '',
-    url: 'https://peisongopen.meituan.com'
-  },
-  dada: {
-    appKey: process.env.DADA_APP_KEY || '',
-    appSecret: process.env.DADA_APP_SECRET || '',
-    url: 'https://openapi-imind.dada.cn'
-  },
-  shunfeng: {
-    customerId: process.env.SF_CUSTOMER_ID || '',
-    checkWord: process.env.SF_CHECK_WORD || '',
-    url: 'https://open-sandbox.sfsy.com'
-  }
+// 服务商名称映射：旧代码 → 新provider键名
+const PROVIDER_MAP = {
+  'meituan': 'meituan',
+  'dada': 'jingdong',
+  'jd': 'jingdong',
+  'jingdong': 'jingdong',
+  'shunfeng': 'shunfeng',
+  'sf': 'shunfeng',
+  'taobao': 'taobao',
+  'tb': 'taobao'
 };
 
 class DeliveryService {
   constructor() {
-    this.providers = ['meituan', 'dada', 'shunfeng'];
+    this.providers = ['meituan', 'jingdong', 'taobao', 'shunfeng'];
+  }
+
+  /** 标准化提供商标识 */
+  _normalizeProvider(raw) {
+    return PROVIDER_MAP[raw] || raw;
   }
 
   /**
-   * 创建配送订单
-   * @param {Object} params
-   * @param {string} params.provider - 配送平台
-   * @param {string} params.orderId - 业务订单ID
-   * @param {Object} params.pickup - 取货信息
-   * @param {Object} params.delivery - 配送信息
-   * @param {string} params.callbackUrl - 状态回调地址
+   * 创建配送订单（根据服务商类型调用对应服务商API）
    */
   async createDelivery(params) {
     const { provider, orderId, pickup, delivery, callbackUrl } = params;
-    
-    switch (provider) {
-      case 'meituan':
-        return await this.createMeituanOrder(orderId, pickup, delivery, callbackUrl);
-      case 'dada':
-        return await this.createDadaOrder(orderId, pickup, delivery, callbackUrl);
-      case 'shunfeng':
-        return await this.createShunfengOrder(orderId, pickup, delivery, callbackUrl);
-      default:
-        throw new Error('不支持的配送平台');
+    const normalizedProvider = this._normalizeProvider(provider);
+
+    const providerInst = deliveryProviders.get(normalizedProvider);
+    if (!providerInst) {
+      return { success: false, error: `不支持的配送平台: ${provider}` };
     }
+
+    const result = await providerInst.createOrder({
+      orderId,
+      pickup,
+      delivery,
+      callbackUrl,
+      goodsDesc: params.goodsDesc || '干洗衣物',
+      weight: params.weight || 1
+    });
+
+    if (result.success) {
+      console.log(`[配送] $顺序 = "provider" | kind = provider.displayName} 下单成功: ${result.platformOrderId} (模式: ${result._mode || 'real'})`);
+    } else {
+      console.error(`[配送] ${providerInst.displayName} 下单失败:`, result.error);
+    }
+
+    return result;
   }
 
   /**
-   * 美团配送下单
-   */
-  async createMeituanOrder(orderId, pickup, delivery, callbackUrl) {
-    const config = DELIVERY_CONFIG.meituan;
-    const timestamp = Math.floor(Date.now() / 1000).toString();
-    
-    // 生成签名
-    const signStr = config.appId + timestamp + config.secret;
-    const sign = crypto.createHash('md5').update(signStr).digest('hex');
-
-    const payload = {
-      app_id: config.appId,
-      timestamp,
-      sign,
-      shop_no: pickup.storeId || '',
-      delivery_id: Date.now().toString(),
-      order_id: orderId,
-      order_type: 1, // 1=外卖订单
-      pickup: {
-        name: pickup.contactName || '',
-        phone: pickup.contactPhone || '',
-        address: pickup.address || '',
-        lat: pickup.latitude || 0,
-        lng: pickup.longitude || 0
-      },
-      dropoff: {
-        name: delivery.contactName || '',
-        phone: delivery.contactPhone || '',
-        address: delivery.address || '',
-        lat: delivery.latitude || 0,
-        lng: delivery.longitude || 0
-      },
-      callback: callbackUrl || ''
-    };
-
-    try {
-      const result = await this.httpRequest(config.url + '/api/delivery/create', 'POST', payload);
-      
-      if (result.code === 0) {
-        return {
-          success: true,
-          provider: 'meituan',
-          data: {
-            deliveryId: result.data.delivery_id,
-            orderId: result.data.order_id,
-            status: result.data.status,
-            driverName: '',
-            driverPhone: '',
-            estimatedTime: result.data.estimated_pickup_time
-          }
-        };
-      }
-      return { success: false, error: result.message };
-    } catch (error) {
-      console.error('[配送] 美团下单失败:', error);
-      return { success: false, error: error.message };
-    }
-  }
-
-  /**
-   * 达达配送下单
-   */
-  async createDadaOrder(orderId, pickup, delivery, callbackUrl) {
-    const config = DELIVERY_CONFIG.dada;
-    const timestamp = Math.floor(Date.now() / 1000).toString();
-    
-    const body = {
-      appkey: config.appKey,
-      order_id: orderId,
-      shop_no: pickup.storeId || '',
-      cargo_type: 1,
-      cargo_weight: 1,
-      pickup_code: pickup.pickupCode || '',
-      dropoff_code: '',
-      callback: callbackUrl || '',
-      pickup: {
-        name: pickup.contactName,
-        phone: pickup.contactPhone,
-        address: pickup.address,
-        lat: pickup.latitude,
-        lng: pickup.longitude
-      },
-      dropoff: {
-        name: delivery.contactName,
-        phone: delivery.contactPhone,
-        address: delivery.address,
-        lat: delivery.latitude,
-        lng: delivery.longitude
-      }
-    };
-
-    try {
-      const result = await this.httpRequest(config.url + '/api/dada/send', 'POST', body);
-      
-      if (result.success) {
-        return {
-          success: true,
-          provider: 'dada',
-          data: {
-            deliveryId: result.deliveryId,
-            orderId: result.orderId,
-            status: result.status,
-            driverName: result.driverName || '',
-            driverPhone: result.driverPhone || ''
-          }
-        };
-      }
-      return { success: false, error: result.errorMsg };
-    } catch (error) {
-      console.error('[配送] 达达下单失败:', error);
-      return { success: false, error: error.message };
-    }
-  }
-
-  /**
-   * 顺丰同城下单
-   */
-  async createShunfengOrder(orderId, pickup, delivery, callbackUrl) {
-    const config = DELIVERY_CONFIG.shunfeng;
-    const timestamp = Math.floor(Date.now() / 1000).toString();
-    
-    // 生成签名
-    const signStr = timestamp + config.checkWord;
-    const sign = crypto.createHash('md5').update(signStr).digest('hex');
-
-    const payload = {
-      customer_id: config.customerId,
-      request_id: timestamp,
-      order_id: orderId,
-      order_type: 1,
-      pay_type: 1,
-      pickup: {
-        name: pickup.contactName,
-        phone: pickup.contactPhone,
-        address: pickup.address,
-        lat: pickup.latitude,
-        lng: pickup.longitude
-      },
-      dropoff: {
-        name: delivery.contactName,
-        phone: delivery.contactPhone,
-        address: delivery.address,
-        lat: delivery.latitude,
-        lng: delivery.longitude
-      },
-      callback_url: callbackUrl || ''
-    };
-
-    try {
-      const result = await this.httpRequest(config.url + '/api/shunfeng/create', 'POST', payload, {
-        'security-sign': sign
-      });
-      
-      if (result.success) {
-        return {
-          success: true,
-          provider: 'shunfeng',
-          data: {
-            deliveryId: result.deliveryId,
-            orderId: result.orderId,
-            status: result.status,
-            driverName: result.driverName || '',
-            driverPhone: result.driverPhone || ''
-          }
-        };
-      }
-      return { success: false, error: result.errorMsg };
-    } catch (error) {
-      console.error('[配送] 顺丰下单失败:', error);
-      return { success: false, error: error.message };
-    }
-  }
-
-  /**
-   * 查询配送状态
+   * 查询配送状态（调用真实服务商API）
    */
   async queryDelivery(deliveryId, provider) {
-    switch (provider) {
-      case 'meituan':
-        return await this.queryMeituanDelivery(deliveryId);
-      case 'dada':
-        return await this.queryDadaDelivery(deliveryId);
-      case 'shunfeng':
-        return await this.queryShunfengDelivery(deliveryId);
-      default:
-        throw new Error('不支持的配送平台');
+    const normalizedProvider = this._normalizeProvider(provider);
+    const providerInst = deliveryProviders.get(normalizedProvider);
+
+    if (!providerInst) {
+      return { success: false, error: '不支持的配送平台' };
     }
-  }
 
-  /**
-   * 查询美团配送状态
-   */
-  async queryMeituanDelivery(deliveryId) {
-    // 模拟实现
-    return {
-      success: true,
-      provider: 'meituan',
-      data: {
-        status: 'delivering',
-        driverName: '张师傅',
-        driverPhone: '138****1234',
-        estimatedTime: new Date(Date.now() + 30 * 60 * 1000).toISOString()
-      }
-    };
-  }
+    const result = await providerInst.queryOrder(deliveryId);
 
-  /**
-   * 查询达达配送状态
-   */
-  async queryDadaDelivery(deliveryId) {
-    return {
-      success: true,
-      provider: 'dada',
-      data: {
-        status: 'delivering',
-        driverName: '李师傅',
-        driverPhone: '139****5678',
-        estimatedTime: new Date(Date.now() + 25 * 60 * 1000).toISOString()
-      }
-    };
-  }
-
-  /**
-   * 查询顺丰配送状态
-   */
-  async queryShunfengDelivery(deliveryId) {
-    return {
-      success: true,
-      provider: 'shunfeng',
-      data: {
-        status: 'delivering',
-        driverName: '王师傅',
-        driverPhone: '137****9012',
-        estimatedTime: new Date(Date.now() + 20 * 60 * 1000).toISOString()
-      }
-    };
-  }
-
-  /**
-   * 取消配送
-   */
-  async cancelDelivery(deliveryId, provider, reason) {
-    switch (provider) {
-      case 'meituan':
-        return await this.cancelMeituanDelivery(deliveryId, reason);
-      case 'dada':
-        return await this.cancelDadaDelivery(deliveryId, reason);
-      case 'shunfeng':
-        return await this.cancelShunfengDelivery(deliveryId, reason);
-      default:
-        throw new Error('不支持的配送平台');
-    }
-  }
-
-  /**
-   * 取消美团配送
-   */
-  async cancelMeituanDelivery(deliveryId, reason) {
-    return { success: true, message: '取消成功' };
-  }
-
-  /**
-   * 取消达达配送
-   */
-  async cancelDadaDelivery(deliveryId, reason) {
-    return { success: true, message: '取消成功' };
-  }
-
-  /**
-   * 取消顺丰配送
-   */
-  async cancelShunfengDelivery(deliveryId, reason) {
-    return { success: true, message: '取消成功' };
-  }
-
-  /**
-   * 估算配送费用
-   */
-  async estimateFee(params) {
-    const { provider, pickup, delivery } = params;
-    
-    // 根据距离计算（简化版）
-    const distance = this.calculateDistance(
-      pickup.latitude, pickup.longitude,
-      delivery.latitude, delivery.longitude
-    );
-    
-    // 各平台计价规则
-    const pricing = {
-      meituan: { base: 5, perKm: 2, min: 8 },
-      dada: { base: 4, perKm: 1.5, min: 7 },
-      shunfeng: { base: 6, perKm: 2.5, min: 10 }
-    };
-    
-    const config = pricing[provider] || pricing.meituan;
-    const fee = Math.max(config.min, config.base + distance * config.perKm);
-    
-    return {
-      success: true,
-      data: {
-        provider,
-        distance: Math.round(distance * 100) / 100,
-        distanceUnit: 'km',
-        fee: Math.round(fee * 100) / 100,
-        currency: 'CNY',
-        estimatedMinutes: Math.round(distance * 3) + 15
-      }
-    };
-  }
-
-  /**
-   * 计算两点间距离（简化版）
-   */
-  calculateDistance(lat1, lng1, lat2, lng2) {
-    const R = 6371; // 地球半径(km)
-    const dLat = (lat2 - lat1) * Math.PI / 180;
-    const dLng = (lng2 - lng1) * Math.PI / 180;
-    const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
-              Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-              Math.sin(dLng/2) * Math.sin(dLng/2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-    return R * c;
-  }
-
-  /**
-   * HTTP请求封装
-   */
-  httpRequest(url, method, data, headers = {}) {
-    return new Promise((resolve, reject) => {
-      const urlObj = new URL(url);
-      const options = {
-        hostname: urlObj.hostname,
-        port: 443,
-        path: urlObj.pathname,
-        method: method,
-        headers: {
-          'Content-Type': 'application/json',
-          ...headers
+    // 标准化响应格式（兼容旧接口调用者）
+    if (result.success) {
+      return {
+        success: true,
+        provider: normalizedProvider,
+        data: {
+          status: result.status,
+          driverName: result.driver?.name || '',
+          driverPhone: result.driver?.phone || '',
+          estimatedTime: result.eta || null,
+          distance: result.distance || null,
+          _mode: result._mode || 'real'
         }
       };
+    }
+    return result;
+  }
 
-      const req = https.request(options, (res) => {
-        let body = '';
-        res.on('data', chunk => body += chunk);
-        res.on('end', () => {
-          try {
-            resolve(JSON.parse(body));
-          } catch (e) {
-            resolve(body);
-          }
-        });
-      });
+  /**
+   * 取消配送（调用真实服务商API）
+   */
+  async cancelDelivery(deliveryId, provider, reason) {
+    const normalizedProvider = this._normalizeProvider(provider);
+    const providerInst = deliveryProviders.get(normalizedProvider);
 
-      req.on('error', reject);
-      if (data) req.write(JSON.stringify(data));
-      req.end();
+    if (!providerInst) {
+      return { success: false, error: '不支持的配送平台' };
+    }
+
+    return await providerInst.cancelOrder(deliveryId, reason);
+  }
+
+  // ─── 以下为定价/报价业务逻辑（不依赖外部API）───
+
+  /**
+   * 各服务商定价规则
+   */
+  getProviderPricingConfig(provider) {
+    const configs = {
+      meituan: {
+        code: 'meituan', name: '美团跑腿', icon: '🛵',
+        base: 5, perKm: 2, minFee: 8,
+        sharedDiscount: 0.35,
+        rating: 4.9,
+        promo: { type: 'newUser', amount: 3, info: '新用户首单立减¥3' }
+      },
+      jingdong: {
+        code: 'jingdong', name: '京东秒送', icon: '🚚',
+        base: 4.5, perKm: 2.5, minFee: 10,
+        sharedDiscount: 0.40,
+        rating: 4.8,
+        promo: { type: 'percent', amount: 0.15, info: '平日85折优惠' }
+      },
+      shunfeng: {
+        code: 'shunfeng', name: '顺丰同城', icon: '✈️',
+        base: 6, perKm: 2, minFee: 12,
+        sharedDiscount: 0.30,
+        rating: 4.9,
+        promo: { type: 'fullReduction', threshold: 50, amount: 5, info: '满¥50减¥5' }
+      },
+      taobao: {
+        code: 'taobao', name: '淘宝闪送', icon: '🛒',
+        base: 5.5, perKm: 1.8, minFee: 9,
+        sharedDiscount: 0.38,
+        rating: 4.7,
+        promo: { type: 'limited', amount: 3, info: '限时优惠¥3' }
+      }
+    };
+    return configs[provider] || null;
+  }
+
+  /** 获取所有可用服务商列表 */
+  getProviderList() {
+    // 检查各服务商的接入模式
+    return this.providers.map(p => {
+      const config = this.getProviderPricingConfig(p);
+      const providerInst = deliveryProviders.get(p);
+      return {
+        ...config,
+        mode: providerInst ? providerInst.getMode() : 'mock',
+        enabled: true  // 所有服务商在前端均可选
+      };
     });
   }
 
   /**
-   * 获取支持的配送平台
+   * 一键获取所有服务商报价（含一对一和拼单两种模式）
    */
+  async getAllQuotes(params) {
+    const { pickup, delivery, distance, serviceTotal, isNewUser } = params;
+
+    const quotes = this.providers.map(provider =>
+      this.calculateProviderFee({ provider, pickup, delivery, distance, serviceTotal, isNewUser })
+    ).filter(Boolean);
+
+    return { success: true, data: quotes };
+  }
+
+  /**
+   * 计算单个服务商费用（含一对一/拼单两种模式）
+   */
+  calculateProviderFee(params) {
+    const { provider, pickup, delivery, serviceTotal, isNewUser } = params;
+    const config = this.getProviderPricingConfig(provider);
+    if (!config) return null;
+
+    let distance = params.distance;
+    if (!distance && pickup && delivery) {
+      distance = this.calculateDistance(
+        pickup.latitude, pickup.longitude,
+        delivery.latitude, delivery.longitude
+      );
+    }
+    if (!distance || isNaN(distance)) distance = 3;
+
+    // 一对一（solo）计费
+    let soloBaseFee = Math.max(config.minFee, config.base + distance * config.perKm);
+    let soloDiscount = 0;
+    let soloDiscountInfo = '';
+
+    if (config.promo) {
+      const promo = config.promo;
+      if (promo.type === 'newUser' && isNewUser) {
+        soloDiscount = promo.amount;
+        soloDiscountInfo = promo.info;
+      } else if (promo.type === 'percent') {
+        soloDiscount = Math.round(soloBaseFee * promo.amount * 100) / 100;
+        soloDiscountInfo = promo.info;
+      } else if (promo.type === 'fullReduction' && (serviceTotal || 0) >= promo.threshold) {
+        soloDiscount = promo.amount;
+        soloDiscountInfo = promo.info;
+      } else if (promo.type === 'limited') {
+        soloDiscount = Math.min(promo.amount, soloBaseFee);
+        soloDiscountInfo = promo.info;
+      }
+    }
+
+    let soloActualFee = Math.max(1, soloBaseFee - soloDiscount);
+    soloBaseFee = Math.round(soloBaseFee * 100) / 100;
+    soloDiscount = Math.round(soloDiscount * 100) / 100;
+    soloActualFee = Math.round(soloActualFee * 100) / 100;
+
+    // 拼单（shared）计费
+    let sharedBaseFee = soloBaseFee * (1 - config.sharedDiscount);
+    let sharedActualFee = Math.max(1, sharedBaseFee - soloDiscount);
+    sharedBaseFee = Math.round(sharedBaseFee * 100) / 100;
+    sharedActualFee = Math.round(sharedActualFee * 100) / 100;
+
+    const estimatedMinutes = Math.round(distance * 3) + 10;
+
+    return {
+      id: config.code,
+      name: config.name,
+      icon: config.icon,
+      rating: config.rating,
+      distance: Math.round(distance * 100) / 100,
+      distanceUnit: 'km',
+      estimatedMinutes,
+      estimatedTime: `${estimatedMinutes}-${estimatedMinutes + 15}分钟`,
+      hasDiscount: soloDiscount > 0,
+      discountInfo: soloDiscountInfo,
+      pricing: {
+        solo: {
+          originalFee: soloBaseFee,
+          discount: soloDiscount,
+          actualFee: soloActualFee
+        },
+        shared: {
+          originalFee: sharedBaseFee,
+          discount: Math.round((soloBaseFee - sharedActualFee) * 100) / 100,
+          actualFee: sharedActualFee
+        }
+      }
+    };
+  }
+
+  /** 估算配送费用（兼容旧接口） */
+  async estimateFee(params) {
+    const { provider, pickup, delivery, deliveryType, serviceTotal, isNewUser } = params;
+    const result = this.calculateProviderFee({
+      provider: provider || 'meituan',
+      pickup, delivery,
+      serviceTotal, isNewUser
+    });
+
+    if (!result) {
+      return { success: false, error: 'unknown_provider', message: '不支持的服务商' };
+    }
+
+    const pricing = deliveryType === 'shared' ? result.pricing.shared : result.pricing.solo;
+    return {
+      success: true,
+      data: {
+        provider: result.id,
+        distance: result.distance,
+        distanceUnit: result.distanceUnit,
+        fee: pricing.actualFee,
+        originalFee: pricing.originalFee,
+        discount: pricing.discount,
+        currency: 'CNY',
+        estimatedMinutes: result.estimatedMinutes,
+        estimatedTime: result.estimatedTime,
+        hasDiscount: result.hasDiscount,
+        discountInfo: result.discountInfo,
+        deliveryType: deliveryType || 'solo'
+      }
+    };
+  }
+
+  /** 计算两点间距离（Haversine公式） */
+  calculateDistance(lat1, lng1, lat2, lng2) {
+    const R = 6371;
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLng = (lng2 - lng1) * Math.PI / 180;
+    const a = Math.sin(dLat / 2) ** 2 +
+      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+      Math.sin(dLng / 2) ** 2;
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  }
+
+  /** 获取支持的配送平台（含接入模式） */
   getAvailableProviders() {
-    return this.providers.map(p => ({
-      code: p,
-      name: p === 'meituan' ? '美团配送' : p === 'dada' ? '达达' : '顺丰同城',
-      enabled: !!DELIVERY_CONFIG[p].appId || !!DELIVERY_CONFIG[p].appKey || !!DELIVERY_CONFIG[p].customerId
-    }));
+    const statusList = deliveryProviders.getStatus();
+    return this.providers.map(p => {
+      const config = this.getProviderPricingConfig(p);
+      const st = statusList.find(s => s.code === p);
+      return {
+        code: p,
+        name: config?.name || p,
+        enabled: true,
+        mode: st?.mode || 'mock'
+      };
+    });
   }
 }
 

@@ -121,17 +121,18 @@
     <!-- 会员卡片 -->
     <div class="px-4 pt-6 pb-20">
         <div class="member-card text-white">
-            <div class="flex items-center gap-4 mb-6 relative z-10">
-                <div class="w-20 h-20 bg-white/20 rounded-full flex items-center justify-center">
-                    <span class="text-4xl">👤</span>
+            <div class="flex items-center gap-4 mb-6 relative z-10" style="cursor:pointer;" onclick="goToPage('c-profile-edit.html')">
+                <div class="w-20 h-20 bg-white/20 rounded-full flex items-center justify-center overflow-hidden relative flex-shrink-0">
+                    <img id="user-avatar" src="" style="display:none;width:100%;height:100%;object-fit:cover;" alt="头像">
+                    <span class="text-4xl" id="avatar-emoji">👤</span>
                 </div>
-                <div class="flex-1">
-                    <h2 class="text-xl font-bold mb-1" id="user-name">尊敬的用户</h2>
+                <div class="flex-1 min-w-0">
+                    <h2 class="text-xl font-bold mb-1 truncate" id="user-name">尊敬的用户</h2>
                     <p class="text-white/80 text-sm" id="user-phone">未登录</p>
                     <p class="text-white/60 text-xs mt-1" id="user-level">会员等级：金牌会员</p>
                 </div>
-                <div class="text-right">
-                    <div class="text-3xl">👑</div>
+                <div class="text-right flex-shrink-0">
+                    <span class="text-white/60 text-2xl">›</span>
                 </div>
             </div>
             
@@ -309,6 +310,26 @@
         
         // 页面初始化
         document.addEventListener('DOMContentLoaded', async function() {
+            initProfilePage();
+        });
+
+        // 页面从bfcache恢复或切换回来时重新同步
+        window.addEventListener('pageshow', function(e) {
+            if (e.persisted || document.visibilityState === 'visible') {
+                const token = localStorage.getItem('userToken');
+                if (token) fetchUserProfile(token);
+            }
+        });
+
+        // 标签页可见性变化时同步
+        document.addEventListener('visibilitychange', function() {
+            if (document.visibilityState === 'visible') {
+                const token = localStorage.getItem('userToken');
+                if (token) fetchUserProfile(token);
+            }
+        });
+
+        async function initProfilePage() {
             const token = localStorage.getItem('userToken');
             const userInfo = localStorage.getItem('userInfo');
             
@@ -327,13 +348,20 @@
                     document.getElementById('user-phone').textContent = user.phone ? maskPhone(user.phone) : '';
                     document.getElementById('user-level').textContent = '会员等级：金牌会员';
                     
+                    // 显示头像
+                    if (user.avatar) {
+                        document.getElementById('user-avatar').src = user.avatar;
+                        document.getElementById('user-avatar').style.display = 'block';
+                        document.getElementById('avatar-emoji').style.display = 'none';
+                    }
+                    
                     // 尝试获取最新用户信息
                     fetchUserProfile(token);
                 } catch (e) {
                     console.error('解析用户信息失败', e);
                 }
             }
-        });
+        }
 
         // 获取用户信息
         async function fetchUserProfile(token) {
@@ -349,6 +377,13 @@
                     document.getElementById('user-phone').textContent = user.phone ? maskPhone(user.phone) : '';
                     document.getElementById('balance').textContent = parseFloat(user.balance || 0).toFixed(2);
                     document.getElementById('points').textContent = user.points || 0;
+                    
+                    // 显示头像
+                    if (user.avatar) {
+                        document.getElementById('user-avatar').src = user.avatar;
+                        document.getElementById('user-avatar').style.display = 'block';
+                        document.getElementById('avatar-emoji').style.display = 'none';
+                    }
                     
                     // 更新本地存储
                     localStorage.setItem('userInfo', JSON.stringify(user));

@@ -67,9 +67,21 @@ const StorePickupManager = {
      */
     getStorePendingOrders(storeId) {
         const storeOrders = JSON.parse(localStorage.getItem('store_orders') || '[]');
-        return storeOrders.filter(order => 
+        const allOrders = JSON.parse(localStorage.getItem('orders') || '[]');
+        // 合并所有订单来源并去重
+        const allOrdersMap = {};
+        [...storeOrders, ...allOrders].forEach(function(o) {
+            const key = o.orderId || o.id;
+            if (key && !allOrdersMap[key]) {
+                allOrdersMap[key] = o;
+            }
+        });
+        const mergedOrders = Object.values(allOrdersMap);
+        return mergedOrders.filter(order => 
             order.deliveryMethod === 'pickup' &&
-            ['awaiting_store_confirm', 'ready'].includes(order.status)
+            ['awaiting_store_confirm', 'ready'].includes(order.status) &&
+            // 按当前门店过滤: 只展示本门店订单
+            (order.storeId === storeId || !order.storeId)
         ).map(order => ({
             ...order,
             // 添加物品未出库数量

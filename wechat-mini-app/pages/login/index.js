@@ -8,13 +8,18 @@ Page({
 
   onLoad() {
     console.log('[登录页] 加载完成');
-    // 检查是否已登录
+    // 检查是否已登录 — 延迟跳转避开框架初始化期
     if (app.globalData.isLoggedIn) {
-      console.log('[登录页] 已登录，跳转首页');
-      wx.switchTab({ 
-        url: '/pages/index/index',
-        fail: (err) => console.error('跳转失败:', err)
-      });
+      console.log('[登录页] 已登录，稍后跳转首页');
+      setTimeout(() => {
+        wx.switchTab({ 
+          url: '/pages/index/index',
+          fail: () => {
+            // switchTab 失败（框架未就绪），使用 reLaunch 保底
+            wx.reLaunch({ url: '/pages/index/index' });
+          }
+        });
+      }, 500);
     }
   },
 

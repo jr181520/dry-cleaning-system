@@ -1,0 +1,135 @@
+{
+  "storeId": "ST002",
+  "categories": [
+    {
+      "id": "cat_1",
+      "name": "衣物清洗",
+      "icon": "👔"
+    },
+    {
+      "id": "cat_2",
+      "name": "鞋子护理",
+      "icon": "👟"
+    },
+    {
+      "id": "cat_3",
+      "name": "箱包洗护",
+      "icon": "👜"
+    },
+    {
+      "id": "cat_4",
+      "name": "家纺清洗",
+      "icon": "🛏️"
+    },
+    {
+      "id": "cat_5",
+      "name": "特殊护理",
+      "icon": "✨"
+    }
+  ],
+  "services": [
+    {
+      "id": "svc_1",
+      "name": "西装干洗",
+      "category": "衣物清洗",
+      "price": 48,
+      "icon": "👔",
+      "desc": "专业熨烫定型",
+      "enabled": true
+    },
+    {
+      "id": "svc_2",
+      "name": "衬衫清洗",
+      "category": "衣物清洗",
+      "price": 30,
+      "icon": "👕",
+      "desc": "轻柔手洗护理",
+      "enabled": true
+    },
+    {
+      "id": "svc_3",
+      "name": "羽绒服清洗",
+      "category": "衣物清洗",
+      "price": 60,
+      "icon": "🧥",
+      "desc": "杀菌除螨护理",
+      "enabled": true
+    },
+    {
+      "id": "svc_4",
+      "name": "运动鞋清洗",
+      "category": "鞋子护理",
+      "price": 40,
+      "icon": "👟",
+      "desc": "深度清洁保养",
+      "enabled": true
+    },
+    {
+      "id": "svc_5",
+      "name": "皮鞋护理",
+      "category": "鞋子护理",
+      "price": 45,
+      "icon": "👞",
+      "desc": "真皮保养上光",
+      "enabled": true
+    },
+    {
+      "id": "svc_6",
+      "name": "皮包护理",
+      "category": "箱包洗护",
+      "price": 100,
+      "icon": "👜",
+      "desc": "奢侈品级养护",
+      "enabled": true
+    },
+    {
+      "id": "svc_7",
+      "name": "床单被罩",
+      "category": "家纺清洗",
+      "price": 60,
+      "icon": "🛏️",
+      "desc": "高温杀菌洗涤",
+      "enabled": true
+    },
+    {
+      "id": "svc_8",
+      "name": "沙发清洗",
+      "category": "家纺清洗",
+      "price": 120,
+      "icon": "🛋️",
+      "desc": "深度除螨清洁",
+      "enabled": true
+    }
+  ],
+  "promotions": [
+    {
+      "id": "promo_1",
+      "type": "discount",
+      "name": "自取9折",
+      "discountPercent": 10,
+      "condition": "pickup",
+      "desc": "到店自取享9折优惠",
+      "enabled": true
+    },
+    {
+      "id": "promo_2",
+      "type": "full_reduce",
+      "name": "满100减10",
+      "threshold": 100,
+      "reduce": 10,
+      "desc": "订单满100元立减10元",
+      "enabled": false
+    },
+    {
+      "id": "promo_3",
+      "type": "discount",
+      "name": "首单8折",
+      "discountPercent": 20,
+      "condition": "first_order",
+      "desc": "新用户首单享8折",
+      "enabled": false
+    }
+  ],
+  "updatedAt": 1782482950790,
+  "savedAt": "2026-06-26T14:09:10.793Z"
+}

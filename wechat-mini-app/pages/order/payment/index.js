@@ -375,7 +375,20 @@ Page({
           serviceType: 'dry_clean'
         })),
         deliveryMethod: orderData.deliveryMethod,
-        selectedProvider: orderData.provider?.id || null,
+        selectedProvider: orderData.provider ? {
+          id: orderData.provider.id,
+          name: orderData.provider.name,
+          icon: orderData.provider.icon
+        } : null,
+        courierTracking: orderData.deliveryMethod === 'courier' && orderData.courier ? {
+          name: orderData.courier.name || '',
+          phone: orderData.courier.phone || '',
+          status: orderData.courier.status || 'picking',
+          progress: orderData.courier.progress || 0,
+          distance: orderData.courier.distance || '1.5km',
+          eta: orderData.courier.eta || '15分钟',
+          assignedAt: orderData.courier.assignedAt || new Date().toISOString()
+        } : null,
         delivery: {
           type: orderData.deliveryMethod === 'courier' ? 'delivery' : 'pickup',
           address: orderData.userAddress || '',

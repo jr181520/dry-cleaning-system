@@ -1,4 +1,5 @@
 const app = getApp();
+const categoryUtil = require('../../utils/category');
 
 Page({
   data: {
@@ -8,64 +9,26 @@ Page({
       { id: 3, image: '/assets/images/banner3.jpg', title: '新用户福利' }
     ],
     pendingOrders: [],
-    services: [
-      { id: 1, icon: '👔', name: '西装干洗', price: 88, desc: '含熨烫，3-5天取件' },
-      { id: 2, icon: '👕', name: '衬衫清洗', price: 25, desc: '含熨烫，2-3天取件' },
-      { id: 3, icon: '🧥', name: '羽绒服清洗', price: 68, desc: '专业清洗，5-7天取件' },
-      { id: 4, icon: '👖', name: '裤子清洗', price: 35, desc: '含熨烫，2-3天取件' },
-      { id: 5, icon: '👗', name: '连衣裙清洗', price: 58, desc: '专业护理，3-5天取件' },
-      { id: 6, icon: '👟', name: '鞋子清洗', price: 45, desc: '深度清洁，3-5天取件' }
-    ],
-    nearbyStores: [
-      {
-        id: 1,
-        name: '干洗店旗舰店',
-        address: '某某市某某区某某街道123号',
-        distance: '1.2km',
-        phone: '400-888-8888',
-        hours: '08:00-22:00',
-        serviceCount: 12,
-        minPrice: 25,
-        isPromotion: true,
-        isRecommended: true,
-        isOnline: true
-      },
-      {
-        id: 2,
-        name: '干洗店中心店',
-        address: '某某市某某区某某街道456号',
-        distance: '2.5km',
-        phone: '400-888-8889',
-        hours: '09:00-21:00',
-        serviceCount: 10,
-        minPrice: 20,
-        isPromotion: false,
-        isRecommended: true,
-        isOnline: true
-      },
-      {
-        id: 3,
-        name: '干洗店东门店',
-        address: '某某市某某区某某街道789号',
-        distance: '3.1km',
-        phone: '400-888-8890',
-        hours: '10:00-20:00',
-        serviceCount: 8,
-        minPrice: 30,
-        isPromotion: true,
-        isRecommended: false,
-        isOnline: true
-      }
-    ],
+    // 品类
+    categories: categoryUtil.getAllCategories(),
+    activeCategory: 'cleaning',
+    currentCategory: categoryUtil.getCategory('cleaning'),
+    // 服务列表（当前品类的热门服务）
+    services: categoryUtil.getHomeServices('cleaning'),
+    // 附近门店（从API动态加载）
+    nearbyStores: [],
+    loadingStores: true,
     selectedStoreId: null
   },
 
   onLoad() {
-    this.loadData();
+    // 不在 onLoad 中发起网络请求，避免 WAServiceMainContext timeout
+    // 所有数据加载推迟到 onShow
   },
 
   onShow() {
-    this.loadData();
+    // 延迟加载数据，等待框架完全就绪且 app.onShow 初始化完成
+    setTimeout(() => this.loadData(), 500);
   },
 
   onPullDownRefresh() {
@@ -76,6 +39,8 @@ Page({
   loadData() {
     // 加载待取件订单
     this.loadPendingOrders();
+    // 加载附近门店
+    this.loadNearbyStores();
   },
 
   async loadPendingOrders() {
@@ -93,6 +58,52 @@ Page({
         pendingOrders: [
           { id: 1, orderId: 'ORD-2025-001', time: '今天 14:30', itemCount: 3 },
           { id: 2, orderId: 'ORD-2025-002', time: '昨天 16:20', itemCount: 1 }
+        ]
+      });
+    }
+  },
+
+  // 从后端API加载附近门店（价格由商家设定）
+  async loadNearbyStores() {
+    try {
+      const result = await app.request('/cleaning/stores');
+      if (result.success && result.data && result.data.length > 0) {
+        const stores = result.data.slice(0, 3).map(store => ({
+          id: store.storeId || store.id,
+          storeId: store.storeId || store.id,
+          name: store.name || store.storeName,
+          address: store.address || store.location || '',
+          distance: store.distance ? parseFloat(store.distance).toFixed(1) + 'km' : '未知',
+          distanceValue: parseFloat(store.distance) || 0,
+          phone: store.phone || store.contactPhone || '',
+          hours: store.hours || store.businessHours || '09:00-21:00',
+          rating: store.rating || 4.5,
+          serviceCount: store.serviceCount || 0,
+          isPromotion: store.hasPromotion || false,
+          isRecommended: store.isRecommended || false,
+          isOnline: store.status !== 'closed' && store.status !== 'offline',
+          promotionDesc: store.promotionDesc || ''
+        }));
+        this.setData({ nearbyStores: stores, loadingStores: false });
+      }
+    } catch (error) {
+      console.error('加载附近门店失败', error);
+      this.setData({ loadingStores: false });
+      // 加载失败时使用默认定点数据（不含价格）
+      this.setData({
+        nearbyStores: [
+          {
+            id: 'ST001', storeId: 'ST001',
+            name: '干洗店旗舰店', address: '朝阳区建国路88号',
+            distance: '1.2km', phone: '400-888-8888', hours: '08:00-22:00',
+            serviceCount: 12, isPromotion: true, isRecommended: true, isOnline: true
+          },
+          {
+            id: 'ST002', storeId: 'ST002',
+            name: '干洗店中心店', address: '海淀区中关村大街1号',
+            distance: '2.5km', phone: '400-888-8889', hours: '09:00-21:00',
+            serviceCount: 10, isPromotion: false, isRecommended: true, isOnline: true
+          }
         ]
       });
     }
@@ -124,20 +135,6 @@ Page({
     });
   },
 
-  // 我的订单
-  onMyOrders() {
-    wx.switchTab({
-      url: '/pages/orders/index'
-    });
-  },
-
-  // 会员中心
-  onMembership() {
-    wx.switchTab({
-      url: '/pages/profile/index'
-    });
-  },
-
   // 联系门店
   onContact() {
     app.showToast('请先选择门店', 'none');
@@ -151,43 +148,71 @@ Page({
     });
   },
 
-  // 线上下单
-  onQuickOrder() {
-    // 直接跳转到服务选择页面
-    wx.navigateTo({
-      url: '/pages/order/create/index'
-    });
-  },
-
-  // 查看全部服务
+  // 查看全部服务（携带当前品类上下文）
   onViewAllServices() {
+    const categoryId = this.data.activeCategory || 'cleaning';
     wx.navigateTo({
-      url: '/pages/services/list'
+      url: '/pages/services/list/index?category=' + categoryId
     });
   },
 
-  // 选择服务项目
+  // 选择服务项目 — 直接跳转下单页，跳过服务详情页
   onSelectService(e) {
     const serviceId = e.currentTarget.dataset.id;
-    // 直接跳转到服务详情页，让用户在详情页预约
+    const categoryId = e.currentTarget.dataset.cat || this.data.activeCategory;
+    
+    // 从当前品类服务列表中找到对应服务
+    const service = this.data.services.find(s => String(s.id) === String(serviceId));
+    
+    if (service) {
+      app.globalData.pendingServiceFromDetail = {
+        id: service.id,
+        icon: service.icon,
+        name: service.name,
+        desc: service.desc,
+        unit: service.unit,
+        isBoarding: service.isBoarding || false,
+        deposit: service.deposit || 0,
+        categoryId: categoryId
+      };
+    }
+    
+    // 直接跳转到服务选择/下单页，跳过服务详情页
     wx.navigateTo({
-      url: `/pages/services/detail/index?id=${serviceId}`
+      url: `/pages/order/create/index?from=home&category=${categoryId}`
     });
   },
 
-  // 查看全部门店
+  // 切换品类
+  onSwitchCategory(e) {
+    const categoryId = e.currentTarget.dataset.id;
+    if (categoryId === this.data.activeCategory) return;
+
+    const cat = categoryUtil.getCategory(categoryId);
+    const services = categoryUtil.getHomeServices(categoryId);
+
+    this.setData({
+      activeCategory: categoryId,
+      currentCategory: cat,
+      services
+    });
+  },
+
+  // 查看全部门店（跳转到门店选择页）
   onViewAllStores() {
     wx.navigateTo({
-      url: '/pages/stores/list'
+      url: '/pages/order/stores/index?from=home'
     });
   },
 
-  // 选择门店
+  // 选择门店 — 跳转下单流程
   onSelectStore(e) {
     const storeId = e.currentTarget.dataset.id;
-    this.setData({
-      selectedStoreId: storeId
-    });
-    app.showToast('门店已选择', 'success');
+    const store = this.data.nearbyStores.find(s => s.id === storeId);
+    if (store) {
+      app.globalData.selectedStore = store;
+    }
+    this.setData({ selectedStoreId: storeId });
+    wx.switchTab({ url: '/pages/services/list/index' });
   }
 });

@@ -33,8 +33,11 @@ const Store = mongoose.models.Store || mongoose.model('Store', storeSchema);
 const orderSchema = new mongoose.Schema({
   orderNo: { type: String, unique: true, index: true },
   orderType: { type: String, default: 'cleaning' },
+  categoryId: { type: String, default: 'cleaning' },  // 服务品类ID（cleaning/shoe_care/luxury_care/pet_grooming/electronics_repair/rental/rental_leisure）
   userId: { type: String, required: true, index: true },
   storeId: { type: String, required: true, index: true },
+  customerPhone: { type: String, index: true },  // 客户手机号（跨平台查询标识）
+  customerName: { type: String },  // 客户姓名
   items: [{
     itemId: String,
     name: String,
@@ -87,8 +90,15 @@ const orderSchema = new mongoose.Schema({
   deliveryFeePaidAt: Date,
   courier: {
     provider: String,
+    name: String,         // 配送员姓名
+    phone: String,        // 配送员电话
     orderId: String,
     fee: Number,
+    status: { type: String, enum: ['picking', 'delivering', 'delivered'], default: 'picking' },
+    progress: { type: Number, default: 0 },  // 0-100
+    distance: String,     // 距离，如 "1.5km"
+    eta: String,          // 预计到达，如 "15分钟"
+    assignedAt: Date,
     estimatedPickup: Date,
     actualPickup: Date,
     paidAt: Date
@@ -122,7 +132,7 @@ const orderSchema = new mongoose.Schema({
     // 9. delivering_back - 配送中（送回用户）
     // 10. completed - 已完成
     // 11. cancelled - 已取消
-    enum: ['pending', 'paid', 'delivering', 'received', 'processing', 'cleaning', 'cleaned', 'ready', 'delivering_back', 'completed', 'cancelled', 'awaiting_pickup_scan', 'awaiting_store_outbound'],
+    enum: ['pending', 'paid', 'delivering', 'received', 'processing', 'cleaning', 'cleaned', 'ready', 'delivering_back', 'completed', 'cancelled', 'awaiting_pickup_scan', 'awaiting_store_outbound', 'store_outbound'],
     default: 'pending',
     index: true
   },
@@ -169,7 +179,7 @@ class OrderService {
    * 创建订单
    */
   async createOrder(params) {
-    const { userId, storeId, items, delivery, amounts, deliveryMethod, selectedProvider } = params;
+    const { userId, storeId, items, delivery, amounts, deliveryMethod, selectedProvider, courierTracking, notes, categoryId, categoryType } = params;
     
     // 预处理 deliveryMethod：将 'pickup' 转换为 'store_pickup'
     const normalizedDeliveryMethod = deliveryMethod === 'pickup' ? 'store_pickup' : (deliveryMethod || 'store_pickup');
@@ -183,13 +193,13 @@ class OrderService {
     }
     
     const orderNo = this.generateOrderNo();
-    console.log('[createOrder] 创建订单:', { orderNo, userId, storeId, items: items.length });
+    console.log('[createOrder] 创建订单:', { orderNo, userId, storeId, items: items.length, phone: delivery?.contactPhone });
 
     const orderItems = items.map(item => ({
       itemId: 'ITEM-' + uuidv4(),
       name: item.name,
-      itemType: 'dry_cleaning',
-      serviceType: item.serviceType || 'dry_clean',
+      itemType: item.itemType || categoryId || 'dry_cleaning',
+      serviceType: item.serviceType || categoryId || 'dry_clean',
       material: item.material,
       price: item.price,
       quantity: item.quantity || 1,
@@ -210,16 +220,26 @@ class OrderService {
       };
       courierProvider = {
         provider: selectedProvider.id,
-        name: selectedProvider.name || selectedProvider.id,
-        fee: providerFees[selectedProvider.id] || 15
+        name: courierTracking?.name || '',
+        phone: courierTracking?.phone || '',
+        orderId: courierTracking?.orderId || '',
+        fee: providerFees[selectedProvider.id] || 15,
+        status: courierTracking?.status || 'picking',
+        progress: courierTracking?.progress || 0,
+        distance: courierTracking?.distance || '1.5km',
+        eta: courierTracking?.eta || '15分钟',
+        assignedAt: courierTracking?.assignedAt ? new Date(courierTracking.assignedAt) : new Date()
       };
     }
 
     const order = await Order.create({
       orderNo,
-      orderType: 'cleaning',
+      orderType: categoryType === 'rental' ? 'rental' : (categoryType || 'cleaning'),
+      categoryId: categoryId || 'cleaning',
       userId,
       storeId,
+      customerPhone: typeof delivery?.contactPhone === 'string' ? delivery.contactPhone : (delivery?.contactPhone || ''),
+      customerName: typeof delivery?.contactName === 'string' ? delivery.contactName : (delivery?.contactName || ''),
       items: orderItems,
       amounts: {
         subtotal: amounts?.subtotal || orderItems.reduce((s, i) => s + i.subtotal, 0),
@@ -274,7 +294,10 @@ class OrderService {
    * 获取订单列表
    */
   async getOrders(params) {
-    const { userId, roles, page, pageSize, status, storeId, includeDeleted } = params;
+    const { userId, roles, page, pageSize, status, storeId, includeDeleted, customerPhone } = params;
+    
+    // 清理手机号（trim 空格/特殊字符）
+    const cleanPhone = typeof customerPhone === 'string' ? customerPhone.trim() : customerPhone;
     
     const filter = {};
     
@@ -296,13 +319,33 @@ class OrderService {
       if (typeof userId === 'string' && /^[a-zA-Z]/.test(userId)) {
         filter.$or.push({ 'user._id': userId });
       }
-    } else if (roles?.includes('customer')) {
-      // 默认customer角色不过滤（需要配合req.user使用）
+      
+      // ===== 跨平台查询增强：同时用手机号匹配 =====
+      // 如果提供了customerPhone，也在$or中增加手机号匹配
+      // 这样即使用户ID不同，同一手机号的订单也能在不同平台间可见
+      if (cleanPhone) {
+        filter.$or.push({ 'delivery.contactPhone': cleanPhone });
+        filter.$or.push({ customerPhone: cleanPhone });
+      }
+    } else if (cleanPhone) {
+      // 只有手机号，没有userId：纯手机号查询（用于跨平台场景）
+      filter.$or = [
+        { 'delivery.contactPhone': cleanPhone },
+        { customerPhone: cleanPhone }
+      ];
     } else if (roles?.includes('store_staff') || roles?.includes('store_owner')) {
+      // 门店角色：按门店过滤
       filter.storeId = storeId;
+    } else {
+      // 无userId、无手机号、无门店角色 → 拒绝查询（安全兜底）
+      // customer角色必须有userId或phone才能查出结果
+      console.log('[getOrders] ⚠️ 无用户标识且无门店角色，返回空列表（安全兜底）');
+      return { list: [], total: 0, page, pageSize };
     }
     
     if (status) filter.status = status;
+    
+    console.log('[getOrders] 🔍 查询条件:', JSON.stringify({ userId, customerPhone: cleanPhone, status, page, pageSize, filterKeys: Object.keys(filter), orCount: filter.$or?.length }));
     
     const skip = (page - 1) * pageSize;
     
@@ -439,7 +482,8 @@ class OrderService {
       completed: '订单已完成，感谢您的使用',
       cancelled: '订单已取消',
       awaiting_pickup_scan: '等待门店扫码取件',
-      awaiting_store_outbound: '等待门店出库'
+      awaiting_store_outbound: '等待门店出库',
+      store_outbound: '商家已完成出库，等待取件'
     };
     order.statusDescription = STATUS_DESCRIPTIONS[order.status] || '订单处理中';
     
@@ -833,7 +877,7 @@ class OrderService {
       'cleaning': { from: ['paid', 'received', 'processing', 'pending', 'awaiting_store_confirm', 'out'], text: '清洗中' },
       'cleaned': { from: ['processing', 'cleaning', 'in_progress', 'received', 'out'], text: '清洗完成' },
       'ready': { from: ['processing', 'cleaned', 'cleaning', 'in_progress', 'received', 'out'], text: '待取件' },
-      'completed': { from: ['ready', 'delivered', 'awaiting_pickup_scan', 'awaiting_store_outbound', 'delivering_back', 'cleaned', 'cleaning', 'received', 'out', 'pending'], text: '已完成' }
+      'completed': { from: ['ready', 'delivered', 'awaiting_pickup_scan', 'awaiting_store_outbound', 'store_outbound', 'delivering_back', 'cleaned', 'cleaning', 'received', 'out', 'pending'], text: '已完成' }
     };
     
     const flow = statusFlow[status];
@@ -1060,6 +1104,16 @@ class OrderService {
       orderEventService.onOrderPaid(order);
     } catch (err) {
       console.error('[订单事件] 发布支付事件失败:', err.message);
+    }
+    
+    // 如果是跑腿配送订单且已选择服务商，启动跟踪模拟
+    try {
+      const courierTracker = require('../../../services/courierTrackingSimulator');
+      if (courierTracker.shouldStartSimulation(order)) {
+        courierTracker.startSimulation(order);
+      }
+    } catch (trackErr) {
+      console.error('[跑腿跟踪] 启动模拟失败:', trackErr.message);
     }
     
     return order;
@@ -1298,28 +1352,82 @@ class OrderService {
     order.courier = order.courier || {};
     order.courier.paidAt = order.deliveryFeePaidAt;
     
-    // 更新状态为等待骑手取件
-    order.deliveryStatus = 'pending_pickup';
+    // ☆ 初始状态：商家待出库（服务商尚未派单/骑手未出发）
+    order.deliveryStatus = 'awaiting_store_outbound';
+    order.courier.status = 'awaiting_store_outbound';
+    order.courier.progress = 0;
+    order.courier.provider = order.courier.provider || paymentInfo.provider || order.selectedProvider;
+    
     order.statusHistory.push({
       status: order.status,
       time: new Date(),
       actorId: auth.userId,
-      note: `配送费已支付，等待${paymentInfo.provider}骑手上门取件`
+      note: `配送费已支付(${paymentInfo.provider})，等待商家准备物品出库`
     });
     
     await order.save();
+    
+    // ========== 触发门店灯条（蓝色=配送准备）==========
+    try {
+      const lightService = require('../../../services/lightService');
+      if (lightService && lightService.isConnected()) {
+        const storeId = order.storeId || 'ST001';
+        const lightTopic = `dryclean/prod/${storeId}/light`;
+        lightService.publish(lightTopic, {
+          action: 'on',
+          color: 'blue',
+          mode: 'delivery_awaiting_outbound',
+          orderId: order._id?.toString() || orderId,
+          orderNo: order.orderNo,
+          priority: 'normal',
+          message: '配送费已支付，请备货出库',
+          timestamp: new Date().toISOString()
+        });
+        console.log(`[配送费支付] 已触发门店 ${storeId} 蓝色灯条（备货出库）`);
+      }
+    } catch (lightErr) {
+      console.warn('[配送费支付] 灯条触发失败:', lightErr.message);
+    }
     
     // 发送通知给门店
     if (order.storeId) {
       await notificationService.send(order.storeId, 'cleaning.delivery_fee_paid', {
         orderNo: order.orderNo,
         provider: paymentInfo.provider,
-        fee: paymentInfo.fee
+        fee: paymentInfo.fee,
+        deliveryStatus: 'awaiting_store_outbound'
       });
     }
     
     // 触发配送服务（传递 order._id 确保是 ObjectId 格式）
     await this.triggerDelivery(order._id, auth);
+    
+    // 启动跑腿配送跟踪模拟（模拟服务商实时回传骑手位置）
+    try {
+      const courierTracker = require('../../../services/courierTrackingSimulator');
+      if (courierTracker.shouldStartSimulation(order)) {
+        courierTracker.startSimulation(order);
+      }
+    } catch (trackErr) {
+      console.error('[跑腿跟踪] 启动模拟失败:', trackErr.message);
+    }
+    
+    // 通过MQTT发布订单事件通知门店
+    try {
+      const orderEventService = require('../../../services/orderEventService');
+      orderEventService.publishOrderEvent('delivery_fee_paid', {
+        _id: order._id,
+        orderId: order._id?.toString() || orderId,
+        orderNo: order.orderNo,
+        storeId: order.storeId,
+        status: order.status,
+        deliveryStatus: 'awaiting_store_outbound',
+        courier: order.courier,
+        selectedProvider: paymentInfo.provider
+      }, { source: 'payment-system' });
+    } catch (eventErr) {
+      console.warn('[配送费支付] 发布订单事件失败:', eventErr.message);
+    }
     
     return {
       orderId: order._id,
@@ -1450,6 +1558,16 @@ class OrderService {
     
     await order.save();
     
+    // 启动跑腿配送跟踪模拟（模拟服务商实时回传骑手位置）
+    try {
+      const courierTracker = require('../../../services/courierTrackingSimulator');
+      if (courierTracker.shouldStartSimulation(order)) {
+        courierTracker.startSimulation(order);
+      }
+    } catch (trackErr) {
+      console.error('[跑腿跟踪] 启动模拟失败:', trackErr.message);
+    }
+    
     return {
       orderId: order._id,
       deliveryMethod: order.deliveryMethod,
@@ -1476,14 +1594,74 @@ class OrderService {
     
     if (!order) throw new Error('订单不存在');
     
-    // TODO: 调用实际配送服务API（美团、达达、顺丰等）
-    console.log(`[配送服务] 为订单 ${order.orderNo} 创建配送单`);
+    // 必须有配送地址和配送费支付信息才创建真实配送单
+    const provider = order.courier?.provider || 'meituan';
+    const pickupAddress = order.storeAddress || order.pickupAddress || '门店仓库';
+    const deliveryAddress = order.pickupAddress || order.courier?.deliveryAddress || '';
+    const contactName = order.pickupContact?.name || order.courier?.contactName || '';
+    const contactPhone = order.pickupContact?.phone || order.courier?.contactPhone || '';
     
-    return {
-      success: true,
-      deliveryId: `DL${Date.now()}`,
-      message: '配送订单已创建'
-    };
+    if (!deliveryAddress || !contactPhone) {
+      console.log(`[配送服务] 订单 ${order.orderNo} 配送信息不完整，跳过创建配送单`);
+      return {
+        success: false,
+        message: '配送信息不完整，请补充配送地址和联系方式'
+      };
+    }
+    
+    console.log(`[配送服务] 为订单 ${order.orderNo} 创建配送单 (服务商: ${provider})`);
+    
+    try {
+      const deliveryService = require('../../common/services/deliveryService');
+      const result = await deliveryService.createDelivery({
+        provider,
+        orderId: order._id.toString(),
+        pickup: {
+          contactName: order.storeName || '干洗店',
+          contactPhone: order.storePhone || '400-000-0000',
+          address: pickupAddress,
+          storeId: order.storeId || ''
+        },
+        delivery: {
+          contactName,
+          contactPhone,
+          address: deliveryAddress
+        }
+      });
+      
+      if (result.success) {
+        // 保存配送信息到订单
+        // 兼容两种返回格式: result.deliveryId 或 result.data.deliveryId
+        const deliveryId = result.deliveryId || result.data?.deliveryId || `DL${Date.now()}`;
+        order.courier = order.courier || {};
+        order.courier.deliveryId = deliveryId;
+        order.courier.provider = provider;
+        order.courier.createdAt = new Date();
+        order.deliveryId = deliveryId;
+        await order.save();
+        
+        console.log(`[配送服务] 订单 ${order.orderNo} 配送单已创建: ${deliveryId}`);
+      }
+      
+      return result;
+    } catch (error) {
+      console.error(`[配送服务] 创建配送单失败 (${order.orderNo}):`, error.message);
+      // 即使外部API失败，也返回模拟ID让订单流程继续
+      const mockDeliveryId = `DL${Date.now()}`;
+      order.courier = order.courier || {};
+      order.courier.deliveryId = mockDeliveryId;
+      order.courier.provider = provider;
+      order.courier.createdAt = new Date();
+      order.deliveryId = mockDeliveryId;
+      await order.save();
+      
+      return {
+        success: true,
+        deliveryId: mockDeliveryId,
+        message: '配送订单已创建（模拟模式）',
+        simulated: true
+      };
+    }
   }
 
   /**

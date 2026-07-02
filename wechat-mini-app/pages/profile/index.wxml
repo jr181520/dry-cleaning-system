@@ -1,11 +1,19 @@
 <view class="container">
   <!-- 用户信息头部 -->
   <view class="profile-header">
-    <view class="user-info">
-      <image class="avatar" src="{{userInfo.avatar || '/assets/images/avatar-default.png'}}" mode="aspectFill"></image>
+    <view class="user-info" bindtap="onEditProfile">
+      <view class="avatar-wrap">
+        <image wx:if="{{userInfo.avatar}}" class="avatar" src="{{userInfo.avatar}}" mode="aspectFill"></image>
+        <view wx:else class="avatar avatar-placeholder">
+          <text class="avatar-text">{{userInfo.nickname ? userInfo.nickname[0] : '用'}}</text>
+        </view>
+      </view>
       <view class="user-detail">
         <text class="nickname">{{userInfo.nickname || '微信用户'}}</text>
         <text class="member-level" wx:if="{{userInfo.memberLevel}}">{{userInfo.memberLevel}}</text>
+        <view class="edit-hint">
+          <text class="edit-arrow">›</text>
+        </view>
       </view>
     </view>
   </view>

@@ -34,6 +34,11 @@ const storeSchema = new mongoose.Schema({
   orderCount: { type: Number, default: 0 },
   ownerId: String,
   staffIds: [String],
+  // 连锁门店相关字段
+  chainId: { type: String, index: true }, // 所属连锁ID
+  storeType: { type: String, enum: ['self', 'franchise', 'joint'], default: 'self' }, // 门店类型: self-自营, franchise-加盟, joint-联营
+  terminalSettlementEnabled: { type: Boolean, default: true }, // 终端结算功能开关
+  settlementRatio: { type: Number, default: 0.7 }, // 结算比例（0-1）
   createdAt: Date,
   updatedAt: Date
 }, { timestamps: true });
@@ -167,13 +172,182 @@ class StoreService {
   }
 
   /**
-   * 获取门店员工列表
+   * 创建门店员工账户（注册新用户并绑定到门店）
+   * @param {string} storeId - 门店ID
+   * @param {string} ownerId - 操作者（必须是store_owner）
+   * @param {object} staffData - { phone, password, name, role }
    */
-  async getStaffList(storeId, ownerId) {
-    const store = await Store.findOne({ _id: storeId, ownerId }).lean();
+  async createStaffAccount(storeId, ownerId, staffData) {
+    const { phone, password, name, role } = staffData;
+    
+    // 验证权限：只有owner或admin可以创建员工
+    const store = await Store.findOne({ _id: storeId }).lean();
+    if (!store) throw new Error('门店不存在');
+    
+    const User = mongoose.models.User;
+    const operator = await User.findById(ownerId);
+    if (!operator) throw new Error('操作者不存在');
+    if (!operator.roles.includes('store_owner') && !operator.roles.includes('admin')) {
+      throw new Error('只有门店老板或管理员可以创建员工账户');
+    }
+    
+    // 检查手机号是否已注册
+    let user = await User.findOne({ phone });
+    if (user) {
+      // 已存在：更新角色和门店关联
+      if (!user.roles.includes(role || 'store_staff')) {
+        user.roles = [...new Set([...user.roles, role || 'store_staff'])];
+      }
+      if (!user.storeId) {
+        user.storeId = storeId;
+      }
+      await user.save();
+    } else {
+      // 创建新用户
+      const { v4: uuidv4 } = require('uuid');
+      user = await User.create({
+        userNo: 'S' + Date.now().toString(36).toUpperCase(),
+        phone,
+        password, // pre-save hook 会自动hash
+        name: name || phone.slice(-4),
+        roles: [role || 'store_staff'],
+        storeId,
+        createdFrom: 'store_admin'
+      });
+    }
+    
+    // 添加到门店staffIds
+    await Store.updateOne(
+      { _id: storeId },
+      { $addToSet: { staffIds: user._id.toString() } }
+    );
+    
+    return { success: true, staffId: user._id, name: user.name, phone: user.phone, roles: user.roles };
+  }
+
+  /**
+   * 移除门店员工
+   */
+  async removeStaffAccount(storeId, ownerId, staffId) {
+    const store = await Store.findOne({ _id: storeId });
+    if (!store) throw new Error('门店不存在');
+    
+    const User = mongoose.models.User;
+    const operator = await User.findById(ownerId);
+    if (!operator || (!operator.roles.includes('store_owner') && !operator.roles.includes('admin'))) {
+      throw new Error('只有门店老板或管理员可以移除员工');
+    }
+    
+    // 从门店staffIds中移除
+    await Store.updateOne(
+      { _id: storeId },
+      { $pull: { staffIds: staffId } }
+    );
+    
+    // 更新用户：清除storeId和门店角色
+    const staff = await User.findById(staffId);
+    if (staff) {
+      staff.storeId = null;
+      staff.roles = staff.roles.filter(r => r !== 'store_staff' && r !== 'store_owner');
+      if (staff.roles.length === 0) staff.roles = ['customer'];
+      await staff.save();
+    }
+    
+    return { success: true };
+  }
+
+  /**
+   * 更新员工角色
+   */
+  async updateStaffRole(storeId, ownerId, staffId, newRole) {
+    const store = await Store.findOne({ _id: storeId });
+    if (!store) throw new Error('门店不存在');
+    
+    const User = mongoose.models.User;
+    const operator = await User.findById(ownerId);
+    if (!operator || (!operator.roles.includes('store_owner') && !operator.roles.includes('admin'))) {
+      throw new Error('只有门店老板或管理员可以修改员工角色');
+    }
+    
+    if (!['store_staff', 'store_owner'].includes(newRole)) {
+      throw new Error('无效的角色类型');
+    }
+    
+    const staff = await User.findById(staffId);
+    if (!staff) throw new Error('员工不存在');
+    if (!store.staffIds.map(id => id.toString()).includes(staffId.toString())) {
+      throw new Error('该员工不属于此门店');
+    }
+    
+    // 移除旧门店角色，添加新角色
+    staff.roles = staff.roles.filter(r => r !== 'store_staff' && r !== 'store_owner');
+    staff.roles.push(newRole);
+    staff.storeId = storeId;
+    await staff.save();
+    
+    return { success: true, roles: staff.roles };
+  }
+
+  /**
+   * 获取门店员工列表（含详细信息）
+   */
+  async getStaffListDetailed(storeId, requestUserId) {
+    const store = await Store.findOne({ _id: storeId }).lean();
+    if (!store) throw new Error('门店不存在');
+    
+    const User = mongoose.models.User;
+    const requestUser = await User.findById(requestUserId).lean();
+    const isAdmin = requestUser && requestUser.roles && requestUser.roles.includes('admin');
+    const isOwner = requestUser && requestUser.roles && requestUser.roles.includes('store_owner');
+    
+    // store_staff 只能查看列表（不能修改）
+    
+    const staffUsers = await User.find(
+      { _id: { $in: store.staffIds.map(id => mongoose.Types.ObjectId.isValid(id) ? id : null).filter(Boolean) } }
+    ).select('-password').lean();
+    
+    // 也查找所有storeId等于此门店的用户（可能没在staffIds里）
+    const storeUsers = await User.find(
+      { storeId: storeId.toString(), roles: { $in: ['store_staff', 'store_owner'] } }
+    ).select('-password').lean();
+    
+    // 合并去重
+    const allStaff = [];
+    const seen = new Set();
+    for (const u of [...staffUsers, ...storeUsers]) {
+      const uid = u._id.toString();
+      if (!seen.has(uid)) {
+        seen.add(uid);
+        allStaff.push({
+          id: uid,
+          userNo: u.userNo,
+          phone: u.phone,
+          name: u.name,
+          roles: u.roles,
+          lastLoginAt: u.lastLoginAt || null,
+          status: u.status,
+          createdAt: u.createdAt
+        });
+      }
+    }
+    
+    return {
+      storeId,
+      storeName: store.name,
+      storeNo: store.storeNo,
+      staff: allStaff,
+      canManage: isAdmin || isOwner
+    };
+  }
+
+  /**
+   * 获取门店员工列表（仅ID，兼容旧接口）
+   */
+  async getStaffList(storeId, requestUserId) {
+    const store = await Store.findOne({ _id: storeId }).lean();
     if (!store) throw new Error('门店不存在或无权操作');
     
-    return store.staffIds;
+    return store.staffIds || [];
   }
 
   /**

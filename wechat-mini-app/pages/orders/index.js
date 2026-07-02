@@ -58,15 +58,26 @@ Page({
     this.setData({ loading: true });
     
     try {
-      // 获取用户信息（优先使用openid或userId）
-      const userInfo = app.globalData.userInfo;
-      const userId = userInfo?.openid || userInfo?.id || userInfo?.userId || '';
+      // 获取用户信息（账户合并后优先使用 _id）
+      const userInfo = app.globalData.userInfo || {};
+      // 优先级：_id（合并后的真实用户ID）> id > openid > userId
+      const userId = userInfo._id || userInfo.id || userInfo.openid || userInfo.userId || '';
       
-      console.log('[订单列表] 用户ID:', userId);
+      // 获取手机号用于跨平台订单匹配
+      // 优先从 userDeliveryInfo（配送表单保存）获取，其次从用户资料获取
+      const deliveryInfo = wx.getStorageSync('userDeliveryInfo') || {};
+      const phone = deliveryInfo.contactPhone || userInfo.phone || '';
       
-      // 构建请求参数
+      console.log('[订单列表] 🔍 查询参数 - 用户ID:', userId, '手机号:', phone, '用户资料:', JSON.stringify({
+        _id: userInfo._id,
+        openid: userInfo.openid,
+        phone: userInfo.phone
+      }));
+      
+      // 构建请求参数（加 phone 实现跨平台查询）
       const params = {
         userId: userId,
+        phone: phone,  // 手机号用于跨平台匹配 C 端订单
         status: this.data.currentTab === 'all' ? '' : this.data.currentTab,
         page: refresh ? 1 : this.data.page,
         pageSize: this.data.pageSize
@@ -147,7 +158,8 @@ Page({
       'cancelled': '已取消',
       // C端/M端操作产生的中间态
       'awaiting_pickup_scan': '等待扫码取件',
-      'awaiting_store_outbound': '等待出库'
+      'awaiting_store_outbound': '等待出库',
+      'store_outbound': '已出库'
     };
     return statusMap[status] || status || '未知';
   },

@@ -8,6 +8,19 @@ const router = express.Router();
 const LightBinding = require('../../../models/LightBinding');
 const lightService = require('../../../services/lightService');
 
+// 延迟加载通知中心
+let notificationHub = null;
+function getNotificationHub() {
+  if (!notificationHub) {
+    try {
+      notificationHub = require('../../../services/notificationHubService');
+    } catch (e) {
+      return null;
+    }
+  }
+  return notificationHub;
+}
+
 // ============================================
 // 激活灯条（订单取件时调用）
 // POST /api/store/order-light/bind
@@ -56,8 +69,19 @@ router.post('/bind', async (req, res) => {
     
     let binding;
     if (existingBinding) {
-      // 更新现有绑定
-      Object.assign(existingBinding, bindingData);
+      // 【修复】只更新请求中明确提供的字段，避免默认值覆盖已有有效数据
+      // （之前 Object.assign 会将 lightId:'ALL'/color:'green' 等默认值覆盖掉已设置的具体值）
+      if (req.body.lightId !== undefined) existingBinding.lightId = lightId || 'ALL';
+      if (req.body.color !== undefined) existingBinding.color = color || 'green';
+      if (req.body.bindingType !== undefined) existingBinding.bindingType = bindingType || 'pickup';
+      if (req.body.userId !== undefined) existingBinding.userId = userId;
+      if (req.body.remark !== undefined) existingBinding.remark = remark;
+      existingBinding.orderId = orderId;
+      existingBinding.storeId = storeId;
+      existingBinding.status = 'active';
+      if (itemIndex !== undefined && itemIndex !== null) {
+        existingBinding.itemIndex = itemIndex;
+      }
       binding = await existingBinding.save();
     } else {
       // 创建新绑定
@@ -86,7 +110,8 @@ router.post('/bind', async (req, res) => {
       itemIndex,
       itemName: req.body.itemName || null,
       customerName: req.body.customerName || null,
-      color: color || 'green'
+      color: color || 'green',
+      orderNo: req.body.orderNo || null
     });
     
     console.log(`[灯条绑定] 激活 - 订单: ${orderId}, 物品: ${itemIndex}, 门店: ${storeId}, 颜色: ${color || 'green'}`);
@@ -152,6 +177,15 @@ router.post('/unbind', async (req, res) => {
         }
         await fallbackBinding.save();
         
+        // 写入通知中心（灯条关闭）
+        const hub1 = getNotificationHub();
+        if (hub1) {
+          hub1.addLightEvent(storeId || fallbackBinding.storeId, {
+            orderId, itemIndex: fallbackBinding.itemIndex,
+            itemName: null, customerName: null, color: null, action: 'deactivate'
+          });
+        }
+        
         // 发布MQTT命令关闭灯条
         const targetStoreId = storeId || fallbackBinding.storeId;
         const topic = `dryclean/prod/${targetStoreId}/light`;
@@ -186,6 +220,15 @@ router.post('/unbind', async (req, res) => {
       binding.remark = binding.remark ? `${binding.remark}; ${reason}` : reason;
     }
     await binding.save();
+    
+    // 写入通知中心（灯条关闭）
+    const hub2 = getNotificationHub();
+    if (hub2) {
+      hub2.addLightEvent(storeId || binding.storeId, {
+        orderId, itemIndex: binding.itemIndex,
+        itemName: null, customerName: null, color: null, action: 'deactivate'
+      });
+    }
     
     // 发布MQTT命令关闭灯条
     const targetStoreId = storeId || binding.storeId;
@@ -490,6 +533,15 @@ router.post('/clear-store/:storeId', async (req, res) => {
       timestamp: Date.now()
     });
     
+    // 写入通知中心（批量关灯）
+    const hub3 = getNotificationHub();
+    if (hub3) {
+      hub3.addLightEvent(storeId, {
+        orderId: 'BATCH', itemIndex: null,
+        itemName: '全部', customerName: null, color: null, action: 'deactivate'
+      });
+    }
+    
     console.log(`[灯条绑定] 清空门店灯条 - 门店: ${storeId}, 关闭数量: ${result.modifiedCount}`);
     
     res.json({
@@ -528,8 +580,9 @@ setInterval(() => {
 
 /**
  * 添加灯条通知到缓存（供 /bind 和 /batch-bind 内部调用）
+ * 同时写入通知中心供 Admin 端查询
  */
-function addLightNotification({ storeId, orderId, itemIndex, itemName, customerName, color }) {
+function addLightNotification({ storeId, orderId, itemIndex, itemName, customerName, color, orderNo }) {
   if (!storeId || !orderId) return;
   
   if (!pendingNotifications.has(storeId)) {
@@ -559,6 +612,20 @@ function addLightNotification({ storeId, orderId, itemIndex, itemName, customerN
     status: 'pending',
     createdAt: Date.now()
   });
+
+  // 同步写入通知中心（Admin 端可查询）
+  const hub = getNotificationHub();
+  if (hub) {
+    hub.addLightEvent(storeId, {
+      orderId,
+      itemIndex,
+      itemName: itemName || '待取件物品',
+      customerName: customerName || '客户',
+      color: color || 'green',
+      action: 'activate',
+      orderNo: orderNo || null
+    });
+  }
 }
 
 // ============================================

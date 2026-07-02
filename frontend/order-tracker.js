@@ -47,19 +47,26 @@ const ORDER_STATUS_CONFIG = {
     color: '#00bcd4',
     step: 5
   },
+  store_outbound: {
+    text: '已出库',
+    description: '商家已完成出库，等待取走/配送',
+    icon: 'icon-send',
+    color: '#00bcd4',
+    step: 6
+  },
   delivering_back: {
     text: '配送中',
     description: '配送员正在送回您的衣物',
     icon: 'icon-truck',
     color: '#2196f3',
-    step: 6
+    step: 7
   },
   completed: {
     text: '已完成',
     description: '订单已完成，感谢您的使用',
     icon: 'icon-check-circle-fill',
     color: '#4caf50',
-    step: 7
+    step: 8
   },
   cancelled: {
     text: '已取消',
@@ -77,6 +84,7 @@ const ORDER_STEPS = [
   { key: 'received', label: '已入库' },
   { key: 'processing', label: '处理中' },
   { key: 'ready', label: '待取件' },
+  { key: 'store_outbound', label: '已出库' },
   { key: 'completed', label: '完成' }
 ];
 

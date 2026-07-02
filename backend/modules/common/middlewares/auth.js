@@ -30,6 +30,23 @@ async function authMiddleware(req, res, next) {
         name: '开发管理员',
         roles: ['admin'],
         storeId: null,
+        chainId: null,
+        creditScore: 100
+      };
+      next();
+      return;
+    }
+    
+    // 开发模式：处理开发连锁管理员token
+    if (process.env.NODE_ENV !== 'production' && token.startsWith('dev-chain-')) {
+      req.user = {
+        id: token.replace('dev-chain-', ''),
+        userNo: 'CHAIN_DEV',
+        phone: '13900139000',
+        name: '连锁管理员',
+        roles: ['chain_admin'],
+        storeId: null,
+        chainId: null,
         creditScore: 100
       };
       next();
@@ -47,6 +64,23 @@ async function authMiddleware(req, res, next) {
         name: '开发管理员',
         roles: ['admin'],
         storeId: null,
+        chainId: null,
+        creditScore: 100
+      };
+      next();
+      return;
+    }
+    
+    // 开发模式：处理开发连锁管理员token
+    if (process.env.NODE_ENV !== 'production' && parsed && parsed.userId.startsWith('dev-chain-')) {
+      req.user = {
+        id: parsed.userId,
+        userNo: 'CHAIN_DEV',
+        phone: '13900139000',
+        name: '连锁管理员',
+        roles: ['chain_admin'],
+        storeId: null,
+        chainId: null,
         creditScore: 100
       };
       next();

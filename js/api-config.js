@@ -54,6 +54,22 @@ const API_CONFIG = {
         // 门店相关
         stores: '/stores',
         storeInfo: (storeId) => `/stores/${storeId}`,
+        storeStaffDetail: (storeId) => `/stores/${storeId}/staff/detail`,
+        storeStaffCreate: (storeId) => `/stores/${storeId}/staff/create`,
+        storeStaffDelete: (storeId, staffId) => `/stores/${storeId}/staff/${staffId}`,
+        storeStaffRole: (storeId, staffId) => `/stores/${storeId}/staff/${staffId}/role`,
+        
+        // 认证相关
+        staffLogin: '/auth/staff-login',
+        
+        // 连锁管理相关
+        chains: '/admin/chains',
+        chainDetail: (chainId) => `/admin/chains/${chainId}`,
+        chainDashboard: (chainId) => `/admin/chains/${chainId}/dashboard`,
+        chainOrders: (chainId) => `/admin/chains/${chainId}/orders`,
+        chainStoreAdd: (chainId, storeId) => `/admin/chains/${chainId}/stores/${storeId}`,
+        chainStoreRemove: (chainId, storeId) => `/admin/chains/${chainId}/stores/${storeId}`,
+        unchainedStores: '/admin/unchained-stores',
         
         // 其他
         health: '/health',
@@ -65,27 +81,75 @@ const API_CONFIG = {
         return `${this.baseUrl}${endpoint}`;
     },
     
-    // 通用的fetch封装
+    // 认证Token管理
+    _authToken: null,
+    
+    setAuthToken(token) {
+        this._authToken = token;
+        if (token) {
+            localStorage.setItem('auth_token', token);
+        } else {
+            localStorage.removeItem('auth_token');
+        }
+    },
+    
+    getAuthToken() {
+        if (!this._authToken) {
+            this._authToken = localStorage.getItem('auth_token');
+        }
+        return this._authToken;
+    },
+    
+    clearAuth() {
+        this._authToken = null;
+        localStorage.removeItem('auth_token');
+        localStorage.removeItem('storeUser');
+        localStorage.removeItem('currentStore');
+    },
+    
+    // 通用的fetch封装（自动带认证头）
     async request(endpoint, options = {}) {
         const url = this.getUrl(endpoint);
-        const config = {
-            headers: {
-                'Content-Type': 'application/json',
-                ...options.headers
-            },
-            timeout: this.timeout,
-            ...options
+        const headers = {
+            'Content-Type': 'application/json',
+            ...options.headers
         };
         
+        // 自动附加认证Token
+        const token = this.getAuthToken();
+        if (token) {
+            headers['Authorization'] = `Bearer ${token}`;
+        }
+        
+        const config = {
+            headers,
+            ...options
+        };
+        // 移除自定义timeout属性（fetch不支持）
+        delete config.timeout;
+        
         try {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), this.timeout);
+            config.signal = controller.signal;
+            
             const response = await fetch(url, config);
+            clearTimeout(timeoutId);
             
             if (!response.ok) {
-                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                const errorData = await response.json().catch(() => ({}));
+                const err = new Error(errorData.error || `HTTP ${response.status}: ${response.statusText}`);
+                err.status = response.status;
+                err.data = errorData;
+                throw err;
             }
             
             return await response.json();
         } catch (error) {
+            if (error.name === 'AbortError') {
+                console.error(`[API] 请求超时: ${endpoint}`);
+                throw new Error('请求超时');
+            }
             console.error(`[API] 请求失败: ${endpoint}`, error);
             throw error;
         }

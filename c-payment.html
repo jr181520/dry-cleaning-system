@@ -416,12 +416,28 @@
         let memberCards = []; // 会员卡列表
         let selectedMemberCard = null; // 选中的会员卡
 
+        // 配送费支付模式参数
+        let isDeliveryOnly = false;   // 是否仅支付配送费
+        let deliveryOnlyFee = 0;      // 配送费金额
+        let deliveryProvider = '';    // 配送服务商
+        let deliveryModeType = 'solo'; // 配送模式
+
         // 页面初始化
         document.addEventListener('DOMContentLoaded', function() {
             // 检查登录状态
             if (!localStorage.getItem('userToken')) {
                 window.location.href = 'c-login.html';
                 return;
+            }
+            
+            // 解析URL参数
+            const urlParams = new URLSearchParams(window.location.search);
+            const paymentType = urlParams.get('type');
+            if (paymentType === 'delivery') {
+                isDeliveryOnly = true;
+                deliveryOnlyFee = parseFloat(urlParams.get('fee') || '0');
+                deliveryProvider = urlParams.get('provider') || '';
+                deliveryModeType = urlParams.get('mode') || 'solo';
             }
             
             loadOrder();
@@ -536,9 +552,12 @@
             updateMemberCardDisplay();
             closeMemberCardModal();
             
+            // 根据支付模式使用对应的金额
+            const payAmount = isDeliveryOnly ? deliveryOnlyFee : (order?.fees?.total || 0);
+            
             // 选中的卡余额不足
-            if (selectedMemberCard.balance < order.fees.total) {
-                alert(`会员卡余额不足，当前余额: ¥${selectedMemberCard.balance.toFixed(2)}，订单金额: ¥${order.fees.total.toFixed(2)}`);
+            if (selectedMemberCard.balance < payAmount) {
+                alert(`会员卡余额不足，当前余额: ¥${selectedMemberCard.balance.toFixed(2)}，需支付: ¥${payAmount.toFixed(2)}`);
             }
         }
         
@@ -565,6 +584,61 @@
             
             order = JSON.parse(orderData);
             
+            // ===== 配送费单独支付模式 =====
+            if (isDeliveryOnly) {
+                document.title = '配送费支付 - 干洗服务';
+                document.querySelector('.page-header .text-xl').textContent = '配送费支付';
+                
+                // 修改取消按钮
+                const cancelBtn = document.getElementById('cancel-btn');
+                if (cancelBtn) {
+                    cancelBtn.textContent = '返回';
+                    cancelBtn.onclick = function() { window.location.href = 'c-courier-select.html?' + window.location.search.substring(1); };
+                }
+                
+                // 配送服务商名称映射
+                const providerNames = {
+                    'meituan': '美团跑腿', 'jd': '京东秒送', 'sf': '顺丰跑腿', 'taobao': '淘宝闪购'
+                };
+                const providerName = providerNames[deliveryProvider] || deliveryProvider || '未选择';
+                
+                // 订单信息显示
+                document.getElementById('store-name').textContent = order.store?.name || '系统自动分配门店';
+                document.getElementById('services-count').textContent = '1项';
+                document.getElementById('delivery-method').textContent = '跑腿配送到家';
+                document.getElementById('pickup-time').textContent = order.time?.text || '-';
+                document.getElementById('store-address').textContent = order.store?.address || '-';
+                document.getElementById('order-id').textContent = order.orderId || order.orderNo || '-';
+                
+                // 服务商信息
+                document.getElementById('provider-row').classList.remove('hidden');
+                document.getElementById('provider-name').textContent = `${providerName} · ${deliveryModeType === 'shared' ? '拼单配送' : '一对一专送'}`;
+                
+                // 费用：仅显示配送费
+                document.getElementById('fee-store').textContent = `¥0`;
+                document.getElementById('fee-delivery-row').classList.remove('hidden');
+                document.getElementById('fee-delivery').textContent = `¥${deliveryOnlyFee.toFixed(2)}`;
+                document.getElementById('fee-total').textContent = `¥${deliveryOnlyFee.toFixed(2)}`;
+                document.getElementById('pay-amount').textContent = `¥${deliveryOnlyFee.toFixed(2)}`;
+                
+                // 积分
+                document.getElementById('points-value').textContent = `${Math.floor(deliveryOnlyFee / 10) * 10} 积分`;
+                
+                // 账户余额
+                document.getElementById('balance-display').textContent = `¥${userBalance.toFixed(2)}`;
+                
+                // 隐藏自取折扣行
+                document.getElementById('fee-discount-row').classList.add('hidden');
+                
+                // 修改费用标题
+                const feeSectionTitle = document.querySelector('.mb-4 h3.font-bold');
+                if (feeSectionTitle) feeSectionTitle.textContent = '配送费用';
+                
+                // 隐藏配送方式提示（非首次下单）
+                return;
+            }
+            
+            // ===== 正常订单支付模式 =====
             // 更新UI
             document.getElementById('store-name').textContent = order.store ? order.store.name : '系统自动分配门店';
             document.getElementById('services-count').textContent = `${order.services.length}项`;
@@ -719,6 +793,7 @@
         // 生成POS付款二维码
         async function generatePOSQRCode() {
             const storeId = order.storeId || localStorage.getItem('storeId') || 'ST001';
+            const payAmount = isDeliveryOnly ? deliveryOnlyFee : (order.fees?.total || 0);
             
             // 优先尝试调用小程序码API
             try {
@@ -726,10 +801,10 @@
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        type: 'order_pay',
-                        orderId: order.orderId,
+                        type: isDeliveryOnly ? 'delivery_pay' : 'order_pay',
+                        orderId: order.orderId || order.orderNo,
                         storeId: storeId,
-                        amount: order.fees.total
+                        amount: payAmount
                     })
                 });
                 
@@ -738,9 +813,9 @@
                 if (result.success && result.data.imageData) {
                     // 显示微信小程序码
                     showQRCodeModal({
-                        orderId: order.orderId,
+                        orderId: order.orderId || order.orderNo,
                         miniQRImage: result.data.imageData,  // base64格式
-                        amount: order.fees.total,
+                        amount: payAmount,
                         source: 'wechat_mini'
                     });
                     return;
@@ -757,11 +832,11 @@
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        orderId: order.orderId,
+                        orderId: order.orderId || order.orderNo,
                         storeId: storeId,
-                        amount: order.fees.total,
+                        amount: payAmount,
                         customerPhone: order.contact?.phone,
-                        items: order.services,
+                        items: order.services || order.items || [],
                         operator: 'system'
                     })
                 });
@@ -770,9 +845,9 @@
                 
                 if (posResult.success) {
                     showQRCodeModal({
-                        orderId: order.orderId,
+                        orderId: order.orderId || order.orderNo,
                         qrCode: posResult.data.qrCode,
-                        amount: order.fees.total,
+                        amount: payAmount,
                         source: 'pos'
                     });
                     return;
@@ -783,15 +858,15 @@
             
             // 最后回退：使用模拟JSON二维码
             showQRCodeModal({
-                orderId: order.orderId,
+                orderId: order.orderId || order.orderNo,
                 qrCode: JSON.stringify({
-                    type: 'order_pay',
+                    type: isDeliveryOnly ? 'delivery_pay' : 'order_pay',
                     storeId: storeId,
-                    orderId: order.orderId,
-                    amount: order.fees.total,
+                    orderId: order.orderId || order.orderNo,
+                    amount: payAmount,
                     page: 'c-order-detail.html'
                 }),
-                amount: order.fees.total,
+                amount: payAmount,
                 source: 'fallback'
             });
         }
@@ -801,6 +876,8 @@
             const modal = document.createElement('div');
             modal.id = 'qrcode-modal';
             modal.className = 'fixed inset-0 bg-black/80 z-50 flex items-center justify-center';
+            
+            const payAmount = isDeliveryOnly ? deliveryOnlyFee : (order?.fees?.total || 0);
             
             // 根据来源决定二维码内容
             const isMiniQR = qrData.source === 'wechat_mini' && qrData.miniQRImage;
@@ -972,6 +1049,9 @@
             const payBtn = document.getElementById('pay-btn');
             const originalText = payBtn.querySelector('span').textContent;
             
+            // 配送费支付的应付金额
+            const payAmount = isDeliveryOnly ? deliveryOnlyFee : (order.fees?.total || 0);
+            
             // 处理现金支付 - 生成二维码
             if (selectedPayment === 'cash') {
                 payBtn.classList.add('paying');
@@ -988,8 +1068,8 @@
                     alert('请先选择会员卡');
                     return;
                 }
-                if (selectedMemberCard.balance < order.fees.total) {
-                    alert(`会员卡余额不足，当前余额: ¥${selectedMemberCard.balance.toFixed(2)}`);
+                if (selectedMemberCard.balance < payAmount) {
+                    alert(`会员卡余额不足，当前余额: ¥${selectedMemberCard.balance.toFixed(2)}，需支付: ¥${payAmount.toFixed(2)}`);
                     return;
                 }
             }
@@ -1007,25 +1087,56 @@
                     await simulatePayment();
                 }
                 
-                // 调用后端 API 更新支付状态
-                try {
-                    const payResponse = await fetch(`http://localhost:3000/api/cleaning/orders/${order.orderId}/pay`, {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'Authorization': 'Bearer ' + (localStorage.getItem('authToken') || '')
-                        },
-                        body: JSON.stringify({
-                            method: selectedPayment,
-                            transactionId: 'TXN' + Date.now()
-                        })
-                    });
-                    const payResult = await payResponse.json();
-                    if (payResult.success) {
-                        console.log('后端支付状态更新成功');
+                // 根据支付类型调用不同API
+                if (isDeliveryOnly) {
+                    // 配送费支付：调用配送费支付API
+                    try {
+                        const orderId = order.orderId || order.orderNo || order.id;
+                        const deliveryPayResponse = await fetch(`http://localhost:3000/api/cleaning/orders/${orderId}/pay-delivery-fee`, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Authorization': 'Bearer ' + (localStorage.getItem('authToken') || '')
+                            },
+                            body: JSON.stringify({
+                                provider: deliveryProvider,
+                                fee: deliveryOnlyFee,
+                                mode: deliveryModeType,
+                                method: selectedPayment,
+                                transactionId: 'TXN' + Date.now(),
+                                payTime: new Date().toISOString()
+                            })
+                        });
+                        const deliveryPayResult = await deliveryPayResponse.json();
+                        if (deliveryPayResult.success) {
+                            console.log('[配送费支付] 后端支付状态更新成功');
+                        } else {
+                            console.warn('[配送费支付] 后端返回失败:', deliveryPayResult.error);
+                        }
+                    } catch (apiError) {
+                        console.warn('[配送费支付] 后端API调用失败（本地模式继续）:', apiError.message);
                     }
-                } catch (apiError) {
-                    console.warn('后端支付状态更新失败:', apiError);
+                } else {
+                    // 正常订单支付：调用订单支付API
+                    try {
+                        const payResponse = await fetch(`http://localhost:3000/api/cleaning/orders/${order.orderId}/pay`, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Authorization': 'Bearer ' + (localStorage.getItem('authToken') || '')
+                            },
+                            body: JSON.stringify({
+                                method: selectedPayment,
+                                transactionId: 'TXN' + Date.now()
+                            })
+                        });
+                        const payResult = await payResponse.json();
+                        if (payResult.success) {
+                            console.log('后端支付状态更新成功');
+                        }
+                    } catch (apiError) {
+                        console.warn('后端支付状态更新失败:', apiError);
+                    }
                 }
                 
                 // 完成支付
@@ -1074,10 +1185,126 @@
         // 完成支付（通用）
         async function completePayment() {
             // 支付成功
-            order.status = 'paid';
+            order.status = order.status || 'paid';
             order.payTime = new Date().toLocaleString();
             order.paymentMethod = selectedPayment;
             
+            // ===== 配送费单独支付模式 =====
+            if (isDeliveryOnly) {
+                // 标记配送费已支付
+                order.deliveryFeePaid = true;
+                order.deliveryFeePaidAt = new Date().toISOString();
+                order.deliveryFee = deliveryOnlyFee;
+                order.selectedProvider = deliveryProvider;
+                order.deliveryMode = deliveryModeType;
+                order.deliveryMethod = 'courier';
+                // 初始状态：商家待出库（等待门店准备物品交给骑手）
+                order.deliveryStatus = 'awaiting_store_outbound';
+                order.courier = order.courier || {};
+                order.courier.status = 'awaiting_store_outbound';
+                order.courier.progress = 0;
+                order.courier.provider = deliveryProvider;
+                order.courier.paidAt = order.deliveryFeePaidAt;
+                
+                // 更新localStorage中的订单数据
+                updateOrderInLocalStorage(order);
+                
+                // 通知门店：配送费已支付 + 触发灯条管理窗口
+                // 跑腿配送到家模式下，店员需要灯条来快速定位物品交给骑手
+                // 注意：isDeliveryOnly 只会在第二程（门店→到家）时进入，第一程支付不会触发
+                try {
+                    const storeId = order.store?.storeId || order.storeId || 'ST001';
+                    const orderId = order.orderId || order.orderNo || order.id;
+                    
+                    // === 1. 写入 store_light_request（触发M端灯条管理窗口） ===
+                    const items = (order.items || order.services || []).map((item, idx) => ({
+                        itemId: `${orderId}-${idx}`,
+                        itemName: item.name || item.serviceName || ('物品' + (idx + 1)),
+                        lampIndex: idx,
+                        orderId: orderId,
+                        customerName: order.contact?.name || '客户',
+                        storeId: storeId,
+                        timestamp: Date.now(),
+                        status: 'active'
+                    }));
+                    
+                    const lightRequest = {
+                        type: 'delivery_return_request',
+                        orderId: orderId,
+                        storeId: storeId,
+                        storeName: order.store?.name || '门店',
+                        timestamp: Date.now(),
+                        customerName: order.contact?.name || '客户',
+                        status: 'active',
+                        deliveryProvider: deliveryProvider,
+                        deliveryFee: deliveryOnlyFee,
+                        deliveryMode: deliveryModeType,
+                        message: '跑腿配送到家：请根据灯条取出物品交给骑手',
+                        items: items.length > 0 ? items : [{
+                            itemId: orderId + '-0',
+                            itemName: '配送物品',
+                            lampIndex: 0,
+                            orderId: orderId,
+                            customerName: order.contact?.name || '客户',
+                            storeId: storeId,
+                            timestamp: Date.now(),
+                            status: 'active'
+                        }]
+                    };
+                    localStorage.setItem('store_light_request', JSON.stringify(lightRequest));
+                    
+                    // 触发跨标签页通知
+                    window.dispatchEvent(new StorageEvent('storage', {
+                        key: 'store_light_request',
+                        newValue: JSON.stringify(lightRequest)
+                    }));
+                    
+                    // === 2. 写入 delivery_fee_paid_ 标记（兜底记录） ===
+                    const payload = {
+                        type: 'delivery_fee_paid',
+                        action: 'light_on',
+                        lightColor: 'blue',
+                        orderId: orderId,
+                        storeId: storeId,
+                        storeName: order.store?.name || '门店',
+                        provider: deliveryProvider,
+                        fee: deliveryOnlyFee,
+                        mode: deliveryModeType,
+                        customerName: order.contact?.name || '客户',
+                        deliveryStatus: 'awaiting_store_outbound',
+                        message: '配送费已支付，请准备物品出库',
+                        timestamp: new Date().toISOString()
+                    };
+                    localStorage.setItem('delivery_fee_paid_' + orderId, JSON.stringify(payload));
+                    
+                    // === 3. 写入 courier_order_paid_* 通知M端（点亮物理灯条+Toast） ===
+                    localStorage.setItem('courier_order_paid_' + orderId, JSON.stringify({
+                        type: 'courier_order_paid',
+                        orderId: orderId,
+                        storeId: storeId,
+                        storeName: order.store?.name || '门店',
+                        customerName: order.contact?.name || '客户',
+                        customerPhone: order.contact?.phone || '',
+                        itemCount: (order.items || order.services || []).length,
+                        deliveryProvider: deliveryProvider,
+                        deliveryFee: deliveryOnlyFee,
+                        timestamp: new Date().toISOString()
+                    }));
+                    localStorage.setItem('last_courier_order_paid', orderId);
+                    
+                    console.log('[配送费支付] 灯条管理窗口已触发 + courier_order_paid 通知, 订单:', orderId);
+                } catch (e) {
+                    console.warn('[配送费支付] 通知门店失败:', e);
+                }
+                
+                // 小延迟后跳转
+                setTimeout(() => {
+                    window.location.href = `c-order-detail.html?id=${order.orderId || order.orderNo}`;
+                }, 500);
+                return;
+            }
+            
+            // ===== 正常订单支付模式 =====
             // 更新C端订单
             const orders = JSON.parse(localStorage.getItem('orders') || '[]');
             const orderIndex = orders.findIndex(o => o.orderId === order.orderId);
@@ -1121,6 +1348,37 @@
             
             // 跳转到成功页面
             window.location.href = 'c-order-success.html';
+        }
+        
+        // 更新订单到localStorage（配送费支付后）
+        function updateOrderInLocalStorage(updatedOrder) {
+            try {
+                // 更新orders列表
+                const orders = JSON.parse(localStorage.getItem('orders') || '[]');
+                const orderId = updatedOrder.orderId || updatedOrder.orderNo || updatedOrder.id;
+                const idx = orders.findIndex(o => 
+                    o.orderId === orderId || o.id === orderId || o.orderNo === orderId
+                );
+                if (idx > -1) {
+                    orders[idx] = { ...orders[idx], ...updatedOrder };
+                    localStorage.setItem('orders', JSON.stringify(orders));
+                }
+                
+                // 更新currentOrder
+                localStorage.setItem('currentOrder', JSON.stringify(updatedOrder));
+                
+                // 同步更新store_orders
+                const storeOrders = JSON.parse(localStorage.getItem('store_orders') || '[]');
+                const storeIdx = storeOrders.findIndex(o => 
+                    o.orderId === orderId || o.id === orderId || o.orderNo === orderId
+                );
+                if (storeIdx > -1) {
+                    storeOrders[storeIdx] = { ...storeOrders[storeIdx], ...updatedOrder };
+                    localStorage.setItem('store_orders', JSON.stringify(storeOrders));
+                }
+            } catch (e) {
+                console.warn('[配送费支付] 更新localStorage失败:', e);
+            }
         }
 
         // 模拟支付
@@ -1216,6 +1474,10 @@
                     storeOrders[orderIndex].deliveryFeePaidAt = new Date().toISOString();
                     localStorage.setItem('store_orders', JSON.stringify(storeOrders));
                 }
+                
+                // 5. 【修复】不再写入 store_light_request — 灯条管理窗口只应在取件时触发
+                // courier_order_paid_* 已在上方写入，M端 handleCourierOrderPaid 会点亮物理灯条
+                console.log('[C端] 跑腿订单支付通知已发送 (courier_order_paid), 订单:', order.orderId);
                 
             } catch (error) {
                 console.error('[C端] 触发跑腿订单准备失败:', error);

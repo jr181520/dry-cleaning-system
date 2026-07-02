@@ -30,8 +30,7 @@ router.post('/orders', async (req, res) => {
     
     const result = await orderService.createOrder({
       ...req.body,
-      userId: userId, // 统一使用userId存储
-      orderType: 'cleaning'
+      userId: userId  // 统一使用userId存储
     });
     
     console.log('[创建订单] 成功:', result.orderNo, '用户ID:', userId);
@@ -66,17 +65,77 @@ router.get('/orders', optionalAuth, async (req, res) => {
     
     const result = await orderService.getOrders({
       userId: queryUserId,
-      roles: req.user?.roles || ['customer'], // 默认作为客户查询
+      roles: req.user?.roles || (queryUserId || phone ? ['customer'] : []), // 有用户标识才给客户角色
       page: parseInt(page) || 1,
       pageSize: parseInt(pageSize) || 20,
       status,
-      storeId
+      storeId,
+      customerPhone: phone || null  // 支持按手机号跨平台查询
     });
     
     res.json({ success: true, data: result });
   } catch (error) {
     console.error('[订单列表] 查询失败:', error);
     res.status(400).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * 根据订单号/订单编号搜索订单（门店端手动搜索用）
+ * GET /api/cleaning/orders/search/:keyword?storeId=ST001
+ * 必须定义在 /orders/:id 之前，避免 :keyword 被 :id 捕获
+ */
+router.get('/orders/search/:keyword', async (req, res) => {
+  try {
+    const { keyword } = req.params;
+    const { storeId } = req.query;
+    const mongoose = require('mongoose');
+    const Order = mongoose.models.Order;
+    if (!Order) {
+      return res.json({ success: true, data: { found: false, message: '订单模型不可用' } });
+    }
+
+    const filter = {
+      $or: [
+        { orderNo: keyword },
+        { _id: mongoose.Types.ObjectId.isValid(keyword) ? new mongoose.Types.ObjectId(keyword) : null }
+      ].filter(c => c._id !== null || c.orderNo)
+    };
+    if (storeId) filter.storeId = storeId;
+
+    const order = await Order.findOne(filter);
+    if (!order) {
+      return res.json({ success: true, data: { found: false, message: '未找到该订单' } });
+    }
+
+    res.json({
+      success: true,
+      data: {
+        found: true,
+        orderId: order._id.toString(),
+        orderNo: order.orderNo,
+        storeId: order.storeId,
+        status: order.status,
+        items: order.items.map((item, idx) => ({
+          index: idx,
+          name: item.name,
+          barcode: item.barcode,
+          status: item.status,
+          itemType: item.itemType,
+          price: item.price
+        })),
+        customer: {
+          name: order.customerName || order.contactName || '',
+          phone: order.customerPhone || order.contactPhone || ''
+        },
+        amounts: order.amounts,
+        delivery: order.delivery,
+        createdAt: order.createdAt
+      }
+    });
+  } catch (error) {
+    console.error('[订单搜索] 错误:', error);
+    res.status(500).json({ success: false, error: error.message });
   }
 });
 
@@ -457,6 +516,20 @@ router.get('/orders/:id/status', async (req, res) => {
         statusText: getStatusText(order.status),
         statusDescription: getStatusDescription(order.status),
         pickupMethod: order.pickupMethod,
+        deliveryMethod: order.deliveryMethod,          // courier | store_pickup
+        deliveryType: order.delivery?.type,             // pickup | delivery（配送方向）
+        selectedProvider: order.selectedProvider,        // 已选跑腿服务商
+        courier: order.courier ? {                      // 骑手状态（跑腿配送的核心数据）
+          provider: order.courier.provider,
+          name: order.courier.name,
+          phone: order.courier.phone,
+          status: order.courier.status,                 // awaiting_store_outbound | picking | delivering | delivered
+          progress: order.courier.progress,
+          distance: order.courier.distance,
+          eta: order.courier.eta,
+          assignedAt: order.courier.assignedAt
+        } : null,
+        deliveryStatus: order.deliveryStatus,
         items: order.items.map(item => ({
           name: item.name,
           status: item.status
@@ -608,6 +681,176 @@ router.get('/stores/:storeId/services', async (req, res) => {
 });
 
 /**
+ * 店面配置同步（服务类别/价格/促销）
+ * POST /api/cleaning/store-config
+ * GET  /api/cleaning/store-config/:storeId
+ */
+router.post('/store-config', async (req, res) => {
+  try {
+    const { storeId, categories, services, promotions, updatedAt } = req.body;
+    if (!storeId) return res.status(400).json({ success: false, error: '缺少storeId' });
+    // 存储到文件（简单持久化，后续可升级为数据库）
+    const fs = require('fs');
+    const path = require('path');
+    const configDir = path.join(__dirname, '..', '..', 'data', 'store-configs');
+    if (!fs.existsSync(configDir)) fs.mkdirSync(configDir, { recursive: true });
+    const configPath = path.join(configDir, storeId + '.json');
+    fs.writeFileSync(configPath, JSON.stringify({
+      storeId, categories, services, promotions, updatedAt,
+      savedAt: new Date().toISOString()
+    }, null, 2));
+    res.json({ success: true, message: '配置已保存' });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+router.get('/store-config/:storeId', async (req, res) => {
+  try {
+    const fs = require('fs');
+    const path = require('path');
+    const configPath = path.join(__dirname, '..', '..', 'data', 'store-configs', req.params.storeId + '.json');
+    if (fs.existsSync(configPath)) {
+      const data = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+      res.json({ success: true, data });
+    } else {
+      res.json({ success: true, data: null });
+    }
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * 获取门店针对用户已选服务的实时报价（含促销折扣计算）
+ * POST /api/cleaning/stores/pricing
+ * Body: { selectedServices: [{name, icon, ...}] }
+ * 返回每家门店匹配的服务价格 + 折扣信息，与 C端 StoreConfig 逻辑一致
+ */
+router.post('/stores/pricing', async (req, res) => {
+  try {
+    const { selectedServices } = req.body;
+    if (!selectedServices || !Array.isArray(selectedServices) || selectedServices.length === 0) {
+      return res.json({ success: true, data: [], message: '未选择服务' });
+    }
+
+    const fs = require('fs');
+    const path = require('path');
+    const configDir = path.join(__dirname, '..', '..', 'data', 'store-configs');
+
+    // 加载门店配置的函数
+    function loadStoreConfig(storeId) {
+      try {
+        const configPath = path.join(configDir, storeId + '.json');
+        if (fs.existsSync(configPath)) {
+          return JSON.parse(fs.readFileSync(configPath, 'utf8'));
+        }
+      } catch (e) { /* ignore */ }
+      return null;
+    }
+
+    // 计算促销折扣（与 StoreConfig.calculatePromotionDiscount 逻辑一致）
+    function calculatePromotionDiscount(promotions, subtotal, deliveryMethod, isFirstOrder) {
+      var totalDiscount = 0;
+      var appliedPromos = [];
+
+      (promotions || []).filter(function(p) { return p.enabled !== false; }).forEach(function(promo) {
+        if (promo.type === 'discount') {
+          if (promo.condition === 'pickup' && deliveryMethod === 'pickup') {
+            var d = Math.round(subtotal * promo.discountPercent / 100);
+            totalDiscount += d;
+            appliedPromos.push({ name: promo.name, amount: d });
+          } else if (promo.condition === 'first_order' && isFirstOrder) {
+            var d2 = Math.round(subtotal * promo.discountPercent / 100);
+            totalDiscount += d2;
+            appliedPromos.push({ name: promo.name, amount: d2 });
+          } else if (!promo.condition) {
+            var d3 = Math.round(subtotal * promo.discountPercent / 100);
+            totalDiscount += d3;
+            appliedPromos.push({ name: promo.name, amount: d3 });
+          }
+        } else if (promo.type === 'full_reduce') {
+          if (subtotal >= promo.threshold) {
+            totalDiscount += promo.reduce;
+            appliedPromos.push({ name: promo.name, amount: promo.reduce });
+          }
+        }
+      });
+
+      return { totalDiscount: totalDiscount, appliedPromos: appliedPromos };
+    }
+
+    // 获取所有活跃门店
+    const storeResult = await storeService.getStores({ page: 1, pageSize: 50 });
+    const stores = storeResult.list || [];
+
+    // 默认服务价格表（当门店无配置时兜底）
+    var defaultServicePrices = {
+      '西装干洗': 50, '衬衫清洗': 30, '羽绒服清洗': 80,
+      '运动鞋清洗': 40, '皮鞋护理': 45, '皮包护理': 100,
+      '床单被罩': 60, '沙发清洗': 120
+    };
+
+    var pricingList = stores.map(function(store) {
+      var storeId = store.storeNo || store._id;
+      var config = loadStoreConfig(storeId);
+
+      // 获取门店服务价格映射
+      var svcMap = {};
+      if (config && config.services) {
+        config.services.filter(function(s) { return s.enabled !== false; }).forEach(function(s) {
+          svcMap[s.name] = s.price;
+        });
+      }
+      // 兜底：使用默认价格表
+      if (Object.keys(svcMap).length === 0) {
+        svcMap = defaultServicePrices;
+      }
+
+      // 匹配用户已选服务
+      var totalServicePrice = 0;
+      var matchedItems = [];
+      var matchCount = 0;
+
+      selectedServices.forEach(function(selSvc) {
+        var price = svcMap[selSvc.name] || selSvc.price || 0;
+        totalServicePrice += price;
+        matchCount++;
+        matchedItems.push({
+          name: selSvc.name,
+          price: price,
+          icon: selSvc.icon || '📦'
+        });
+      });
+
+      // 计算促销折扣（门店级别，取通用/无条件促销）
+      var promotionResult = { totalDiscount: 0, appliedPromos: [] };
+      if (config && config.promotions) {
+        // 仅计算无条件促销（不区分取送方式，门店列表阶段统一展示）
+        promotionResult = calculatePromotionDiscount(
+          config.promotions, totalServicePrice, 'pickup', false
+        );
+      }
+
+      return {
+        storeId: storeId,
+        serviceTotal: totalServicePrice,
+        discount: promotionResult.totalDiscount,
+        finalPrice: Math.max(0, totalServicePrice - promotionResult.totalDiscount),
+        matchedItems: matchedItems,
+        matchCount: matchCount,
+        appliedPromos: promotionResult.appliedPromos
+      };
+    });
+
+    res.json({ success: true, data: pricingList, message: '报价计算完成' });
+  } catch (error) {
+    console.error('[门店报价] 计算失败:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
  * 获取服务列表（小程序用）
  * GET /api/cleaning/services
  */
@@ -736,29 +979,58 @@ router.get('/stores', async (req, res) => {
   try {
     const result = await storeService.getStores({ page: 1, pageSize: 50 });
     const stores = result.list || [];
+
+    // 加载门店配置（服务/促销信息）
+    const fs = require('fs');
+    const path = require('path');
+    const configDir = path.join(__dirname, '..', '..', 'data', 'store-configs');
     
-    const storeList = stores.map(store => ({
-      storeId: store.storeNo,
-      id: store.storeNo,
-      name: store.name,
-      storeName: store.name,
-      address: store.address || '',
-      location: store.address || '',
-      phone: store.phone || '',
-      contactPhone: store.phone || '',
-      hours: store.businessHours || '09:00-21:00',
-      businessHours: store.businessHours || '09:00-21:00',
-      status: store.status === 'active' ? 'online' : 'offline',
-      isOnline: store.status === 'active',
-      rating: 4.5,
-      hasPromotion: false,
-      isRecommended: false,
-      serviceCount: 0,
-      minPrice: 20,
-      startingPrice: 20,
-      distance: 0,
-      deliveryFee: 10
-    }));
+    function loadStoreConfig(storeId) {
+      try {
+        const configPath = path.join(configDir, storeId + '.json');
+        if (fs.existsSync(configPath)) {
+          return JSON.parse(fs.readFileSync(configPath, 'utf8'));
+        }
+      } catch (e) { /* ignore */ }
+      return null;
+    }
+    
+    const storeList = stores.map(store => {
+      const storeId = store.storeNo;
+      const config = loadStoreConfig(storeId);
+      
+      // 从配置读取真实的服务和促销数据
+      var services = config ? (config.services || []) : [];
+      var enabledSvcs = services.filter(function(s) { return s.enabled !== false; });
+      var enabledPromos = config ? (config.promotions || []).filter(function(p) { return p.enabled !== false; }) : [];
+      var minPrice = enabledSvcs.length > 0 ? Math.min.apply(null, enabledSvcs.map(function(s) { return s.price; })) : 20;
+      var hasPromotion = enabledPromos.length > 0;
+      var promoDesc = hasPromotion ? enabledPromos.map(function(p) { return p.name; }).join('、') : '';
+      
+      return {
+        storeId: storeId,
+        id: storeId,
+        name: store.name,
+        storeName: store.name,
+        address: store.address || '',
+        location: store.address || '',
+        phone: store.phone || '',
+        contactPhone: store.phone || '',
+        hours: store.businessHours || '09:00-21:00',
+        businessHours: store.businessHours || '09:00-21:00',
+        status: store.status === 'active' ? 'online' : 'offline',
+        isOnline: store.status === 'active',
+        rating: store.rating || 4.5,
+        hasPromotion: hasPromotion,
+        isRecommended: store.isRecommended || false,
+        promotionDesc: promoDesc,
+        serviceCount: enabledSvcs.length,
+        minPrice: minPrice,
+        startingPrice: minPrice,
+        distance: 0,
+        deliveryFee: 10
+      };
+    });
     
     res.json({ 
       success: true, 
@@ -848,6 +1120,434 @@ router.get('/store/:storeId/orders', async (req, res) => {
     console.error('[门店订单] 获取失败:', error);
     res.status(500).json({ success: false, error: 'server_error', message: '获取门店订单失败' });
   }
+});
+
+/**
+ * 根据物品条码搜索订单（门店端扫码出库用）
+ * GET /api/cleaning/items/barcode/:barcode?storeId=ST001
+ * 返回: 匹配的物品所在订单及物品详情
+ */
+router.get('/items/barcode/:barcode', async (req, res) => {
+  try {
+    const { barcode } = req.params;
+    const { storeId } = req.query;
+    const mongoose = require('mongoose');
+    const Order = mongoose.models.Order;
+    if (!Order) {
+      return res.json({ success: true, data: { found: false, message: '订单模型不可用' } });
+    }
+
+    const filter = {};
+    if (storeId) filter.storeId = storeId;
+
+    // 使用聚合管道在嵌套items数组中搜索barcode
+    const orders = await Order.aggregate([
+      { $match: filter },
+      { $unwind: '$items' },
+      { $match: { 'items.barcode': barcode } },
+      { $limit: 5 }
+    ]);
+
+    if (orders.length === 0) {
+      return res.json({ success: true, data: { found: false, message: '未找到匹配的物品' } });
+    }
+
+    // 返回第一个匹配结果（条码应唯一）
+    const result = orders[0];
+    res.json({
+      success: true,
+      data: {
+        found: true,
+        orderId: result._id.toString(),
+        orderNo: result.orderNo,
+        storeId: result.storeId,
+        status: result.status,
+        item: {
+          index: result.items._index || 0,
+          name: result.items.name,
+          barcode: result.items.barcode,
+          status: result.items.status,
+          itemType: result.items.itemType,
+          price: result.items.price
+        },
+        customer: {
+          name: result.customerName || result.contactName,
+          phone: result.customerPhone || result.contactPhone
+        }
+      }
+    });
+  } catch (error) {
+    console.error('[条码搜索] 错误:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// ============================================
+// 全局搜索（跨订单/客户/物品）
+// ============================================
+
+/**
+ * 全局搜索
+ * GET /api/cleaning/search?keyword=xxx&storeId=xxx&type=all|order|customer|item
+ */
+router.get('/search', async (req, res) => {
+  try {
+    const { keyword, storeId, type = 'all' } = req.query;
+    
+    if (!keyword || keyword.trim().length === 0) {
+      return res.json({ success: true, data: { orders: [], customers: [], items: [] } });
+    }
+    
+    const mongoose = require('mongoose');
+    const Order = mongoose.models.Order;
+    const User = mongoose.models.User;
+    
+    const trimmed = keyword.trim();
+    // 安全转义正则特殊字符
+    const escaped = trimmed.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const keywordRegex = new RegExp(escaped, 'i');
+    const results = { orders: [], customers: [], items: [] };
+    
+    // ===== 搜索订单（orderNo / 客户名 / 客户电话 / 物品名 / 条码） =====
+    if (type === 'all' || type === 'order') {
+      const orderFilter = {
+        $or: [
+          { orderNo: keywordRegex },
+          { 'delivery.contactName': keywordRegex },
+          { 'delivery.contactPhone': keywordRegex },
+          { 'items.name': keywordRegex },
+          { 'items.barcode': trimmed }
+        ]
+      };
+      if (storeId) orderFilter.storeId = storeId;
+      
+      try {
+        const orders = await Order.find(orderFilter)
+          .sort({ createdAt: -1 })
+          .limit(15)
+          .lean();
+        
+        results.orders = orders.map(o => ({
+          _id: o._id,
+          orderId: o._id.toString(),
+          orderNo: o.orderNo,
+          status: o.status,
+          storeId: o.storeId,
+          customerName: o.customerName || o.delivery?.contactName || '',
+          customerPhone: o.customerPhone || o.delivery?.contactPhone || '',
+          itemCount: (o.items || []).length,
+          totalAmount: o.amounts?.total || 0,
+          createdAt: o.createdAt
+        }));
+      } catch (e) {
+        console.warn('[全局搜索] 订单搜索失败:', e.message);
+      }
+    }
+    
+    // ===== 搜索客户（姓名 / 电话） =====
+    if ((type === 'all' || type === 'customer') && User) {
+      try {
+        const users = await User.find({
+          roles: 'customer',
+          $or: [
+            { phone: keywordRegex },
+            { 'profile.name': keywordRegex }
+          ]
+        })
+          .limit(10)
+          .lean();
+        
+        results.customers = users.map(u => ({
+          _id: u._id,
+          userId: u._id.toString(),
+          name: u.profile?.name || '',
+          phone: u.phone || '',
+          avatar: u.profile?.avatar || ''
+        }));
+      } catch (e) {
+        console.warn('[全局搜索] 客户搜索失败:', e.message);
+      }
+    }
+    
+    // ===== 搜索物品（从订单中按名称/条码查找） =====
+    if (type === 'all' || type === 'item') {
+      try {
+        const itemFilter = {
+          $or: [
+            { 'items.name': keywordRegex },
+            { 'items.barcode': trimmed }
+          ]
+        };
+        if (storeId) itemFilter.storeId = storeId;
+        
+        const itemOrders = await Order.find(itemFilter)
+          .sort({ createdAt: -1 })
+          .limit(10)
+          .lean();
+        
+        itemOrders.forEach(order => {
+          (order.items || []).forEach(item => {
+            const matchName = keywordRegex.test(item.name || '');
+            const matchBarcode = item.barcode === trimmed;
+            if (matchName || matchBarcode) {
+              results.items.push({
+                orderId: order._id.toString(),
+                orderNo: order.orderNo,
+                name: item.name,
+                barcode: item.barcode,
+                status: item.status,
+                customerName: order.customerName || order.delivery?.contactName || ''
+              });
+            }
+          });
+        });
+        results.items = results.items.slice(0, 15);
+      } catch (e) {
+        console.warn('[全局搜索] 物品搜索失败:', e.message);
+      }
+    }
+    
+    res.json({ success: true, data: results });
+  } catch (error) {
+    console.error('[全局搜索] 错误:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// ============================================
+// 🧠 智慧大脑推荐系统
+// 平台统计所有入驻门店对应服务的费用，提供综合推荐/附近推荐/价优推荐
+// ============================================
+
+/**
+ * 门店智能推荐
+ * POST /api/cleaning/stores/recommend
+ * Body: { categoryId, serviceIds, boardingDetail?, lat?, lng? }
+ * 返回: { comprehensive: [], nearby: [], bestPrice: [] }
+ */
+router.post('/stores/recommend', async (req, res) => {
+  try {
+    const { categoryId, serviceIds, boardingDetail, lat, lng } = req.body;
+    
+    if (!serviceIds || !Array.isArray(serviceIds) || serviceIds.length === 0) {
+      return res.json({ success: true, data: { comprehensive: [], nearby: [], bestPrice: [] }, message: '未选择服务' });
+    }
+
+    const fs = require('fs');
+    const path = require('path');
+    const configDir = path.join(__dirname, '..', '..', 'data', 'store-configs');
+    const categoryService = require('../common/services/categoryService');
+
+    // 获取品类服务定义（获取系统默认价格作为兜底）
+    const cat = categoryService.getCategory(categoryId || 'cleaning');
+    const catServices = cat ? cat.services : [];
+
+    // 获取所有活跃门店
+    const storeResult = await storeService.getStores({ page: 1, pageSize: 100 });
+    const stores = storeResult.list || [];
+
+    function loadStoreConfig(storeId) {
+      try {
+        const configPath = path.join(configDir, storeId + '.json');
+        if (fs.existsSync(configPath)) {
+          return JSON.parse(fs.readFileSync(configPath, 'utf8'));
+        }
+      } catch (e) { /* ignore */ }
+      return null;
+    }
+
+    // 计算促销折扣
+    function calcDiscount(promotions, subtotal) {
+      let totalDiscount = 0;
+      let appliedPromos = [];
+      (promotions || []).filter(p => p.enabled !== false).forEach(promo => {
+        if (promo.type === 'discount' && (!promo.condition || promo.condition === 'pickup')) {
+          const d = Math.round(subtotal * promo.discountPercent / 100);
+          totalDiscount += d;
+          appliedPromos.push({ name: promo.name, amount: d });
+        } else if (promo.type === 'full_reduce' && subtotal >= promo.threshold) {
+          totalDiscount += promo.reduce;
+          appliedPromos.push({ name: promo.name, amount: promo.reduce });
+        }
+      });
+      return { totalDiscount, appliedPromos };
+    }
+
+    // 为每个门店计算报价
+    const storePricingList = stores.map(store => {
+      const storeId = store.storeNo || String(store._id);
+      const config = loadStoreConfig(storeId);
+
+      // 构建门店服务价格映射
+      const svcMap = {};
+      if (config && config.services) {
+        config.services.filter(s => s.enabled !== false).forEach(s => {
+          svcMap[s.name] = s.price;
+        });
+      }
+
+      let totalPrice = 0;
+      const matchedServices = [];
+      let allMatched = true;
+
+      // 计算每个选中服务的价格
+      serviceIds.forEach(svcId => {
+        // 从品类服务中找到服务定义
+        const catSvc = catServices.find(s => s.id === svcId);
+        if (!catSvc) { allMatched = false; return; }
+
+        // 处理寄养服务
+        if (svcId === 'boarding' && boardingDetail) {
+          const cfg = (config && config.boardingConfig) ? config.boardingConfig : null;
+          const defaultBoarding = {
+            small_dog: 30, medium_dog: 50, large_dog: 80, cat: 40, foodPerDay: 15
+          };
+          const bCfg = cfg || defaultBoarding;
+          const petPrice = bCfg[boardingDetail.petType] || defaultBoarding[boardingDetail.petType] || 30;
+          const foodPrice = boardingDetail.foodOption === 'store' ? (bCfg.foodPerDay || 15) : 0;
+          const boardingTotal = (petPrice + foodPrice) * boardingDetail.days;
+
+          totalPrice += boardingTotal;
+          matchedServices.push({
+            serviceId: svcId,
+            name: catSvc.name,
+            icon: catSvc.icon,
+            price: boardingTotal,
+            isBoarding: true,
+            boardingDetail: {
+              petType: boardingDetail.petType,
+              petName: boardingDetail.petName,
+              days: boardingDetail.days,
+              foodOption: boardingDetail.foodOption,
+              petPricePerDay: petPrice,
+              foodPricePerDay: foodPrice
+            }
+          });
+        } else {
+          // 普通服务：门店价格 > 系统默认价
+          const price = svcMap[catSvc.name] || catSvc.price || 0;
+          totalPrice += price;
+          matchedServices.push({
+            serviceId: svcId,
+            name: catSvc.name,
+            icon: catSvc.icon,
+            price: price,
+            isBoarding: false
+          });
+        }
+      });
+
+      if (!allMatched && matchedServices.length === 0) return null;
+
+      // 计算折扣
+      const promoResult = config && config.promotions ? calcDiscount(config.promotions, totalPrice) : { totalDiscount: 0, appliedPromos: [] };
+      const finalPrice = Math.max(0, totalPrice - promoResult.totalDiscount);
+
+      // 计算距离（如果提供了用户位置）
+      let distance = 0;
+      if (lat && lng && store.location && store.location.coordinates) {
+        const R = 6371;
+        const dLat = (store.location.coordinates[1] - lat) * Math.PI / 180;
+        const dLng = (store.location.coordinates[0] - lng) * Math.PI / 180;
+        const a = Math.sin(dLat/2)**2 + Math.cos(lat*Math.PI/180) * Math.cos(store.location.coordinates[1]*Math.PI/180) * Math.sin(dLng/2)**2;
+        distance = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+      }
+
+      return {
+        storeId: storeId,
+        storeName: store.name,
+        address: store.address || '',
+        phone: store.phone || '',
+        rating: store.rating || 4.5,
+        isOnline: store.status === 'active',
+        isRecommended: store.isRecommended || false,
+        hasPromotion: promoResult.appliedPromos.length > 0,
+        promotions: promoResult.appliedPromos,
+        distance: Math.round(distance * 10) / 10,
+        matchedServices: matchedServices,
+        serviceTotal: totalPrice,
+        discount: promoResult.totalDiscount,
+        finalPrice: finalPrice,
+        boardingConfig: config ? config.boardingConfig : null
+      };
+    }).filter(Boolean);
+
+    // 综合推荐算法：多维度加权评分
+    const maxPrice = Math.max(...storePricingList.map(s => s.finalPrice), 1);
+    const maxDistance = Math.max(...storePricingList.map(s => s.distance), 1);
+
+    const scored = storePricingList.map(s => ({
+      ...s,
+      _score: (s.rating / 5) * 0.4
+        + (1 - s.finalPrice / maxPrice) * 0.3
+        + (1 - s.distance / maxDistance) * 0.2
+        + (s.isRecommended ? 0.1 : 0)
+        + (s.hasPromotion ? 0.05 : 0)
+    }));
+
+    const comprehensive = [...scored].sort((a, b) => b._score - a._score).map(({_score, ...s}) => s);
+    const nearby = [...storePricingList].sort((a, b) => a.distance - b.distance);
+    const bestPrice = [...storePricingList].sort((a, b) => a.finalPrice - b.finalPrice);
+
+    res.json({
+      success: true,
+      data: { comprehensive, nearby, bestPrice },
+      message: '推荐计算完成'
+    });
+  } catch (error) {
+    console.error('[智慧推荐] 错误:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * 获取门店寄养配置
+ * GET /api/cleaning/boarding/config/:storeId
+ * 返回: { small_dog: 30, medium_dog: 50, large_dog: 80, cat: 40, foodPerDay: 15 }
+ */
+router.get('/boarding/config/:storeId', async (req, res) => {
+  try {
+    const fs = require('fs');
+    const path = require('path');
+    const configPath = path.join(__dirname, '..', '..', 'data', 'store-configs', req.params.storeId + '.json');
+
+    const defaultBoarding = {
+      small_dog: 30, medium_dog: 50, large_dog: 80, cat: 40, foodPerDay: 15
+    };
+
+    if (fs.existsSync(configPath)) {
+      const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+      res.json({
+        success: true,
+        data: config.boardingConfig || defaultBoarding
+      });
+    } else {
+      res.json({
+        success: true,
+        data: defaultBoarding,
+        message: '门店无自定义配置，使用系统默认'
+      });
+    }
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * 获取系统默认寄养配置（未选门店时使用）
+ * GET /api/cleaning/boarding/defaults
+ */
+router.get('/boarding/defaults', async (req, res) => {
+  res.json({
+    success: true,
+    data: {
+      small_dog:  { name: '小型犬', icon: '🐕',  basePrice: 30 },
+      medium_dog: { name: '中型犬', icon: '🐕‍🦺', basePrice: 50 },
+      large_dog:  { name: '大型犬', icon: '🐩',  basePrice: 80 },
+      cat:        { name: '猫咪',   icon: '🐱',  basePrice: 40 },
+      foodPerDay: 15
+    }
+  });
 });
 
 module.exports = router;

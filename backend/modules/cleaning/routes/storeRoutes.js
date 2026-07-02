@@ -99,7 +99,70 @@ router.get('/owner/my', authMiddleware, requireRoles('admin', 'store_owner'), as
 });
 
 /**
- * 添加门店员工
+ * 创建门店员工账户
+ * POST /api/stores/:id/staff/create
+ * Body: { phone, password, name, role }
+ */
+router.post('/:id/staff/create', authMiddleware, requireRoles('admin', 'store_owner'), async (req, res) => {
+  try {
+    const { phone, password, name, role } = req.body;
+    if (!phone) throw new Error('请提供手机号');
+    if (!password) throw new Error('请提供密码');
+    
+    const result = await storeService.createStaffAccount(req.params.id, req.user.id, {
+      phone, password, name, role
+    });
+    res.json({ success: true, data: result });
+  } catch (error) {
+    res.status(400).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * 获取门店员工列表（含详细信息）
+ * GET /api/stores/:id/staff/detail
+ */
+router.get('/:id/staff/detail', authMiddleware, requireRoles('admin', 'store_owner', 'store_staff'), async (req, res) => {
+  try {
+    const result = await storeService.getStaffListDetailed(req.params.id, req.user.id);
+    res.json({ success: true, data: result });
+  } catch (error) {
+    res.status(400).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * 移除门店员工
+ * DELETE /api/stores/:id/staff/:staffId
+ */
+router.delete('/:id/staff/:staffId', authMiddleware, requireRoles('admin', 'store_owner'), async (req, res) => {
+  try {
+    const result = await storeService.removeStaffAccount(req.params.id, req.user.id, req.params.staffId);
+    res.json({ success: true, data: result });
+  } catch (error) {
+    res.status(400).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * 更新员工角色
+ * PUT /api/stores/:id/staff/:staffId/role
+ * Body: { role: 'store_staff' | 'store_owner' }
+ */
+router.put('/:id/staff/:staffId/role', authMiddleware, requireRoles('admin', 'store_owner'), async (req, res) => {
+  try {
+    const { role } = req.body;
+    if (!role) throw new Error('请提供角色类型');
+    
+    const result = await storeService.updateStaffRole(req.params.id, req.user.id, req.params.staffId, role);
+    res.json({ success: true, data: result });
+  } catch (error) {
+    res.status(400).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * 添加门店员工（旧接口 - 通过staffId）
  * POST /api/stores/:id/staff
  */
 router.post('/:id/staff', authMiddleware, requireRoles('admin', 'store_owner'), async (req, res) => {
@@ -115,7 +178,7 @@ router.post('/:id/staff', authMiddleware, requireRoles('admin', 'store_owner'), 
 });
 
 /**
- * 获取门店员工列表
+ * 获取门店员工列表（旧接口 - 仅ID）
  * GET /api/stores/:id/staff
  */
 router.get('/:id/staff', authMiddleware, requireRoles('admin', 'store_owner', 'store_staff'), async (req, res) => {

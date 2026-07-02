@@ -6,20 +6,12 @@ Page({
     // 配送方式
     deliveryMethods: [
       {
-        id: 'pickup',
-        name: '自送到店',
-        icon: '🏪',
-        desc: '自行将衣物送到门店',
-        discount: 0.9,  // 享受9折优惠
-        discountText: '享9折优惠'
+        id: 'pickup', name: '自送到店', icon: '🏪',
+        desc: '自行将衣物送到门店', discountText: '享9折优惠'
       },
       {
-        id: 'courier',
-        name: '跑腿上门取件',
-        icon: '🛵',
-        desc: '骑手上门取件送到门店',
-        discount: 1,
-        discountText: ''
+        id: 'courier', name: '跑腿上门取件', icon: '🛵',
+        desc: '骑手上门取件送到门店', discountText: ''
       }
     ],
     selectedDeliveryMethod: 'pickup',
@@ -27,21 +19,24 @@ Page({
     // 配送服务商（跑腿方式时显示）
     deliveryProviders: [],
     selectedProvider: null,
+    deliveryType: 'solo',  // solo: 一对一, shared: 拼单 — 与C端保持一致
     
     // 用户信息
     selectedStore: null,
     selectedServices: [],
     serviceTotalPrice: 0,
-    contactName: '',       // 联系人姓名
+    contactName: '',
     userAddress: '',
     userPhone: '',
     
     // 费用明细
-    originalPrice: 0,      // 原价
-    discount: 0,          // 折扣金额
-    storeFee: 0,           // 门店服务费
-    deliveryFee: 0,        // 配送费
-    totalAmount: 0,        // 总计
+    originalPrice: 0,
+    discount: 0,
+    storeFee: 0,
+    deliveryFee: 0,
+    deliveryOriginalFee: 0,
+    deliveryDiscount: 0,
+    totalAmount: 0,
     
     // 预约时间
     timeOptions: [],
@@ -55,7 +50,6 @@ Page({
     console.log('[配送页面] - selectedServices:', app.globalData.selectedServices);
     console.log('[配送页面] - serviceTotalPrice:', app.globalData.serviceTotalPrice);
     
-    // 获取全局数据
     const selectedStore = app.globalData.selectedStore;
     const selectedServices = app.globalData.selectedServices;
     const serviceTotalPrice = app.globalData.serviceTotalPrice;
@@ -63,32 +57,20 @@ Page({
     if (!selectedServices || selectedServices.length === 0) {
       console.error('[配送页面] 错误: 服务数据为空!');
       app.showToast('请先选择服务', 'none');
-      setTimeout(() => {
-        wx.navigateBack();
-      }, 1500);
+      setTimeout(() => { wx.navigateBack(); }, 1500);
       return;
     }
     
-    console.log('[配送页面] 接收到的服务数据:', selectedServices);
-    console.log('[配送页面] 接收到的门店数据:', selectedStore);
-    
     this.setData({
-      selectedStore: selectedStore, // 可能是 null
+      selectedStore: selectedStore,
       selectedServices: selectedServices,
       serviceTotalPrice: serviceTotalPrice,
       originalPrice: serviceTotalPrice
     });
     
-    // 加载用户信息
     this.loadUserInfo();
-    
-    // 生成预约时间选项
     this.generateTimeOptions();
-    
-    // 加载配送服务商
     this.loadDeliveryProviders();
-    
-    // 计算初始费用
     this.calculateFees();
   },
 
@@ -152,72 +134,53 @@ Page({
     });
   },
 
-    // 加载配送服务商（聚合跑腿API）
+  // 加载配送服务商（从后端获取实时报价，含一对一/拼单两种模式）
   async loadDeliveryProviders() {
     try {
-      // 根据是否有门店选择不同的取件地址
-      const pickupAddress = this.data.selectedStore 
-        ? this.data.selectedStore.address 
-        : '系统自动分配最近门店';
+      // 获取配送距离
+      let distanceKm = 3;
+      if (this.data.selectedStore) {
+        var distStr = (this.data.selectedStore.distance || '3km').replace(/[^0-9.]/g, '');
+        var d = parseFloat(distStr);
+        if (!isNaN(d) && d > 0) distanceKm = d;
+      }
       
-      // 调用配送服务商查询（使用聚合跑腿API）
-      const result = await app.queryProviders({
-        pickupAddress: pickupAddress,
-        dropoffAddress: this.data.userAddress
-      });
+      var serviceTotal = this.data.serviceTotalPrice;
+      var isNewUser = !wx.getStorageSync('hasOrderedBefore');
       
-      if (result.success) {
+      // 调用后端 /api/delivery/quotes 获取所有服务商实时报价
+      const result = await app.request('/delivery/quotes', {
+        distance: distanceKm,
+        serviceTotal: serviceTotal,
+        isNewUser: isNewUser
+      }, 'POST');
+      
+      if (result.success && result.data && result.data.length > 0) {
         this.setData({
-          deliveryProviders: result.providers,
-          selectedProvider: result.providers[0]
+          deliveryProviders: result.data,
+          selectedProvider: null
         });
-        this.calculateFees();
+        console.log('[配送报价] 从后端获取实时报价成功:', result.data.length, '个服务商');
+      } else {
+        throw new Error('后端返回数据为空');
       }
     } catch (error) {
-      console.error('加载配送服务商失败', error);
-      // 使用默认数据（与C端保持一致）
-      const defaultProviders = [
-        {
-          id: 'meituan',
-          name: '美团跑腿',
-          icon: '🛵',
-          estimatedTime: '30-45分钟',
-          fee: 12,
-          actualFee: 9,
-          rating: 4.9,
-          hasDiscount: true,
-          discountInfo: '新用户首单立减3元'
-        },
-        {
-          id: 'jd',
-          name: '京东秒送',
-          icon: '🚚',
-          estimatedTime: '35-50分钟',
-          fee: 15,
-          actualFee: 15,
-          rating: 4.8,
-          hasDiscount: false,
-          discountInfo: ''
-        },
-        {
-          id: 'shunfeng',
-          name: '顺丰跑腿',
-          icon: '✈️',
-          estimatedTime: '40-60分钟',
-          fee: 18,
-          actualFee: 13,
-          rating: 4.9,
-          hasDiscount: true,
-          discountInfo: '满50元减5元'
-        }
+      console.warn('[配送报价] 获取失败，使用本地默认:', error.message || error);
+      // 离线兜底：使用本地默认服务商（含solo/shared定价）
+      var defaultProviders = [
+        { id: 'meituan', name: '美团跑腿', icon: '🛵', rating: 4.9, estimatedTime: '30-45分钟', pricing: { solo: { originalFee: 15, discount: 3, actualFee: 12 }, shared: { originalFee: 9.75, discount: 6.75, actualFee: 8.25 } } },
+        { id: 'jd', name: '京东秒送', icon: '🚚', rating: 4.8, estimatedTime: '35-50分钟', pricing: { solo: { originalFee: 18, discount: 0, actualFee: 18 }, shared: { originalFee: 10.8, discount: 7.2, actualFee: 10.8 } } },
+        { id: 'sf', name: '顺丰跑腿', icon: '✈️', rating: 4.9, estimatedTime: '40-60分钟', pricing: { solo: { originalFee: 20, discount: 5, actualFee: 15 }, shared: { originalFee: 14, discount: 9, actualFee: 10 } } },
+        { id: 'taobao', name: '淘宝闪购', icon: '🛒', rating: 4.7, estimatedTime: '30-50分钟', pricing: { solo: { originalFee: 16, discount: 3, actualFee: 13 }, shared: { originalFee: 9.92, discount: 9.08, actualFee: 9.92 } } }
       ];
       
       this.setData({
         deliveryProviders: defaultProviders,
         selectedProvider: null
       });
-      this.calculateFees();
     }
+    
+    this.calculateFees();
   },
 
   // 选择配送方式
@@ -236,7 +199,24 @@ Page({
     
     if (provider) {
       this.setData({
+        selectedDeliveryMethod: 'courier',
         selectedProvider: provider
+      });
+      this.calculateFees();
+    }
+  },
+  
+  // 选择配送方式（一对一/拼单）— 与C端一致
+  onSelectDeliveryType(e) {
+    const providerId = e.currentTarget.dataset.providerId;
+    const type = e.currentTarget.dataset.type;
+    const provider = this.data.deliveryProviders.find(p => p.id === providerId);
+    
+    if (provider) {
+      this.setData({
+        selectedDeliveryMethod: 'courier',
+        selectedProvider: provider,
+        deliveryType: type
       });
       this.calculateFees();
     }
@@ -276,22 +256,35 @@ Page({
     });
   },
 
-  // 计算费用明细
+  // 计算费用明细（含一对一/拼单配送模式）— 与C端一致
   calculateFees() {
-    const { selectedDeliveryMethod, selectedProvider, serviceTotalPrice } = this.data;
+    const { selectedDeliveryMethod, selectedProvider, serviceTotalPrice, deliveryType } = this.data;
     
     let storeFee = serviceTotalPrice;
     let discount = 0;
     let deliveryFee = 0;
+    let deliveryOriginalFee = 0;
+    let deliveryDiscount = 0;
     
     if (selectedDeliveryMethod === 'pickup') {
       // 自送到店享受9折优惠
-      discount = serviceTotalPrice * 0.1;
-      storeFee = Math.round(serviceTotalPrice * 0.9);
+      discount = Math.round(serviceTotalPrice * 0.1);
+      storeFee = serviceTotalPrice - discount;
       deliveryFee = 0;
-    } else {
-      // 跑腿上门取件
-      deliveryFee = selectedProvider?.actualFee || selectedProvider?.fee || 0;
+    } else if (selectedProvider) {
+      // 跑腿上门取件：根据deliveryType（solo/shared）获取对应价格
+      var dt = deliveryType || 'solo';
+      var p = selectedProvider;
+      
+      if (p.pricing && p.pricing[dt]) {
+        deliveryFee = p.pricing[dt].actualFee;
+        deliveryOriginalFee = p.pricing[dt].originalFee;
+        deliveryDiscount = p.pricing[dt].discount;
+      } else if (p.actualFee) {
+        deliveryFee = p.actualFee;
+      } else if (p.fee) {
+        deliveryFee = p.fee;
+      }
     }
     
     const totalAmount = storeFee + deliveryFee;
@@ -301,6 +294,8 @@ Page({
       discount: discount,
       storeFee: storeFee,
       deliveryFee: deliveryFee,
+      deliveryOriginalFee: deliveryOriginalFee,
+      deliveryDiscount: deliveryDiscount,
       totalAmount: totalAmount
     });
   },
@@ -312,9 +307,27 @@ Page({
       return;
     }
     
-    if (this.data.selectedDeliveryMethod === 'courier' && !this.data.selectedProvider) {
-      app.showToast('请选择配送服务商', 'none');
-      return;
+    if (this.data.selectedDeliveryMethod === 'courier') {
+      if (!this.data.selectedProvider) {
+        app.showToast('请选择配送服务商', 'none');
+        return;
+      }
+      if (!this.data.contactName || !this.data.contactName.trim()) {
+        app.showToast('请填写联系人姓名', 'none');
+        return;
+      }
+      if (!this.data.userPhone || !this.data.userPhone.trim()) {
+        app.showToast('请填写联系电话', 'none');
+        return;
+      }
+      if (this.data.userPhone.trim().length < 11) {
+        app.showToast('请填写正确的联系电话', 'none');
+        return;
+      }
+      if (!this.data.userAddress || !this.data.userAddress.trim()) {
+        app.showToast('请填写取件地址', 'none');
+        return;
+      }
     }
     
     // 保存配送信息到本地存储
@@ -325,17 +338,17 @@ Page({
     });
     
     // 保存订单数据到全局
-    // 将前端的 'pickup' 转换为后端期望的 'store_pickup'
     const deliveryMethodMap = {
       'pickup': 'store_pickup',
       'courier': 'courier'
     };
     
     const orderData = {
-      store: this.data.selectedStore, // 可能是 null（系统自动分配）
-      storeAutoAssigned: !this.data.selectedStore, // 标记是否自动分配门店
+      store: this.data.selectedStore,
+      storeAutoAssigned: !this.data.selectedStore,
       services: this.data.selectedServices,
       deliveryMethod: deliveryMethodMap[this.data.selectedDeliveryMethod] || 'store_pickup',
+      deliveryType: this.data.deliveryType || 'solo',  // 一对一/拼单
       provider: this.data.selectedProvider,
       time: {
         id: this.data.selectedTime,
@@ -346,17 +359,18 @@ Page({
         discount: this.data.discount,
         storeFee: this.data.storeFee,
         deliveryFee: this.data.deliveryFee,
+        deliveryOriginalFee: this.data.deliveryOriginalFee,
+        deliveryDiscount: this.data.deliveryDiscount,
         totalAmount: this.data.totalAmount
       },
       contactName: this.data.contactName,
       userAddress: this.data.userAddress,
       userPhone: this.data.userPhone,
       createdAt: new Date().toISOString(),
-      // 跑腿订单配送信息
       courier: this.data.selectedDeliveryMethod === 'courier' ? {
         name: this.data.selectedProvider ? 
           (this.data.selectedProvider.id === 'meituan' ? '张师傅' : 
-           this.data.selectedProvider.id === 'shunfeng' ? '李师傅' : '王师傅') : '配送员',
+           this.data.selectedProvider.id === 'sf' ? '李师傅' : '王师傅') : '配送员',
         phone: '138****1234',
         distance: '1.5km',
         eta: '15分钟',

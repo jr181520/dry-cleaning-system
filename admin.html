@@ -82,17 +82,18 @@
                             <span>业务管理</span>
                             <i class="fa fa-chevron-down ml-auto text-xs transition-transform duration-300"></i>
                         </a>
-                        <ul class="submenu pl-6 mt-1 space-y-1 hidden">
+                        <ul class="submenu pl-4 mt-1 space-y-1 hidden" id="business-submenu">
+                            <!-- 全品类概览 -->
                             <li>
                                 <a href="#orders" class="nav-link flex items-center space-x-3 p-2 rounded-lg text-gray-600 hover:bg-blue-50 hover:text-primary transition-all duration-300 ease-in-out hover:translate-x-1">
-                                    <i class="fa fa-shopping-cart w-5 text-center"></i>
-                                    <span>订单管理</span>
+                                    <i class="fa fa-globe w-5 text-center"></i>
+                                    <span>全部订单</span>
                                 </a>
                             </li>
                             <li>
                                 <a href="#customers" class="nav-link flex items-center space-x-3 p-2 rounded-lg text-gray-600 hover:bg-blue-50 hover:text-primary transition-all duration-300 ease-in-out hover:translate-x-1">
                                     <i class="fa fa-users w-5 text-center"></i>
-                                    <span>客户管理</span>
+                                    <span>全部客户</span>
                                 </a>
                             </li>
                             <li>
@@ -104,9 +105,12 @@
                             <li>
                                 <a href="#members" class="nav-link flex items-center space-x-3 p-2 rounded-lg text-gray-600 hover:bg-blue-50 hover:text-primary transition-all duration-300 ease-in-out hover:translate-x-1">
                                     <i class="fa fa-user-circle w-5 text-center"></i>
-                                    <span>会员管理</span>
+                                    <span>全部会员</span>
                                 </a>
                             </li>
+                            <!-- 分隔线 -->
+                            <li class="pt-2 mt-2 border-t border-gray-100"></li>
+                            <!-- 品类入口动态渲染 -->
                         </ul>
                     </li>
                     
@@ -157,6 +161,41 @@
                                 <a href="#store-approval" class="nav-link flex items-center space-x-3 p-2 rounded-lg text-gray-600 hover:bg-blue-50 hover:text-primary transition-all duration-300 ease-in-out hover:translate-x-1">
                                     <i class="fa fa-check-square w-5 text-center"></i>
                                     <span>审批管理</span>
+                                </a>
+                            </li>
+                        </ul>
+                    </li>
+                    
+                    <!-- 连锁企业管理 -->
+                    <li class="menu-item">
+                        <a href="#chain-management" class="nav-link flex items-center space-x-3 p-3 rounded-lg text-gray-700 hover:bg-blue-50 hover:text-primary transition-all duration-300 ease-in-out hover:translate-x-1">
+                            <i class="fa fa-sitemap w-5 text-center"></i>
+                            <span>连锁企业管理</span>
+                            <i class="fa fa-chevron-down ml-auto text-xs transition-transform duration-300"></i>
+                        </a>
+                        <ul class="submenu pl-6 mt-1 space-y-1 hidden">
+                            <li>
+                                <a href="#chain-list" class="nav-link flex items-center space-x-3 p-2 rounded-lg text-gray-600 hover:bg-blue-50 hover:text-primary transition-all duration-300 ease-in-out hover:translate-x-1">
+                                    <i class="fa fa-list w-5 text-center"></i>
+                                    <span>连锁列表</span>
+                                </a>
+                            </li>
+                            <li>
+                                <a href="#chain-create" class="nav-link flex items-center space-x-3 p-2 rounded-lg text-gray-600 hover:bg-blue-50 hover:text-primary transition-all duration-300 ease-in-out hover:translate-x-1">
+                                    <i class="fa fa-plus-circle w-5 text-center"></i>
+                                    <span>创建连锁</span>
+                                </a>
+                            </li>
+                            <li>
+                                <a href="#chain-stores" class="nav-link flex items-center space-x-3 p-2 rounded-lg text-gray-600 hover:bg-blue-50 hover:text-primary transition-all duration-300 ease-in-out hover:translate-x-1">
+                                    <i class="fa fa-link w-5 text-center"></i>
+                                    <span>门店关联</span>
+                                </a>
+                            </li>
+                            <li>
+                                <a href="chain-admin.html" target="_blank" class="nav-link flex items-center space-x-3 p-2 rounded-lg text-gray-600 hover:bg-blue-50 hover:text-primary transition-all duration-300 ease-in-out hover:translate-x-1">
+                                    <i class="fa fa-external-link w-5 text-center"></i>
+                                    <span>连锁管理端</span>
                                 </a>
                             </li>
                         </ul>
@@ -278,11 +317,129 @@
             <main class="flex-1 overflow-y-auto p-6">
                 <!-- 总仪表盘 -->
                 <div id="dashboard-content" class="content-section">
-                    <div class="mb-6">
-                        <h2 class="text-2xl font-bold text-gray-800">总仪表盘</h2>
-                        <p class="text-gray-600">系统概览和关键指标</p>
+                    <div class="flex items-center justify-between mb-6">
+                        <div>
+                            <h2 class="text-2xl font-bold text-gray-800">总仪表盘</h2>
+                            <p class="text-gray-500 text-sm mt-1">系统概览与各业务模块快捷入口</p>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <span id="dash-refresh-time" class="text-xs text-gray-400"></span>
+                            <button onclick="loadDashboard()" class="px-3 py-1.5 text-sm bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors flex items-center gap-1">
+                                <i class="fa fa-refresh"></i> 刷新
+                            </button>
+                        </div>
                     </div>
-                    <p>总仪表盘内容</p>
+                    
+                    <!-- 核心数据卡片 -->
+                    <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-4 mb-6">
+                        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5 hover:shadow-md hover:border-blue-300 transition-all cursor-pointer group" onclick="navigateToSection('users')" title="点击查看消费者用户详情（C端+微信小程序，手机号已验证）">
+                            <div class="flex items-center justify-between mb-3">
+                                <span class="text-xs font-semibold text-gray-500 uppercase tracking-wider">消费者用户</span>
+                                <span class="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center group-hover:bg-blue-200 transition-colors"><i class="fa fa-users text-blue-600 text-sm"></i></span>
+                            </div>
+                            <p id="dash-users" class="text-3xl font-bold text-gray-800">-</p>
+                            <p class="text-xs text-gray-400 mt-1 group-hover:text-blue-500 transition-colors">已手机验证 →</p>
+                        </div>
+                        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5 hover:shadow-md hover:border-cyan-300 transition-all cursor-pointer group" onclick="navigateToSection('users')" title="点击查看日活用户详情">
+                            <div class="flex items-center justify-between mb-3">
+                                <span class="text-xs font-semibold text-gray-500 uppercase tracking-wider">日活用户</span>
+                                <span class="w-8 h-8 rounded-lg bg-cyan-100 flex items-center justify-center group-hover:bg-cyan-200 transition-colors"><i class="fa fa-bolt text-cyan-600 text-sm"></i></span>
+                            </div>
+                            <p id="dash-dau" class="text-3xl font-bold text-gray-800">-</p>
+                            <p class="text-xs text-gray-400 mt-1 group-hover:text-cyan-500 transition-colors">今日登录用户 →</p>
+                        </div>
+                        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5 hover:shadow-md hover:border-teal-300 transition-all cursor-pointer group" onclick="navigateToSection('users')" title="点击查看月活用户详情">
+                            <div class="flex items-center justify-between mb-3">
+                                <span class="text-xs font-semibold text-gray-500 uppercase tracking-wider">月活用户</span>
+                                <span class="w-8 h-8 rounded-lg bg-teal-100 flex items-center justify-center group-hover:bg-teal-200 transition-colors"><i class="fa fa-calendar text-teal-600 text-sm"></i></span>
+                            </div>
+                            <p id="dash-mau" class="text-3xl font-bold text-gray-800">-</p>
+                            <p class="text-xs text-gray-400 mt-1 group-hover:text-teal-500 transition-colors">30日内活跃 →</p>
+                        </div>
+                        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5 hover:shadow-md hover:border-indigo-300 transition-all cursor-pointer group" onclick="navigateToSection('users')" title="点击查看日新增用户详情">
+                            <div class="flex items-center justify-between mb-3">
+                                <span class="text-xs font-semibold text-gray-500 uppercase tracking-wider">日新增用户</span>
+                                <span class="w-8 h-8 rounded-lg bg-indigo-100 flex items-center justify-center group-hover:bg-indigo-200 transition-colors"><i class="fa fa-user-plus text-indigo-600 text-sm"></i></span>
+                            </div>
+                            <p id="dash-today-new-users" class="text-3xl font-bold text-gray-800">-</p>
+                            <p class="text-xs text-gray-400 mt-1 group-hover:text-indigo-500 transition-colors">今日注册用户 →</p>
+                        </div>
+                        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5 hover:shadow-md hover:border-green-300 transition-all cursor-pointer group" onclick="navigateToSection('stores')" title="点击查看门店详情">
+                            <div class="flex items-center justify-between mb-3">
+                                <span class="text-xs font-semibold text-gray-500 uppercase tracking-wider">活跃门店</span>
+                                <span class="w-8 h-8 rounded-lg bg-green-100 flex items-center justify-center group-hover:bg-green-200 transition-colors"><i class="fa fa-building text-green-600 text-sm"></i></span>
+                            </div>
+                            <p id="dash-stores" class="text-3xl font-bold text-gray-800">-</p>
+                            <p class="text-xs text-gray-400 mt-1 group-hover:text-green-500 transition-colors">在营业门店 →</p>
+                        </div>
+                        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5 hover:shadow-md hover:border-purple-300 transition-all cursor-pointer group" onclick="navigateToSection('orders')" title="点击查看全部订单">
+                            <div class="flex items-center justify-between mb-3">
+                                <span class="text-xs font-semibold text-gray-500 uppercase tracking-wider">总订单数</span>
+                                <span class="w-8 h-8 rounded-lg bg-purple-100 flex items-center justify-center group-hover:bg-purple-200 transition-colors"><i class="fa fa-file-text text-purple-600 text-sm"></i></span>
+                            </div>
+                            <p id="dash-orders" class="text-3xl font-bold text-gray-800">-</p>
+                            <p class="text-xs text-gray-400 mt-1 group-hover:text-purple-500 transition-colors">历史累计订单 →</p>
+                        </div>
+                        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5 hover:shadow-md hover:border-orange-300 transition-all cursor-pointer group" onclick="navigateToFilteredOrders('today')" title="点击查看今日订单">
+                            <div class="flex items-center justify-between mb-3">
+                                <span class="text-xs font-semibold text-gray-500 uppercase tracking-wider">今日订单</span>
+                                <span class="w-8 h-8 rounded-lg bg-orange-100 flex items-center justify-center group-hover:bg-orange-200 transition-colors"><i class="fa fa-calendar-check-o text-orange-600 text-sm"></i></span>
+                            </div>
+                            <p id="dash-today-orders" class="text-3xl font-bold text-gray-800">-</p>
+                            <p class="text-xs text-gray-400 mt-1 group-hover:text-orange-500 transition-colors">今日新增订单 →</p>
+                        </div>
+                        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5 hover:shadow-md hover:border-red-300 transition-all cursor-pointer group" onclick="navigateToSection('statistics')" title="点击查看营收统计">
+                            <div class="flex items-center justify-between mb-3">
+                                <span class="text-xs font-semibold text-gray-500 uppercase tracking-wider">总营收</span>
+                                <span class="w-8 h-8 rounded-lg bg-red-100 flex items-center justify-center group-hover:bg-red-200 transition-colors"><i class="fa fa-cny text-red-600 text-sm"></i></span>
+                            </div>
+                            <p id="dash-revenue" class="text-3xl font-bold text-gray-800">-</p>
+                            <p class="text-xs text-gray-400 mt-1 group-hover:text-red-500 transition-colors" id="dash-today-revenue"></p>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+                        <!-- 订单状态分布 -->
+                        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5 lg:col-span-1">
+                            <h3 class="text-sm font-semibold text-gray-700 mb-4 flex items-center gap-2">
+                                <i class="fa fa-pie-chart text-blue-500"></i> 订单状态分布
+                            </h3>
+                            <div id="dash-status-bars" class="space-y-3">
+                                <div class="text-center text-gray-400 text-sm py-8">加载中...</div>
+                            </div>
+                        </div>
+                        
+                        <!-- 7日订单趋势 -->
+                        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5 lg:col-span-1">
+                            <h3 class="text-sm font-semibold text-gray-700 mb-4 flex items-center gap-2">
+                                <i class="fa fa-line-chart text-green-500"></i> 近7日订单趋势
+                            </h3>
+                            <div id="dash-trend-chart" class="flex items-end gap-1 h-40 px-2">
+                                <div class="text-center text-gray-400 text-sm w-full py-12">加载中...</div>
+                            </div>
+                            <div id="dash-trend-labels" class="flex gap-1 px-2 mt-2"></div>
+                        </div>
+
+                        <!-- 用户来源统计 -->
+                        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5 lg:col-span-1">
+                            <h3 class="text-sm font-semibold text-gray-700 mb-4 flex items-center gap-2">
+                                <i class="fa fa-user-plus text-indigo-500"></i> 用户来源统计
+                            </h3>
+                            <div id="dash-user-sources" class="space-y-3">
+                                <div class="text-center text-gray-400 text-sm py-8">加载中...</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 业务模块快捷入口 -->
+                    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+                        <h3 class="text-sm font-semibold text-gray-700 mb-4 flex items-center gap-2">
+                            <i class="fa fa-th-large text-indigo-500"></i> 业务模块快捷入口
+                        </h3>
+                        <div id="dash-module-cards" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-3">
+                            <div class="text-center text-gray-400 text-sm col-span-full py-4">加载中...</div>
+                        </div>
+                    </div>
                 </div>
                 
                 <!-- 订单管理 -->
@@ -443,11 +600,133 @@
                 
                 <!-- 会员管理 -->
                 <div id="members-content" class="content-section hidden">
-                    <div class="mb-6">
-                        <h2 class="text-2xl font-bold text-gray-800">会员管理</h2>
-                        <p class="text-gray-600">管理会员信息</p>
+                    <div class="mb-6 flex justify-between items-center">
+                        <div>
+                            <h2 class="text-2xl font-bold text-gray-800">会员管理</h2>
+                            <p class="text-gray-600">管理所有会员等级与消费数据 - 数据来源: MongoDB</p>
+                        </div>
+                        <div class="flex space-x-3">
+                            <input type="text" id="member-search-input" placeholder="搜索会员..." class="border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-primary" oninput="loadMembers()">
+                            <select id="member-level-filter" class="border border-gray-300 rounded-lg px-3 py-2" onchange="loadMembers()">
+                                <option value="">全部等级</option>
+                                <option value="platinum">铂金会员</option>
+                                <option value="gold">黄金会员</option>
+                                <option value="silver">白银会员</option>
+                                <option value="normal">普通会员</option>
+                            </select>
+                            <button onclick="loadMembers()" class="bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary/90 flex items-center space-x-2">
+                                <i class="fa fa-refresh"></i><span>刷新</span>
+                            </button>
+                        </div>
                     </div>
-                    <p>会员管理内容</p>
+                    <!-- 会员等级分布 -->
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6" id="member-stats-cards"></div>
+                    <div class="bg-white rounded-xl shadow p-4 overflow-x-auto">
+                        <table class="w-full text-sm">
+                            <thead><tr class="bg-gray-50">
+                                <th class="p-3 text-left">用户编号</th><th class="p-3 text-left">姓名</th><th class="p-3 text-left">手机号</th>
+                                <th class="p-3 text-left">会员等级</th><th class="p-3 text-left">积分</th>
+                                <th class="p-3 text-left">订单数</th><th class="p-3 text-left">消费总额</th>
+                                <th class="p-3 text-left">注册时间</th>
+                            </tr></thead>
+                            <tbody id="members-table-body"><tr><td colspan="8" class="p-8 text-center text-gray-400">加载中...</td></tr></tbody>
+                        </table>
+                        <div id="members-pagination" class="flex justify-between items-center mt-4 px-2"></div>
+                    </div>
+                </div>
+                
+                <!-- ========== 品类业务管理（动态模板） ========== -->
+                <!-- 品类订单管理 -->
+                <div id="business-orders-content" class="content-section hidden">
+                    <div class="mb-6 flex justify-between items-center">
+                        <div>
+                            <h2 class="text-2xl font-bold text-gray-800" id="biz-orders-title">品类订单管理</h2>
+                            <p class="text-gray-600" id="biz-orders-subtitle">按品类查看和管理订单</p>
+                        </div>
+                    </div>
+                    <!-- 统计卡片 -->
+                    <div class="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6" id="biz-orders-stats"></div>
+                    <!-- 筛选 -->
+                    <div class="bg-white rounded-lg shadow-md p-4 mb-4">
+                        <div class="flex flex-wrap gap-4 items-end">
+                            <div><label class="block text-sm font-medium text-gray-700 mb-1">状态</label>
+                                <select id="biz-orders-status" class="px-3 py-2 border rounded-lg" onchange="loadBizOrders()">
+                                    <option value="">全部</option><option value="pending">待支付</option><option value="paid">待处理</option>
+                                    <option value="processing">处理中</option><option value="completed">已完成</option><option value="cancelled">已取消</option>
+                                </select></div>
+                            <div><label class="block text-sm font-medium text-gray-700 mb-1">搜索</label>
+                                <input type="text" id="biz-orders-search" placeholder="订单号/手机号/姓名" class="px-3 py-2 border rounded-lg w-48" onkeyup="if(event.key==='Enter')loadBizOrders()"></div>
+                            <button onclick="loadBizOrders()" class="bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary/90"><i class="fa fa-search mr-1"></i>查询</button>
+                        </div>
+                    </div>
+                    <!-- 订单表格 -->
+                    <div class="bg-white rounded-lg shadow-md overflow-hidden">
+                        <table class="w-full">
+                            <thead class="bg-gray-50"><tr>
+                                <th class="p-3 text-left">订单号</th><th class="p-3 text-left">客户</th><th class="p-3 text-left">门店</th>
+                                <th class="p-3 text-left">状态</th><th class="p-3 text-right">金额</th><th class="p-3 text-left">时间</th>
+                            </tr></thead>
+                            <tbody id="biz-orders-tbody"><tr><td colspan="6" class="p-8 text-center text-gray-400">请选择品类查看订单</td></tr></tbody>
+                        </table>
+                        <div id="biz-orders-pagination" class="flex justify-between items-center p-4 border-t"></div>
+                    </div>
+                </div>
+
+                <!-- 品类客户管理 -->
+                <div id="business-customers-content" class="content-section hidden">
+                    <div class="mb-6 flex justify-between items-center">
+                        <div>
+                            <h2 class="text-2xl font-bold text-gray-800" id="biz-customers-title">品类客户管理</h2>
+                            <p class="text-gray-600" id="biz-customers-subtitle">按品类查看和管理客户</p>
+                        </div>
+                        <div class="flex space-x-3">
+                            <input type="text" id="biz-customers-search" placeholder="搜索客户..." class="border rounded-lg px-3 py-2" onkeyup="if(event.key==='Enter')loadBizCustomers()">
+                            <button onclick="loadBizCustomers()" class="bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary/90"><i class="fa fa-search"></i></button>
+                        </div>
+                    </div>
+                    <div class="bg-white rounded-lg shadow-md overflow-hidden">
+                        <table class="w-full">
+                            <thead class="bg-gray-50"><tr>
+                                <th class="p-3 text-left">客户</th><th class="p-3 text-left">手机号</th>
+                                <th class="p-3 text-center">订单数</th><th class="p-3 text-right">消费总额</th>
+                                <th class="p-3 text-left">最近下单</th><th class="p-3 text-center">状态</th>
+                            </tr></thead>
+                            <tbody id="biz-customers-tbody"><tr><td colspan="6" class="p-8 text-center text-gray-400">请选择品类查看客户</td></tr></tbody>
+                        </table>
+                        <div id="biz-customers-pagination" class="flex justify-between items-center p-4 border-t"></div>
+                    </div>
+                </div>
+
+                <!-- 品类会员管理 -->
+                <div id="business-members-content" class="content-section hidden">
+                    <div class="mb-6 flex justify-between items-center">
+                        <div>
+                            <h2 class="text-2xl font-bold text-gray-800" id="biz-members-title">品类会员管理</h2>
+                            <p class="text-gray-600" id="biz-members-subtitle">按品类查看和管理会员</p>
+                        </div>
+                        <div class="flex space-x-3">
+                            <input type="text" id="biz-members-search" placeholder="搜索会员..." class="border rounded-lg px-3 py-2" onkeyup="if(event.key==='Enter')loadBizMembers()">
+                            <select id="biz-members-level" class="border rounded-lg px-3 py-2" onchange="loadBizMembers()">
+                                <option value="">全部等级</option>
+                                <option value="platinum">铂金</option><option value="gold">黄金</option>
+                                <option value="silver">白银</option><option value="normal">普通</option>
+                            </select>
+                            <button onclick="loadBizMembers()" class="bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary/90"><i class="fa fa-refresh"></i></button>
+                        </div>
+                    </div>
+                    <!-- 会员等级分布 -->
+                    <div class="grid grid-cols-4 gap-4 mb-4" id="biz-members-stats"></div>
+                    <div class="bg-white rounded-lg shadow-md overflow-hidden">
+                        <table class="w-full">
+                            <thead class="bg-gray-50"><tr>
+                                <th class="p-3 text-left">姓名</th><th class="p-3 text-left">手机号</th>
+                                <th class="p-3 text-center">等级</th><th class="p-3 text-right">积分</th>
+                                <th class="p-3 text-center">品类订单</th><th class="p-3 text-right">品类消费</th>
+                            </tr></thead>
+                            <tbody id="biz-members-tbody"><tr><td colspan="6" class="p-8 text-center text-gray-400">请选择品类查看会员</td></tr></tbody>
+                        </table>
+                        <div id="biz-members-pagination" class="flex justify-between items-center p-4 border-t"></div>
+                    </div>
                 </div>
                 
                 <!-- 门店列表 -->
@@ -1314,29 +1593,88 @@
                 
                 <!-- 用户管理 -->
                 <div id="users-content" class="content-section hidden">
-                    <div class="mb-6">
-                        <h2 class="text-2xl font-bold text-gray-800">用户管理</h2>
-                        <p class="text-gray-600">管理系统用户</p>
+                    <div class="mb-6 flex justify-between items-center">
+                        <div>
+                            <h2 class="text-2xl font-bold text-gray-800">用户管理</h2>
+                            <p class="text-gray-600">管理系统所有用户 - 数据来源: MongoDB</p>
+                        </div>
+                        <div class="flex space-x-3">
+                            <input type="text" id="user-search-input" placeholder="搜索用户名/手机号..." class="border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-primary" oninput="loadUsers()">
+                            <select id="user-status-filter" class="border border-gray-300 rounded-lg px-3 py-2" onchange="loadUsers()">
+                                <option value="">全部状态</option>
+                                <option value="active">已激活</option>
+                                <option value="inactive">未激活</option>
+                                <option value="banned">已禁用</option>
+                            </select>
+                            <button onclick="loadUsers()" class="bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary/90 flex items-center space-x-2">
+                                <i class="fa fa-refresh"></i><span>刷新</span>
+                            </button>
+                        </div>
                     </div>
-                    <p>用户管理内容</p>
+                    <!-- 用户统计卡片 -->
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6" id="user-stats-cards"></div>
+                    <div class="bg-white rounded-xl shadow p-4 overflow-x-auto">
+                        <table class="w-full text-sm">
+                            <thead><tr class="bg-gray-50">
+                                <th class="p-3 text-left">用户编号</th><th class="p-3 text-left">姓名</th><th class="p-3 text-left">手机号</th>
+                                <th class="p-3 text-left">角色</th><th class="p-3 text-left">状态</th><th class="p-3 text-left">注册时间</th>
+                                <th class="p-3 text-left">最后登录</th><th class="p-3 text-left">操作</th>
+                            </tr></thead>
+                            <tbody id="users-table-body"><tr><td colspan="8" class="p-8 text-center text-gray-400">加载中...</td></tr></tbody>
+                        </table>
+                        <div id="users-pagination" class="flex justify-between items-center mt-4 px-2"></div>
+                    </div>
                 </div>
                 
                 <!-- 消息中心 -->
                 <div id="messages-content" class="content-section hidden">
-                    <div class="mb-6">
-                        <h2 class="text-2xl font-bold text-gray-800">消息中心</h2>
-                        <p class="text-gray-600">管理系统消息</p>
+                    <div class="mb-6 flex justify-between items-center">
+                        <div>
+                            <h2 class="text-2xl font-bold text-gray-800">消息中心</h2>
+                            <p class="text-gray-600">系统通知与订单事件 - 数据来源: NotificationHub</p>
+                        </div>
+                        <button onclick="loadMessages()" class="bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary/90 flex items-center space-x-2">
+                            <i class="fa fa-refresh"></i><span>刷新</span>
+                        </button>
                     </div>
-                    <p>消息中心内容</p>
+                    <div class="bg-white rounded-xl shadow p-4">
+                        <div id="messages-list" class="space-y-3">
+                            <p class="text-gray-400 text-center p-8">点击刷新按钮加载消息...</p>
+                        </div>
+                    </div>
                 </div>
                 
                 <!-- 统计分析 -->
                 <div id="statistics-content" class="content-section hidden">
                     <div class="mb-6">
                         <h2 class="text-2xl font-bold text-gray-800">统计分析</h2>
-                        <p class="text-gray-600">系统统计数据</p>
+                        <p class="text-gray-600">实时数据统计 - 数据来源: MongoDB</p>
                     </div>
-                    <p>统计分析内容</p>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8" id="stats-overview-cards">
+                        <div class="bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl p-6 text-white"><h3 class="text-blue-100">总用户数</h3><p class="text-3xl font-bold mt-2" id="stat-total-users">-</p></div>
+                        <div class="bg-gradient-to-br from-green-500 to-green-600 rounded-xl p-6 text-white"><h3 class="text-green-100">总订单数</h3><p class="text-3xl font-bold mt-2" id="stat-total-orders">-</p></div>
+                        <div class="bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl p-6 text-white"><h3 class="text-purple-100">总营收</h3><p class="text-3xl font-bold mt-2" id="stat-total-revenue">-</p></div>
+                    </div>
+                    <!-- 数据完整性面板 -->
+                    <div class="bg-white rounded-xl shadow p-6 mb-6" id="data-integrity-panel">
+                        <div class="flex items-center justify-between mb-4">
+                            <h3 class="text-lg font-semibold">数据完整性检查</h3>
+                            <button onclick="checkDataIntegrity()" class="bg-orange-500 text-white px-4 py-2 rounded-lg hover:bg-orange-600 flex items-center space-x-2">
+                                <i class="fa fa-check-circle"></i><span>执行检查</span>
+                            </button>
+                        </div>
+                        <div id="integrity-result" class="text-sm text-gray-600">点击"执行检查"按钮开始验证数据完整性...</div>
+                    </div>
+                    <!-- 数据导出 -->
+                    <div class="bg-white rounded-xl shadow p-6">
+                        <h3 class="text-lg font-semibold mb-4">数据导出</h3>
+                        <div class="flex space-x-3">
+                            <button onclick="exportData('all')" class="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600"><i class="fa fa-download mr-2"></i>导出全部数据</button>
+                            <button onclick="exportData('users')" class="bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600"><i class="fa fa-users mr-2"></i>导出用户数据</button>
+                            <button onclick="exportData('orders')" class="bg-orange-500 text-white px-4 py-2 rounded-lg hover:bg-orange-600"><i class="fa fa-list mr-2"></i>导出订单数据</button>
+                            <button onclick="exportData('stores')" class="bg-purple-500 text-white px-4 py-2 rounded-lg hover:bg-purple-600"><i class="fa fa-building mr-2"></i>导出门店数据</button>
+                        </div>
+                    </div>
                 </div>
                 
                 <!-- 系统设置 -->
@@ -2048,6 +2386,105 @@
                         </div>
                     </div>
                 </div>
+                
+                <!-- 连锁企业管理 - 连锁列表 -->
+                <div id="chain-list-content" class="content-section hidden">
+                    <div class="mb-6 flex justify-between items-center">
+                        <div>
+                            <h2 class="text-2xl font-bold text-gray-800">连锁企业列表</h2>
+                            <p class="text-gray-600">管理所有连锁品牌 - 多门店统一管理</p>
+                        </div>
+                        <div class="flex gap-2">
+                            <input type="text" id="chain-search-input" placeholder="搜索连锁名称..." class="border border-gray-300 rounded-lg px-3 py-2 text-sm w-48" onkeyup="if(event.key==='Enter')loadChainList()">
+                            <button onclick="loadChainList()" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg text-sm flex items-center gap-1"><i class="fa fa-search"></i> 搜索</button>
+                            <button onclick="navigateToSection('chain-create')" class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg text-sm flex items-center gap-1"><i class="fa fa-plus"></i> 创建连锁</button>
+                        </div>
+                    </div>
+                    <div class="bg-white rounded-xl shadow-card p-4 overflow-x-auto">
+                        <table class="w-full">
+                            <thead><tr>
+                                <th>编号</th><th>连锁名称</th><th>管理员</th><th>门店数</th><th>总订单</th><th>总营收</th><th>套餐</th><th>状态</th><th>操作</th>
+                            </tr></thead>
+                            <tbody id="chain-list-tbody">
+                                <tr><td colspan="9" class="text-center text-gray-400 py-8"><i class="fa fa-spinner fa-spin"></i> 加载中...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                
+                <!-- 连锁企业管理 - 创建连锁 -->
+                <div id="chain-create-content" class="content-section hidden">
+                    <div class="mb-6">
+                        <h2 class="text-2xl font-bold text-gray-800">创建连锁企业</h2>
+                        <p class="text-gray-600">为多门店连锁企业创建统一管理账户</p>
+                    </div>
+                    <div class="bg-white rounded-xl shadow-card p-6 max-w-2xl">
+                        <div class="grid grid-cols-2 gap-4 mb-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">企业名称 *</label>
+                                <input type="text" id="chain-create-name" class="w-full border border-gray-300 rounded-lg p-2.5 text-sm" placeholder="如：洁神连锁">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">简称</label>
+                                <input type="text" id="chain-create-short" class="w-full border border-gray-300 rounded-lg p-2.5 text-sm" placeholder="如：洁神">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">管理员手机号 *</label>
+                                <input type="text" id="chain-create-phone" class="w-full border border-gray-300 rounded-lg p-2.5 text-sm" placeholder="连锁管理员手机号">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">管理员姓名</label>
+                                <input type="text" id="chain-create-contact" class="w-full border border-gray-300 rounded-lg p-2.5 text-sm" placeholder="如：张三">
+                            </div>
+                            <div class="col-span-2">
+                                <label class="block text-sm font-medium text-gray-700 mb-1">总部地址</label>
+                                <input type="text" id="chain-create-address" class="w-full border border-gray-300 rounded-lg p-2.5 text-sm" placeholder="如：北京市朝阳区XX大厦">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">订阅套餐</label>
+                                <select id="chain-create-plan" class="w-full border border-gray-300 rounded-lg p-2.5 text-sm">
+                                    <option value="basic">基础版 (≤5门店)</option>
+                                    <option value="pro">专业版 (≤20门店)</option>
+                                    <option value="enterprise">企业版 (不限门店)</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="flex gap-3">
+                            <button onclick="createChain()" class="bg-primary text-white px-6 py-2.5 rounded-lg hover:bg-primary/90 text-sm font-medium"><i class="fa fa-check mr-1"></i> 创建连锁企业</button>
+                            <button onclick="navigateToSection('chain-list')" class="border border-gray-300 text-gray-600 px-6 py-2.5 rounded-lg hover:bg-gray-50 text-sm">取消</button>
+                        </div>
+                        <p id="chain-create-msg" class="mt-3 text-sm hidden"></p>
+                    </div>
+                </div>
+                
+                <!-- 连锁企业管理 - 门店关联 -->
+                <div id="chain-stores-content" class="content-section hidden">
+                    <div class="mb-6 flex justify-between items-center">
+                        <div>
+                            <h2 class="text-2xl font-bold text-gray-800">门店关联管理</h2>
+                            <p class="text-gray-600">将门店加入或移出连锁企业</p>
+                        </div>
+                        <div class="flex gap-2">
+                            <select id="chain-stores-select" class="border border-gray-300 rounded-lg px-3 py-2 text-sm" onchange="loadChainStoreLinks()">
+                                <option value="">选择连锁企业...</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">
+                        <div class="bg-white rounded-xl shadow-card p-4">
+                            <h3 class="text-sm font-semibold text-gray-700 mb-3 flex items-center"><i class="fa fa-link text-indigo-500 mr-2"></i> 已关联门店</h3>
+                            <div id="chain-linked-stores" class="max-h-96 overflow-y-auto">
+                                <p class="text-gray-400 text-sm text-center py-8">请先选择连锁企业</p>
+                            </div>
+                        </div>
+                        <div class="bg-white rounded-xl shadow-card p-4">
+                            <h3 class="text-sm font-semibold text-gray-700 mb-3 flex items-center"><i class="fa fa-plus-circle text-green-500 mr-2"></i> 可关联门店</h3>
+                            <div id="chain-unlinked-stores" class="max-h-96 overflow-y-auto">
+                                <p class="text-gray-400 text-sm text-center py-8">请先选择连锁企业</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </main>
         </div>
     </div>
@@ -2056,7 +2493,7 @@
         // 权限配置
         const permissions = {
             '总管理员': {
-                navigation: ['dashboard', 'orders', 'customers', 'items', 'members', 'stores', 'provincial-summary', 'light-system', 'store-apply', 'store-approval', 'bd-communication', 'users', 'messages', 'statistics', 'fund-management', 'store-supervision', 'settings', 'backup', 'miniprogram'],
+                navigation: ['dashboard', 'orders', 'customers', 'items', 'members', 'stores', 'provincial-summary', 'light-system', 'store-apply', 'store-approval', 'bd-communication', 'users', 'messages', 'statistics', 'fund-management', 'store-supervision', 'settings', 'backup', 'miniprogram', 'business-orders', 'business-customers', 'business-members', 'chain-list', 'chain-create', 'chain-stores'],
                 canViewAllData: true,
                 canManageUsers: true,
                 canManageStores: true,
@@ -2168,8 +2605,13 @@
                 
                 const target = href.substring(1);
                 
-                // 对于父菜单项（业务管理、门店管理、门店入驻申请、系统管理），只要有一个子菜单项被允许，就显示该父菜单项
-                if (target === 'business' || target === 'store-management' || target === 'store-registration' || target === 'system') {
+                // 品类父菜单项检查
+                if (target.startsWith('business-cat-')) {
+                    // 品类父菜单项：始终显示（由动态渲染控制）
+                    link.style.display = 'flex';
+                }
+                // 对于父菜单项（业务管理、门店管理、门店入驻申请、系统管理、连锁企业管理），只要有一个子菜单项被允许，就显示该父菜单项
+                else if (target === 'business' || target === 'store-management' || target === 'store-registration' || target === 'system' || target === 'chain-management') {
                     // 检查是否有子菜单项被允许
                     const submenu = link.nextElementSibling;
                     if (submenu && submenu.classList.contains('submenu')) {
@@ -3059,88 +3501,314 @@
             }
         }
         
-        // 初始化导航功能
+        // ========== 多品类业务管理 ==========
+        // 当前选中的品类ID
+        let currentBusinessCategory = null;
+        
+        // 品类侧边栏配置（从 modules.js 同步）
+        const BUSINESS_CATEGORIES = [
+            { id: 'cleaning', name: '衣物干洗', icon: '👔', category: 'service' },
+            { id: 'shoe_care', name: '鞋类洗护', icon: '👟', category: 'service' },
+            { id: 'luxury_care', name: '奢侈品护理', icon: '👜', category: 'service' },
+            { id: 'pet_grooming', name: '宠物清洗', icon: '🐕', category: 'service' },
+            { id: 'electronics_repair', name: '电子产品维修', icon: '📱', category: 'service' },
+            { id: 'rental', name: '服饰租赁', icon: '👘', category: 'rental' },
+            { id: 'rental_leisure', name: '小件商品租赁', icon: '🎮', category: 'rental' }
+        ];
+
+        // 动态渲染品类侧边栏子菜单
+        function renderBusinessCategoryMenu() {
+            const submenu = document.getElementById('business-submenu');
+            if (!submenu) return;
+            
+            // 移除旧的品类条目（如果有的话）
+            submenu.querySelectorAll('.biz-cat-item').forEach(el => el.remove());
+            
+            BUSINESS_CATEGORIES.forEach(cat => {
+                const li = document.createElement('li');
+                li.className = 'biz-cat-item menu-item mt-1';
+                li.innerHTML = `
+                    <a href="#business-cat-${cat.id}" class="nav-link flex items-center space-x-2 p-2 rounded-lg text-gray-600 hover:bg-blue-50 hover:text-primary transition-all duration-300 ease-in-out hover:translate-x-1 text-sm">
+                        <span class="w-5 text-center">${cat.icon}</span>
+                        <span>${cat.name}</span>
+                        <i class="fa fa-chevron-down ml-auto text-xs transition-transform duration-300"></i>
+                    </a>
+                    <ul class="submenu pl-8 mt-1 space-y-1 hidden">
+                        <li>
+                            <a href="#business-orders" data-category="${cat.id}" class="nav-link biz-nav-link flex items-center space-x-2 p-2 rounded-lg text-gray-500 hover:bg-blue-50 hover:text-primary transition-all text-sm">
+                                <i class="fa fa-shopping-cart w-4 text-center"></i>
+                                <span>订单管理</span>
+                            </a>
+                        </li>
+                        <li>
+                            <a href="#business-customers" data-category="${cat.id}" class="nav-link biz-nav-link flex items-center space-x-2 p-2 rounded-lg text-gray-500 hover:bg-blue-50 hover:text-primary transition-all text-sm">
+                                <i class="fa fa-users w-4 text-center"></i>
+                                <span>客户管理</span>
+                            </a>
+                        </li>
+                        <li>
+                            <a href="#business-members" data-category="${cat.id}" class="nav-link biz-nav-link flex items-center space-x-2 p-2 rounded-lg text-gray-500 hover:bg-blue-50 hover:text-primary transition-all text-sm">
+                                <i class="fa fa-user-circle w-4 text-center"></i>
+                                <span>会员管理</span>
+                            </a>
+                        </li>
+                    </ul>
+                `;
+                submenu.appendChild(li);
+            });
+        }
+
+        // 品类订单加载函数
+        async function loadBizOrders(page = 1) {
+            if (!currentBusinessCategory) return;
+            const cat = currentBusinessCategory;
+            const status = document.getElementById('biz-orders-status')?.value || '';
+            const keyword = document.getElementById('biz-orders-search')?.value || '';
+            
+            try {
+                const params = new URLSearchParams({ page, pageSize: 20, status, keyword });
+                const res = await fetch(`http://localhost:3000/api/admin/business/${cat}/orders?${params}`, {
+                    headers: { 'Authorization': 'Bearer ' + await initAdminToken() }
+                });
+                const result = await res.json();
+                
+                if (result.success && result.data) {
+                    const { list, pagination } = result.data;
+                    const tbody = document.getElementById('biz-orders-tbody');
+                    if (list.length === 0) {
+                        tbody.innerHTML = '<tr><td colspan="6" class="p-8 text-center text-gray-400">暂无订单数据</td></tr>';
+                    } else {
+                        tbody.innerHTML = list.map(o => `
+                            <tr class="hover:bg-gray-50 border-t">
+                                <td class="p-3 text-sm font-mono text-blue-600">${o.orderNo || o._id?.slice(-8) || '-'}</td>
+                                <td class="p-3 text-sm">${o.delivery?.contactName || '未知'}<br><span class="text-xs text-gray-400">${o.delivery?.contactPhone || ''}</span></td>
+                                <td class="p-3 text-sm text-gray-600">${o.storeId || '-'}</td>
+                                <td class="p-3"><span class="px-2 py-1 rounded text-xs font-medium ${getStatusBadgeClass(o.status)}">${getStatusText(o.status)}</span></td>
+                                <td class="p-3 text-right text-sm font-semibold">¥${(o.amounts?.total || 0).toFixed(2)}</td>
+                                <td class="p-3 text-xs text-gray-500">${formatDateTime(o.createdAt)}</td>
+                            </tr>
+                        `).join('');
+                    }
+                    // 分页
+                    const pagDiv = document.getElementById('biz-orders-pagination');
+                    pagDiv.innerHTML = `
+                        <span class="text-sm text-gray-500">共 ${pagination.total} 条，第 ${pagination.page}/${pagination.totalPages} 页</span>
+                        <div class="space-x-2">
+                            <button onclick="loadBizOrders(${pagination.page - 1})" ${pagination.page <= 1 ? 'disabled' : ''} class="px-3 py-1 border rounded text-sm ${pagination.page <= 1 ? 'text-gray-300' : 'hover:bg-gray-100'}">上一页</button>
+                            <button onclick="loadBizOrders(${pagination.page + 1})" ${pagination.page >= pagination.totalPages ? 'disabled' : ''} class="px-3 py-1 border rounded text-sm ${pagination.page >= pagination.totalPages ? 'text-gray-300' : 'hover:bg-gray-100'}">下一页</button>
+                        </div>`;
+                }
+            } catch (err) {
+                console.error('加载品类订单失败:', err);
+                document.getElementById('biz-orders-tbody').innerHTML = '<tr><td colspan="6" class="p-8 text-center text-red-400">加载失败，请重试</td></tr>';
+            }
+        }
+
+        async function loadBizCustomers(page = 1) {
+            if (!currentBusinessCategory) return;
+            const cat = currentBusinessCategory;
+            const keyword = document.getElementById('biz-customers-search')?.value || '';
+            try {
+                const params = new URLSearchParams({ page, pageSize: 20, keyword });
+                const res = await fetch(`http://localhost:3000/api/admin/business/${cat}/customers?${params}`, {
+                    headers: { 'Authorization': 'Bearer ' + await initAdminToken() }
+                });
+                const result = await res.json();
+                if (result.success && result.data) {
+                    const { list, pagination } = result.data;
+                    const tbody = document.getElementById('biz-customers-tbody');
+                    if (list.length === 0) {
+                        tbody.innerHTML = '<tr><td colspan="6" class="p-8 text-center text-gray-400">暂无客户数据</td></tr>';
+                    } else {
+                        tbody.innerHTML = list.map(c => `
+                            <tr class="hover:bg-gray-50 border-t">
+                                <td class="p-3 text-sm font-medium">${c.name}</td>
+                                <td class="p-3 text-sm text-gray-600">${c.phone}</td>
+                                <td class="p-3 text-center text-sm font-semibold">${c.orderCount}</td>
+                                <td class="p-3 text-right text-sm font-semibold">¥${c.totalSpent.toFixed(2)}</td>
+                                <td class="p-3 text-xs text-gray-500">${c.lastOrderAt ? formatDateTime(c.lastOrderAt) : '暂无'}</td>
+                                <td class="p-3 text-center"><span class="px-2 py-1 rounded text-xs ${c.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}">${c.status === 'active' ? '正常' : '禁用'}</span></td>
+                            </tr>
+                        `).join('');
+                    }
+                    document.getElementById('biz-customers-pagination').innerHTML = `
+                        <span class="text-sm text-gray-500">共 ${pagination.total} 条</span>
+                        <div class="space-x-2">
+                            <button onclick="loadBizCustomers(${pagination.page - 1})" ${pagination.page <= 1 ? 'disabled' : ''} class="px-3 py-1 border rounded text-sm ${pagination.page <= 1 ? 'text-gray-300' : 'hover:bg-gray-100'}">上一页</button>
+                            <button onclick="loadBizCustomers(${pagination.page + 1})" ${pagination.page >= pagination.totalPages ? 'disabled' : ''} class="px-3 py-1 border rounded text-sm ${pagination.page >= pagination.totalPages ? 'text-gray-300' : 'hover:bg-gray-100'}">下一页</button>
+                        </div>`;
+                }
+            } catch (err) {
+                document.getElementById('biz-customers-tbody').innerHTML = '<tr><td colspan="6" class="p-8 text-center text-red-400">加载失败</td></tr>';
+            }
+        }
+
+        async function loadBizMembers(page = 1) {
+            if (!currentBusinessCategory) return;
+            const cat = currentBusinessCategory;
+            const keyword = document.getElementById('biz-members-search')?.value || '';
+            const level = document.getElementById('biz-members-level')?.value || '';
+            try {
+                const params = new URLSearchParams({ page, pageSize: 20, keyword, level });
+                const res = await fetch(`http://localhost:3000/api/admin/business/${cat}/members?${params}`, {
+                    headers: { 'Authorization': 'Bearer ' + await initAdminToken() }
+                });
+                const result = await res.json();
+                if (result.success && result.data) {
+                    const { list, pagination, stats } = result.data;
+                    // 等级分布统计
+                    const statsDiv = document.getElementById('biz-members-stats');
+                    if (stats) {
+                        statsDiv.innerHTML = `
+                            <div class="bg-white rounded-lg shadow p-4 border-t-4 border-purple-500"><p class="text-xs text-gray-500">铂金会员</p><p class="text-2xl font-bold text-purple-600">${stats.platinum}</p></div>
+                            <div class="bg-white rounded-lg shadow p-4 border-t-4 border-yellow-500"><p class="text-xs text-gray-500">黄金会员</p><p class="text-2xl font-bold text-yellow-600">${stats.gold}</p></div>
+                            <div class="bg-white rounded-lg shadow p-4 border-t-4 border-gray-400"><p class="text-xs text-gray-500">白银会员</p><p class="text-2xl font-bold text-gray-600">${stats.silver}</p></div>
+                            <div class="bg-white rounded-lg shadow p-4 border-t-4 border-blue-400"><p class="text-xs text-gray-500">普通会员</p><p class="text-2xl font-bold text-blue-600">${stats.normal}</p></div>`;
+                    }
+                    const tbody = document.getElementById('biz-members-tbody');
+                    if (list.length === 0) {
+                        tbody.innerHTML = '<tr><td colspan="6" class="p-8 text-center text-gray-400">暂无会员数据</td></tr>';
+                    } else {
+                        const levelBadge = { platinum: 'bg-purple-100 text-purple-700', gold: 'bg-yellow-100 text-yellow-700', silver: 'bg-gray-100 text-gray-700', normal: 'bg-blue-100 text-blue-700' };
+                        const levelName = { platinum: '铂金', gold: '黄金', silver: '白银', normal: '普通' };
+                        tbody.innerHTML = list.map(m => `
+                            <tr class="hover:bg-gray-50 border-t">
+                                <td class="p-3 text-sm font-medium">${m.name}</td>
+                                <td class="p-3 text-sm text-gray-600">${m.phone}</td>
+                                <td class="p-3 text-center"><span class="px-2 py-1 rounded text-xs font-medium ${levelBadge[m.memberLevel] || ''}">${levelName[m.memberLevel] || m.memberName}</span></td>
+                                <td class="p-3 text-right text-sm">${m.points}</td>
+                                <td class="p-3 text-center text-sm font-semibold">${m.categoryOrderCount}</td>
+                                <td class="p-3 text-right text-sm font-semibold">¥${m.categoryTotalSpent.toFixed(2)}</td>
+                            </tr>
+                        `).join('');
+                    }
+                    document.getElementById('biz-members-pagination').innerHTML = `
+                        <span class="text-sm text-gray-500">共 ${pagination.total} 条</span>
+                        <div class="space-x-2">
+                            <button onclick="loadBizMembers(${pagination.page - 1})" ${pagination.page <= 1 ? 'disabled' : ''} class="px-3 py-1 border rounded text-sm ${pagination.page <= 1 ? 'text-gray-300' : 'hover:bg-gray-100'}">上一页</button>
+                            <button onclick="loadBizMembers(${pagination.page + 1})" ${pagination.page >= pagination.totalPages ? 'disabled' : ''} class="px-3 py-1 border rounded text-sm ${pagination.page >= pagination.totalPages ? 'text-gray-300' : 'hover:bg-gray-100'}">下一页</button>
+                        </div>`;
+                }
+            } catch (err) {
+                document.getElementById('biz-members-tbody').innerHTML = '<tr><td colspan="6" class="p-8 text-center text-red-400">加载失败</td></tr>';
+            }
+        }
+
+        // 辅助函数：状态文本
+        function getStatusText(status) {
+            const map = { pending: '待支付', paid: '待处理', processing: '处理中', completed: '已完成', cancelled: '已取消', refunded: '已退款' };
+            return map[status] || status || '未知';
+        }
+        function getStatusBadgeClass(status) {
+            const map = { pending: 'bg-yellow-100 text-yellow-700', paid: 'bg-blue-100 text-blue-700', processing: 'bg-orange-100 text-orange-700', completed: 'bg-green-100 text-green-700', cancelled: 'bg-red-100 text-red-700', refunded: 'bg-gray-100 text-gray-700' };
+            return map[status] || 'bg-gray-100 text-gray-600';
+        }
+        function formatDateTime(d) {
+            if (!d) return '-';
+            const dt = new Date(d);
+            return dt.toLocaleDateString('zh-CN') + ' ' + dt.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
+        }
+
+        // 初始化导航功能（更新版支持3级品类菜单）
         function initNavigation() {
             console.log('初始化导航功能');
             
-            // 获取所有导航链接
+            // 先渲染品类菜单
+            renderBusinessCategoryMenu();
+            
             const navLinks = document.querySelectorAll('.nav-link');
-            // 获取所有内容区域
             const contentSections = document.querySelectorAll('.content-section');
             
             console.log('导航链接数量:', navLinks.length);
             console.log('内容区域数量:', contentSections.length);
             
-            // 为每个导航链接添加点击事件监听器
+            // 所有会展开/折叠子菜单的父级 target
+            const parentMenus = ['business', 'store-management', 'store-registration', 'system', 'chain-management'];
+            // 品类父菜单（动态生成的）
+            BUSINESS_CATEGORIES.forEach(cat => parentMenus.push('business-cat-' + cat.id));
+            
             navLinks.forEach(link => {
                 link.addEventListener('click', function(e) {
                     const href = link.getAttribute('href');
-                    console.log('导航链接点击:', href);
                     if (href && href.startsWith('#')) {
                         const target = href.substring(1);
-                        console.log('导航目标:', target);
-                        const isParentMenu = (target === 'business' || target === 'store-management' || target === 'store-registration' || target === 'system');
+                        const isParentMenu = parentMenus.includes(target);
                         
-                        e.preventDefault(); // 阻止默认的锚点行为
+                        e.preventDefault();
                         
                         if (isParentMenu) {
-                            // 处理父菜单项点击，展开/折叠子菜单
-                            console.log('点击父菜单项，切换子菜单显示状态:', target);
+                            // 折叠/展开子菜单
                             const menuItem = link.closest('.menu-item');
                             if (menuItem) {
-                                const submenu = menuItem.querySelector('.submenu');
+                                const submenu = menuItem.querySelector(':scope > .submenu');
                                 if (submenu) {
                                     submenu.classList.toggle('hidden');
                                     const icon = link.querySelector('.fa-chevron-down');
-                                    if (icon) {
-                                        icon.classList.toggle('rotate-180');
-                                    }
+                                    if (icon) icon.classList.toggle('rotate-180');
                                 }
                             }
                         } else {
-                            // 处理子菜单项点击，导航到对应内容区域
-                            console.log('点击子菜单项，导航到:', target);
+                            // 导航到内容区域
+                            console.log('导航到:', target);
                             
-                            // 更新导航菜单的活跃状态
-                            navLinks.forEach(navLink => {
-                                navLink.classList.remove('text-primary', 'bg-blue-50', 'font-medium', 'border-l-4', 'border-primary');
-                                navLink.classList.add('text-gray-700', 'hover:bg-blue-50', 'hover:text-primary');
+                            // 品类专属导航：提取 data-category
+                            const category = link.getAttribute('data-category');
+                            if (category && (target === 'business-orders' || target === 'business-customers' || target === 'business-members')) {
+                                currentBusinessCategory = category;
+                                const catInfo = BUSINESS_CATEGORIES.find(c => c.id === category);
+                                const catName = catInfo ? `${catInfo.icon} ${catInfo.name}` : category;
+                                
+                                if (target === 'business-orders') {
+                                    document.getElementById('biz-orders-title').textContent = catName + ' - 订单管理';
+                                    document.getElementById('biz-orders-subtitle').textContent = '按品类查看和管理' + (catInfo?.name || '') + '订单';
+                                    loadBizOrders();
+                                } else if (target === 'business-customers') {
+                                    document.getElementById('biz-customers-title').textContent = catName + ' - 客户管理';
+                                    document.getElementById('biz-customers-subtitle').textContent = '按品类查看和管理' + (catInfo?.name || '') + '客户';
+                                    loadBizCustomers();
+                                } else if (target === 'business-members') {
+                                    document.getElementById('biz-members-title').textContent = catName + ' - 会员管理';
+                                    document.getElementById('biz-members-subtitle').textContent = '按品类查看和管理' + (catInfo?.name || '') + '会员';
+                                    loadBizMembers();
+                                }
+                            }
+                            
+                            // 更新活跃状态
+                            navLinks.forEach(nl => {
+                                nl.classList.remove('text-primary', 'bg-blue-50', 'font-medium', 'border-l-4', 'border-primary');
+                                nl.classList.add('text-gray-700', 'hover:bg-blue-50', 'hover:text-primary');
                             });
                             link.classList.remove('text-gray-700', 'hover:bg-blue-50', 'hover:text-primary');
                             link.classList.add('text-primary', 'bg-blue-50', 'font-medium', 'border-l-4', 'border-primary');
                             
-                            // 显示对应的内容区域，隐藏其他内容区域
-                            contentSections.forEach(section => {
-                                section.classList.add('hidden');
-                            });
-                            const targetSection = document.getElementById(`${target}-content`);
+                            // 切换内容区域
+                            contentSections.forEach(s => s.classList.add('hidden'));
+                            const sectionId = target === 'business-orders' ? 'business-orders-content' :
+                                            target === 'business-customers' ? 'business-customers-content' :
+                                            target === 'business-members' ? 'business-members-content' :
+                                            `${target}-content`;
+                            const targetSection = document.getElementById(sectionId);
                             if (targetSection) {
-                                console.log('✓ 显示内容区域:', `${target}-content`);
                                 targetSection.classList.remove('hidden');
-                                
-                                // 如果是门店列表，自动加载数据
-                                if (target === 'stores') {
-                                    loadStoresData();
-                                }
-                                
-                                // 如果是订单管理，自动加载订单数据
-                                if (target === 'orders') {
-                                    loadAdminOrders();
-                                }
+                                if (target === 'stores') loadStoresData();
+                                if (target === 'orders') loadAdminOrders();
+                                if (target === 'dashboard') loadDashboard();
                             } else {
-                                console.warn('内容区域未找到:', `${target}-content`);
+                                console.warn('内容区域未找到:', sectionId);
                             }
                         }
                     }
                 });
             });
             
-            // 默认选中仪表盘链接（页面加载时的初始化状态）
-            const dashboardLink = document.querySelector('.nav-link[href="#dashboard"]');
-            if (dashboardLink) {
-                dashboardLink.classList.remove('text-gray-700', 'hover:bg-blue-50', 'hover:text-primary');
-                dashboardLink.classList.add('text-primary', 'bg-blue-50', 'font-medium', 'border-l-4', 'border-primary');
+            // 默认选中仪表盘
+            const dashLink = document.querySelector('.nav-link[href="#dashboard"]');
+            if (dashLink) {
+                dashLink.classList.remove('text-gray-700', 'hover:bg-blue-50', 'hover:text-primary');
+                dashLink.classList.add('text-primary', 'bg-blue-50', 'font-medium', 'border-l-4', 'border-primary');
             }
+            // 默认加载仪表盘数据
+            loadDashboard();
         }
         
         // 全局事件委托：确保订单详情按钮点击正常工作
@@ -3394,10 +4062,10 @@
             // 每10秒刷新终端数据
             setInterval(loadAllTerminals, 10000);
             
-            // 启动数据同步管理器（管理员端同步所有订单）
-            OrderSyncManager.start();
+            // ⚠️ 轮询同步已禁用 — MQTT WebSocket (OrderEventClient) 接管实时推送
+            // admin.html 未引入 order-sync.js，此调用原本无效；保留事件监听兼容 MQTT 触发
             
-            // 监听同步完成事件
+            // 监听订单同步事件（MQTT 或其他来源触发）
             window.addEventListener('ordersSynced', (e) => {
                 console.log('管理员端订单已同步，刷新数据...');
                 renderPickupOrdersList();
@@ -4422,6 +5090,8 @@
             in_progress: { text: '清洗中', color: 'yellow', bgClass: 'bg-yellow-100', textClass: 'text-yellow-800' },
             cleaning: { text: '清洗中', color: 'yellow', bgClass: 'bg-yellow-100', textClass: 'text-yellow-800' },
             cleaned: { text: '清洗完成', color: 'purple', bgClass: 'bg-purple-100', textClass: 'text-purple-800' },
+            store_outbound: { text: '已出库', color: 'teal', bgClass: 'bg-teal-100', textClass: 'text-teal-800' },
+            awaiting_store_outbound: { text: '待出库', color: 'orange', bgClass: 'bg-orange-100', textClass: 'text-orange-800' },
             ready: { text: '待取件', color: 'orange', bgClass: 'bg-orange-100', textClass: 'text-orange-800' },
             delivering_back: { text: '配送中', color: 'blue', bgClass: 'bg-blue-100', textClass: 'text-blue-800' },
             completed: { text: '已完成', color: 'green', bgClass: 'bg-green-100', textClass: 'text-green-800' },
@@ -4537,8 +5207,14 @@
                 if (statusFilter && order.status !== statusFilter) return false;
                 if (storeFilter && order.storeId !== storeFilter) return false;
                 if (searchTerm) {
-                    const searchStr = `${order.orderId} ${order.customerName || ''}`.toLowerCase();
-                    if (!searchStr.includes(searchTerm)) return false;
+                    // 检查是否是日期格式 (YYYY-MM-DD)，按订单时间筛选
+                    if (/^\d{4}-\d{2}-\d{2}$/.test(searchTerm)) {
+                        const orderDate = (order.createdAt || order.orderTime || order.createTime || '').toString().slice(0, 10);
+                        if (orderDate !== searchTerm) return false;
+                    } else {
+                        const searchStr = `${order.orderId} ${order.customerName || ''}`.toLowerCase();
+                        if (!searchStr.includes(searchTerm)) return false;
+                    }
                 }
                 return true;
             });
@@ -4806,6 +5482,892 @@
             
             return `${year}-${month}-${day} ${hours}:${minutes}`;
         }
+
+        // ================================================================
+        // 用户管理 (Users Tab)
+        // ================================================================
+        window.loadUsers = async function(page = 1) {
+            const token = localStorage.getItem('adminToken') || '';
+            const keyword = document.getElementById('user-search-input')?.value || '';
+            const status = document.getElementById('user-status-filter')?.value || '';
+            
+            // 添加来源筛选
+            const sourceFilter = window.CURRENT_USER_SOURCE_FILTER || '';
+            
+            try {
+                const params = new URLSearchParams({ page, pageSize: 20, keyword, status });
+                // 如果有来源筛选，添加到查询参数
+                if (sourceFilter) {
+                    params.set('registrationSource', sourceFilter);
+                }
+                
+                const resp = await fetch(`http://localhost:3000/api/admin/users?${params}`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const result = await resp.json();
+                
+                if (!result.success) throw new Error(result.error || '加载失败');
+                
+                const { list, pagination } = result.data;
+                
+                // 统计卡片
+                const statsHtml = `
+                    <div class="bg-white rounded-xl shadow p-4"><p class="text-gray-500 text-xs">总用户数</p><p class="text-2xl font-bold mt-1">${pagination.total}</p></div>
+                    <div class="bg-white rounded-xl shadow p-4"><p class="text-gray-500 text-xs">当前页</p><p class="text-2xl font-bold mt-1">${list.length}</p></div>
+                    <div class="bg-white rounded-xl shadow p-4"><p class="text-gray-500 text-xs">总页数</p><p class="text-2xl font-bold mt-1">${pagination.totalPages}</p></div>
+                    <div class="bg-white rounded-xl shadow p-4"><p class="text-gray-500 text-xs">数据来源</p><p class="text-2xl font-bold mt-1">MongoDB</p></div>
+                `;
+                document.getElementById('user-stats-cards').innerHTML = statsHtml;
+                
+                // 表格
+                const tbody = document.getElementById('users-table-body');
+                if (list.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="9" class="p-8 text-center text-gray-400">暂无数据</td></tr>';
+                } else {
+                    tbody.innerHTML = list.map(u => {
+                        // 处理用户来源显示
+                        const sourceConfig = {
+                            'wechat_mini_program': { name: '微信小程序', icon: 'fa-wechat', color: 'text-green-600' },
+                            'c_index': { name: 'C端网页', icon: 'fa-globe', color: 'text-blue-600' },
+                            'admin': { name: '管理员创建', icon: 'fa-user-md', color: 'text-purple-600' },
+                            'store_register': { name: '门店注册', icon: 'fa-building', color: 'text-orange-600' },
+                            'unknown': { name: '未知来源', icon: 'fa-question', color: 'text-gray-600' }
+                        };
+                        
+                        const sourceInfo = sourceConfig[u.registrationSource] || sourceConfig['unknown'];
+                        
+                        return `
+                        <tr class="border-b hover:bg-gray-50">
+                            <td class="p-3 text-xs font-mono">${u.userNo || '-'}</td>
+                            <td class="p-3">${u.name || '-'}</td>
+                            <td class="p-3">${u.phone || '-'}</td>
+                            <td class="p-3">
+                                <div class="flex items-center gap-1">
+                                    <i class="fa ${sourceInfo.icon} ${sourceInfo.color} text-xs"></i>
+                                    <span class="text-xs text-gray-600">${sourceInfo.name}</span>
+                                </div>
+                            </td>
+                            <td class="p-3"><span class="px-2 py-0.5 bg-gray-100 rounded text-xs">${(u.roles || []).join(',') || 'customer'}</span></td>
+                            <td class="p-3"><span class="px-2 py-0.5 rounded text-xs ${u.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}">${u.status || 'unknown'}</span></td>
+                            <td class="p-3 text-xs">${formatDate(u.createdAt)}</td>
+                            <td class="p-3 text-xs">${formatDate(u.lastLoginAt)}</td>
+                            <td class="p-3"><button onclick="toggleUserStatus('${u._id}','${u.status}')" class="text-xs text-primary hover:underline">${u.status === 'active' ? '禁用' : '启用'}</button></td>
+                        </tr>
+                    `;
+                    }).join('');
+                }
+                
+                // 分页
+                document.getElementById('users-pagination').innerHTML = `
+                    <span class="text-sm text-gray-500">共 ${pagination.total} 条，第 ${pagination.page}/${pagination.totalPages} 页</span>
+                    <div class="space-x-2">
+                        <button onclick="loadUsers(${pagination.page - 1})" ${pagination.page <= 1 ? 'disabled' : ''} class="px-3 py-1 border rounded text-sm ${pagination.page <= 1 ? 'text-gray-300' : 'hover:bg-gray-100'}">上一页</button>
+                        <button onclick="loadUsers(${pagination.page + 1})" ${pagination.page >= pagination.totalPages ? 'disabled' : ''} class="px-3 py-1 border rounded text-sm ${pagination.page >= pagination.totalPages ? 'text-gray-300' : 'hover:bg-gray-100'}">下一页</button>
+                    </div>
+                `;
+            } catch (e) {
+                console.error('[用户管理] 加载失败:', e);
+                document.getElementById('users-table-body').innerHTML = `<tr><td colspan="8" class="p-8 text-center text-red-400">加载失败: ${e.message}</td></tr>`;
+            }
+        };
+
+        window.toggleUserStatus = async function(userId, currentStatus) {
+            const newStatus = currentStatus === 'active' ? 'disabled' : 'active';
+            const token = localStorage.getItem('adminToken') || '';
+            try {
+                const resp = await fetch(`http://localhost:3000/api/admin/users/${userId}/status`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                    body: JSON.stringify({ status: newStatus })
+                });
+                const result = await resp.json();
+                if (result.success) {
+                    alert(`用户状态已更新为: ${newStatus}`);
+                    loadUsers();
+                } else {
+                    alert('操作失败: ' + (result.error || '未知错误'));
+                }
+            } catch (e) { alert('操作失败: ' + e.message); }
+        };
+
+        // ================================================================
+        // 会员管理 (Members Tab)
+        // ================================================================
+        window.loadMembers = async function(page = 1) {
+            const token = localStorage.getItem('adminToken') || '';
+            const keyword = document.getElementById('member-search-input')?.value || '';
+            const level = document.getElementById('member-level-filter')?.value || '';
+            
+            try {
+                const params = new URLSearchParams({ page, pageSize: 20, keyword, level });
+                const resp = await fetch(`http://localhost:3000/api/admin/members?${params}`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const result = await resp.json();
+                
+                if (!result.success) throw new Error(result.error || '加载失败');
+                
+                const { list, pagination, stats } = result.data;
+                
+                // 等级分布卡片
+                const levelColors = { platinum: 'border-purple-500', gold: 'border-yellow-500', silver: 'border-gray-400', normal: 'border-blue-300' };
+                document.getElementById('member-stats-cards').innerHTML = `
+                    <div class="bg-white rounded-xl shadow p-4 border-l-4 ${levelColors.platinum}"><p class="text-gray-500 text-xs">铂金会员</p><p class="text-2xl font-bold mt-1 text-purple-600">${stats.platinum}</p></div>
+                    <div class="bg-white rounded-xl shadow p-4 border-l-4 ${levelColors.gold}"><p class="text-gray-500 text-xs">黄金会员</p><p class="text-2xl font-bold mt-1 text-yellow-600">${stats.gold}</p></div>
+                    <div class="bg-white rounded-xl shadow p-4 border-l-4 ${levelColors.silver}"><p class="text-gray-500 text-xs">白银会员</p><p class="text-2xl font-bold mt-1 text-gray-600">${stats.silver}</p></div>
+                    <div class="bg-white rounded-xl shadow p-4 border-l-4 ${levelColors.normal}"><p class="text-gray-500 text-xs">普通会员</p><p class="text-2xl font-bold mt-1 text-blue-600">${stats.normal}</p></div>
+                `;
+                
+                // 表格
+                const tbody = document.getElementById('members-table-body');
+                if (list.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="8" class="p-8 text-center text-gray-400">暂无数据</td></tr>';
+                } else {
+                    const levelBadgeMap = { platinum: 'bg-purple-100 text-purple-800', gold: 'bg-yellow-100 text-yellow-800', silver: 'bg-gray-100 text-gray-800', normal: 'bg-blue-100 text-blue-800' };
+                    tbody.innerHTML = list.map(m => `
+                        <tr class="border-b hover:bg-gray-50">
+                            <td class="p-3 text-xs font-mono">${m.userNo || '-'}</td>
+                            <td class="p-3">${m.name || '-'}</td>
+                            <td class="p-3">${m.phone || '-'}</td>
+                            <td class="p-3"><span class="px-2 py-0.5 rounded text-xs ${levelBadgeMap[m.memberLevel] || ''}">${m.memberName}</span></td>
+                            <td class="p-3">${m.points}</td>
+                            <td class="p-3">${m.orderCount}</td>
+                            <td class="p-3 font-medium">¥${(m.totalSpent || 0).toFixed(2)}</td>
+                            <td class="p-3 text-xs">${formatDate(m.createdAt)}</td>
+                        </tr>
+                    `).join('');
+                }
+                
+                document.getElementById('members-pagination').innerHTML = `
+                    <span class="text-sm text-gray-500">共 ${pagination.total} 条，第 ${pagination.page}/${pagination.totalPages} 页</span>
+                    <div class="space-x-2">
+                        <button onclick="loadMembers(${pagination.page - 1})" ${pagination.page <= 1 ? 'disabled' : ''} class="px-3 py-1 border rounded text-sm ${pagination.page <= 1 ? 'text-gray-300' : 'hover:bg-gray-100'}">上一页</button>
+                        <button onclick="loadMembers(${pagination.page + 1})" ${pagination.page >= pagination.totalPages ? 'disabled' : ''} class="px-3 py-1 border rounded text-sm ${pagination.page >= pagination.totalPages ? 'text-gray-300' : 'hover:bg-gray-100'}">下一页</button>
+                    </div>
+                `;
+            } catch (e) {
+                console.error('[会员管理] 加载失败:', e);
+                document.getElementById('members-table-body').innerHTML = `<tr><td colspan="8" class="p-8 text-center text-red-400">加载失败: ${e.message}</td></tr>`;
+            }
+        };
+
+        // ================================================================
+        // 消息中心 (Messages Tab)
+        // ================================================================
+        window.loadMessages = async function() {
+            const token = localStorage.getItem('adminToken') || '';
+            const container = document.getElementById('messages-list');
+            container.innerHTML = '<p class="text-center text-gray-400 p-4">加载中...</p>';
+            
+            try {
+                const resp = await fetch('http://localhost:3000/api/admin/notifications', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const result = await resp.json();
+                
+                if (!result.success) throw new Error(result.error || '无消息数据');
+                
+                const notifications = result.data || [];
+                if (notifications.length === 0) {
+                    container.innerHTML = '<p class="text-center text-gray-400 p-8">暂无消息</p>';
+                    return;
+                }
+                
+                container.innerHTML = notifications.map(n => `
+                    <div class="p-4 bg-gray-50 rounded-lg border border-gray-200">
+                        <div class="flex justify-between items-start">
+                            <span class="font-medium">${n.event || n.type || '系统通知'}</span>
+                            <span class="text-xs text-gray-400">${formatDate(n.time || n.createdAt)}</span>
+                        </div>
+                        <p class="text-sm text-gray-600 mt-1">订单号: ${n.orderNo || '-'} | 来源: ${n._source || 'system'}</p>
+                        ${n.data ? `<p class="text-xs text-gray-500 mt-1">${JSON.stringify(n.data)}</p>` : ''}
+                    </div>
+                `).join('');
+            } catch (e) {
+                container.innerHTML = `<p class="text-center text-red-400 p-4">加载失败: ${e.message}</p>`;
+            }
+        };
+
+        // ================================================================
+        // 总仪表盘 (Dashboard) - 系统概览与快捷入口
+        // ================================================================
+        window.loadDashboard = async function() {
+            const token = localStorage.getItem('adminToken') || '';
+            const now = new Date();
+            document.getElementById('dash-refresh-time').textContent = '更新于 ' + now.toLocaleTimeString('zh-CN');
+            
+            try {
+                const resp = await fetch('http://localhost:3000/api/admin/dashboard', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const result = await resp.json();
+                if (!result.success || !result.data) throw new Error(result.error || '数据为空');
+                
+                const d = result.data;
+                const ov = d.overview || {};
+                const fin = d.finance || {};
+                const st = d.orderStatus || {};
+                
+                // -- 核心数据卡片 --
+                document.getElementById('dash-users').textContent = (ov.totalUsers || 0).toLocaleString();
+                document.getElementById('dash-dau').textContent = (ov.dauUsers || 0).toLocaleString();
+                document.getElementById('dash-mau').textContent = (ov.mauUsers || 0).toLocaleString();
+                document.getElementById('dash-today-new-users').textContent = (ov.todayNewUsers || 0).toLocaleString();
+                document.getElementById('dash-stores').textContent = (ov.totalStores || 0).toLocaleString();
+                document.getElementById('dash-orders').textContent = (ov.totalOrders || 0).toLocaleString();
+                document.getElementById('dash-today-orders').textContent = (ov.todayOrders || 0).toLocaleString();
+                document.getElementById('dash-revenue').textContent = '¥' + ((fin.totalAmount || 0)).toLocaleString();
+                document.getElementById('dash-today-revenue').textContent = '今日 ¥' + ((fin.todayAmount || 0)).toLocaleString();
+                
+                // -- 订单状态分布（彩色进度条） --
+                const statusMap = [
+                    { key: 'pending', label: '待支付', color: '#f59e0b', bg: '#fef3c7' },
+                    { key: 'paid', label: '待处理', color: '#3b82f6', bg: '#dbeafe' },
+                    { key: 'cleaning', label: '处理中', color: '#8b5cf6', bg: '#ede9fe' },
+                    { key: 'completed', label: '已完成', color: '#10b981', bg: '#d1fae5' },
+                    { key: 'cancelled', label: '已取消', color: '#ef4444', bg: '#fee2e2' }
+                ];
+                const totalStatus = Object.values(st).reduce((s, v) => s + v, 0) || 1;
+                let barsHtml = '';
+                statusMap.forEach(item => {
+                    const count = st[item.key] || 0;
+                    const pct = Math.round((count / totalStatus) * 100);
+                    barsHtml += `
+                        <div class="cursor-pointer hover:bg-gray-50 rounded-lg p-2 -mx-2 transition-colors" onclick="navigateToFilteredOrders('${item.key}')" title="点击查看${item.label}订单详情">
+                            <div class="flex justify-between text-xs mb-1">
+                                <span class="font-medium text-gray-600">${item.label}</span>
+                                <span class="text-gray-500">${count} 单 (${pct}%) →</span>
+                            </div>
+                            <div class="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
+                                <div class="h-full rounded-full transition-all duration-500" style="width:${pct}%;background:${item.color}"></div>
+                            </div>
+                        </div>`;
+                });
+                document.getElementById('dash-status-bars').innerHTML = barsHtml || '<div class="text-center text-gray-400 text-sm py-4">暂无订单数据</div>';
+                
+                // -- 7日订单趋势（CSS柱状图） --
+                const trend = d.orderTrend || [];
+                const maxCount = Math.max(1, ...trend.map(t => t.count || 0));
+                const chartHeight = 140; // px
+                let chartHtml = '';
+                let labelsHtml = '';
+                trend.forEach((day, i) => {
+                    const h = Math.max(4, Math.round((day.count / maxCount) * chartHeight));
+                    const label = (day._id || '').slice(5); // "MM-DD"
+                    const isToday = (i === trend.length - 1);
+                    const dayDate = (day._id || '');
+                    chartHtml += `
+                        <div class="flex-1 flex flex-col items-center justify-end cursor-pointer group" 
+                             title="${day._id}: ${day.count}单, ¥${(day.amount||0).toLocaleString()} — 点击查看当日订单"
+                             onclick="navigateToFilteredOrders('${dayDate}')">
+                            <span class="text-xs text-gray-500 mb-1 font-medium group-hover:text-blue-600 transition-colors">${day.count}</span>
+                            <div class="w-full max-w-[32px] rounded-t-md transition-all duration-300 group-hover:opacity-80 group-hover:scale-105" 
+                                 style="height:${h}px;background:${isToday ? '#3b82f6' : '#93c5fd'};min-width:16px"></div>
+                        </div>`;
+                    labelsHtml += `<div class="flex-1 text-center"><span class="text-xs text-gray-400">${label}</span></div>`;
+                });
+                document.getElementById('dash-trend-chart').innerHTML = chartHtml || '<div class="text-center text-gray-400 text-sm w-full py-12">暂无趋势数据</div>';
+                document.getElementById('dash-trend-labels').innerHTML = labelsHtml;
+                
+                // -- 用户来源统计 --
+                const userSources = d.userSourceStats?.sources || {};
+                const sourceConfig = {
+                    'wechat_mini_program': { name: '微信小程序', icon: 'fa-wechat', color: '#4CAF50', bg: '#E8F5E9' },
+                    'c_index': { name: 'C端网页', icon: 'fa-globe', color: '#2196F3', bg: '#E3F2FD' },
+                    'admin': { name: '管理员创建', icon: 'fa-user-md', color: '#9C27B0', bg: '#F3E5F5' },
+                    'store_register': { name: '门店注册', icon: 'fa-building', color: '#FF9800', bg: '#FFF3E0' },
+                    'unknown': { name: '未知来源', icon: 'fa-question', color: '#757575', bg: '#F5F5F5' }
+                };
+                
+                let sourceHtml = '';
+                let totalSourceUsers = d.userSourceStats?.total || 0;
+                
+                // 先按来源统计排序
+                const sourceEntries = Object.entries(userSources);
+                sourceEntries.sort((a, b) => b[1].total - a[1].total);
+                
+                if (sourceEntries.length === 0) {
+                    sourceHtml = '<div class="text-center text-gray-400 text-sm py-8">暂无用户来源数据</div>';
+                } else {
+                    sourceEntries.forEach(([sourceKey, stats]) => {
+                        const config = sourceConfig[sourceKey] || sourceConfig['unknown'];
+                        const percentage = totalSourceUsers > 0 ? Math.round((stats.total / totalSourceUsers) * 100) : 0;
+                        
+                        sourceHtml += `
+                            <div class="cursor-pointer hover:bg-gray-50 rounded-lg p-2 -mx-2 transition-colors" onclick="navigateToSourceUsers('${sourceKey}')" title="点击查看${config.name}用户详情">
+                                <div class="flex justify-between items-center text-xs mb-1">
+                                    <div class="flex items-center gap-2">
+                                        <span class="w-6 h-6 rounded-full flex items-center justify-center" style="background:${config.bg}; color:${config.color}">
+                                            <i class="fa ${config.icon} text-xs"></i>
+                                        </span>
+                                        <span class="font-medium text-gray-600">${config.name}</span>
+                                    </div>
+                                    <span class="text-gray-500">${stats.total} 人 (${percentage}%)</span>
+                                </div>
+                                <div class="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
+                                    <div class="h-full rounded-full transition-all duration-500" style="width:${percentage}%;background:${config.color}"></div>
+                                </div>
+                                <div class="flex justify-between text-xs text-gray-400 mt-1">
+                                    <span title="今日新增">今日 +${stats.today || 0}</span>
+                                    <span title="本周新增">本周 +${stats.week || 0}</span>
+                                    <span title="本月新增">本月 +${stats.month || 0}</span>
+                                </div>
+                            </div>`;
+                    });
+                }
+                
+                document.getElementById('dash-user-sources').innerHTML = sourceHtml;
+                
+                // -- 业务模块快捷入口 --
+                const modules = [
+                    { id: 'cleaning', name: '衣物干洗', icon: '👔', color: '#3b82f6', bg: '#eff6ff' },
+                    { id: 'shoe_care', name: '鞋类洗护', icon: '👟', color: '#8b5cf6', bg: '#f5f3ff' },
+                    { id: 'luxury_care', name: '奢品护理', icon: '👜', color: '#ec4899', bg: '#fdf2f8' },
+                    { id: 'pet_grooming', name: '宠物清洗', icon: '🐕', color: '#f59e0b', bg: '#fffbeb' },
+                    { id: 'electronics_repair', name: '电子维修', icon: '📱', color: '#10b981', bg: '#ecfdf5' },
+                    { id: 'rental', name: '服饰租赁', icon: '👘', color: '#ef4444', bg: '#fef2f2' },
+                    { id: 'rental_leisure', name: '好物租赁', icon: '🎮', color: '#06b6d4', bg: '#ecfeff' }
+                ];
+                let moduleHtml = '';
+                modules.forEach(m => {
+                    moduleHtml += `
+                        <div class="relative rounded-xl border-2 border-gray-100 p-4 text-center cursor-pointer hover:shadow-lg hover:-translate-y-1 transition-all duration-200 group"
+                             onclick="navigateToBizOrders('${m.id}','${m.name}','${m.icon}')"
+                             style="background:${m.bg}">
+                            <div class="text-3xl mb-2 group-hover:scale-110 transition-transform">${m.icon}</div>
+                            <p class="text-sm font-semibold text-gray-700">${m.name}</p>
+                            <div class="absolute inset-0 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none"
+                                 style="border:2px solid ${m.color}"></div>
+                        </div>`;
+                });
+                document.getElementById('dash-module-cards').innerHTML = moduleHtml;
+                
+            } catch (e) {
+                console.error('[仪表盘] 加载失败:', e);
+                ['dash-users','dash-dau','dash-mau','dash-stores','dash-orders','dash-today-orders','dash-revenue'].forEach(id => {
+                    const el = document.getElementById(id);
+                    if (el) el.textContent = '加载失败';
+                });
+                document.getElementById('dash-status-bars').innerHTML = '<div class="text-center text-red-400 text-sm py-4">数据加载失败，请检查服务连接</div>';
+                document.getElementById('dash-trend-chart').innerHTML = '<div class="text-center text-red-400 text-sm w-full py-12">数据加载失败</div>';
+                document.getElementById('dash-module-cards').innerHTML = '<div class="text-center text-red-400 text-sm col-span-full py-4">模块加载失败</div>';
+            }
+        };
+        
+        // 从仪表盘跳转到用户来源统计页面
+        window.navigateToSourceUsers = function(sourceKey) {
+            const sourceConfig = {
+                'wechat_mini_program': { name: '微信小程序', icon: 'fa-wechat' },
+                'c_index': { name: 'C端网页', icon: 'fa-globe' },
+                'admin': { name: '管理员创建', icon: 'fa-user-md' },
+                'store_register': { name: '门店注册', icon: 'fa-building' },
+                'unknown': { name: '未知来源', icon: 'fa-question' }
+            };
+            
+            const config = sourceConfig[sourceKey] || sourceConfig['unknown'];
+            
+            // 更新用户列表标题和筛选条件
+            document.getElementById('users-title').textContent = config.name + ' 用户列表';
+            document.getElementById('users-subtitle').textContent = '查看和管理' + config.name + '注册的用户';
+            
+            // 设置筛选条件
+            window.CURRENT_USER_SOURCE_FILTER = sourceKey;
+            
+            // 切换内容区域到用户管理
+            document.querySelectorAll('.content-section').forEach(s => s.classList.add('hidden'));
+            const targetSection = document.getElementById('users-content');
+            if (targetSection) targetSection.classList.remove('hidden');
+            
+            // 更新侧边栏高亮
+            const navLinks = document.querySelectorAll('.nav-link');
+            navLinks.forEach(nl => {
+                nl.classList.remove('text-primary', 'bg-blue-50', 'font-medium', 'border-l-4', 'border-primary');
+                nl.classList.add('text-gray-700', 'hover:bg-blue-50', 'hover:text-primary');
+            });
+            
+            // 高亮用户管理菜单
+            const userLink = document.querySelector('.nav-link[href="#users"]');
+            if (userLink) {
+                userLink.classList.remove('text-gray-700', 'hover:bg-blue-50', 'hover:text-primary');
+                userLink.classList.add('text-primary', 'bg-blue-50', 'font-medium', 'border-l-4', 'border-primary');
+            }
+            
+            // 加载用户数据
+            if (typeof loadUsers === 'function') {
+                setTimeout(loadUsers, 100);
+            }
+        };
+        
+        // 从仪表盘跳转到品类业务订单页
+        window.navigateToBizOrders = function(categoryId, categoryName, categoryIcon) {
+            // 设置当前品类上下文
+            window.currentBusinessCategory = categoryId;
+            window.BUSINESS_CATEGORIES = window.BUSINESS_CATEGORIES || [];
+            if (!window.BUSINESS_CATEGORIES.find(c => c.id === categoryId)) {
+                window.BUSINESS_CATEGORIES.push({ id: categoryId, name: categoryName, icon: categoryIcon });
+            }
+            
+            // 更新品类订单标题
+            document.getElementById('biz-orders-title').textContent = categoryIcon + ' ' + categoryName + ' - 订单管理';
+            document.getElementById('biz-orders-subtitle').textContent = '按品类查看和管理' + categoryName + '订单';
+            
+            // 切换内容区域
+            document.querySelectorAll('.content-section').forEach(s => s.classList.add('hidden'));
+            const targetSection = document.getElementById('business-orders-content');
+            if (targetSection) targetSection.classList.remove('hidden');
+            
+            // 更新侧边栏高亮（展开业务管理子菜单）
+            const navLinks = document.querySelectorAll('.nav-link');
+            navLinks.forEach(nl => {
+                nl.classList.remove('text-primary', 'bg-blue-50', 'font-medium', 'border-l-4', 'border-primary');
+                nl.classList.add('text-gray-700', 'hover:bg-blue-50', 'hover:text-primary');
+            });
+            
+            // 加载订单数据
+            if (typeof loadBizOrders === 'function') {
+                setTimeout(loadBizOrders, 100);
+            }
+        };
+
+        // 通用：导航到指定内容区域（模拟点击侧边栏链接）
+        window.navigateToSection = function(target) {
+            const link = document.querySelector(`.nav-link[href="#${target}"]`);
+            if (link) {
+                link.click();
+            } else {
+                // 兜底：手动切换内容区域
+                const contentSections = document.querySelectorAll('.content-section');
+                contentSections.forEach(s => s.classList.add('hidden'));
+                const targetSection = document.getElementById(`${target}-content`);
+                if (targetSection) {
+                    targetSection.classList.remove('hidden');
+                    if (target === 'stores' && typeof loadStoresData === 'function') loadStoresData();
+                    if (target === 'orders' && typeof loadAdminOrders === 'function') loadAdminOrders();
+                    if (target === 'dashboard' && typeof loadDashboard === 'function') loadDashboard();
+                    if (target === 'statistics' && typeof loadStatistics === 'function') loadStatistics();
+                    if (target === 'users' && typeof loadUsers === 'function') loadUsers();
+                    if (target === 'chain-list' && typeof loadChainList === 'function') loadChainList();
+                    if (target === 'chain-stores' && typeof loadChainStoresSelect === 'function') loadChainStoresSelect();
+                }
+            }
+        };
+
+        // 导航到订单页并预置筛选条件
+        window.navigateToFilteredOrders = function(filter) {
+            // 先导航到订单页
+            const orderLink = document.querySelector('.nav-link[href="#orders"]');
+            if (orderLink) {
+                orderLink.click();
+            } else {
+                // 兜底
+                document.querySelectorAll('.content-section').forEach(s => s.classList.add('hidden'));
+                const section = document.getElementById('orders-content');
+                if (section) section.classList.remove('hidden');
+            }
+
+            // 延迟设置筛选条件（等DOM完全切换后）
+            setTimeout(() => {
+                const statusFilter = document.getElementById('order-status-filter');
+                const searchInput = document.getElementById('order-search');
+
+                if (filter === 'today') {
+                    // 今日订单：用今天的日期字符串搜索
+                    const today = new Date().toISOString().slice(0, 10); // "2026-06-30"
+                    if (statusFilter) statusFilter.value = '';
+                    if (searchInput) searchInput.value = today;
+                } else if (['pending', 'paid', 'cleaning', 'cleaned', 'ready', 'completed', 'cancelled'].includes(filter)) {
+                    // 状态筛选
+                    if (statusFilter) statusFilter.value = filter;
+                    if (searchInput) searchInput.value = '';
+                } else if (/^\d{4}-\d{2}-\d{2}$/.test(filter)) {
+                    // 日期筛选（如 "2026-06-28"）
+                    if (statusFilter) statusFilter.value = '';
+                    if (searchInput) searchInput.value = filter;
+                }
+
+                // 触发加载
+                if (typeof loadAdminOrders === 'function') {
+                    loadAdminOrders();
+                }
+            }, 200);
+        };
+
+        // ================================================================
+        // 统计分析 (Statistics Tab) + 数据完整性 + 数据导出
+        // ================================================================
+        window.loadStatistics = async function() {
+            const token = localStorage.getItem('adminToken') || '';
+            try {
+                const resp = await fetch('http://localhost:3000/api/admin/dashboard', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const result = await resp.json();
+                if (result.success && result.data) {
+                    const d = result.data;
+                    document.getElementById('stat-total-users').textContent = d.overview?.totalUsers || 0;
+                    document.getElementById('stat-total-orders').textContent = d.overview?.totalOrders || 0;
+                    document.getElementById('stat-total-revenue').textContent = '¥' + ((d.finance?.totalAmount || 0).toLocaleString());
+                }
+            } catch (e) {
+                console.error('[统计] 加载失败:', e);
+            }
+        };
+
+        window.checkDataIntegrity = async function() {
+            const token = localStorage.getItem('adminToken') || '';
+            const container = document.getElementById('integrity-result');
+            container.innerHTML = '<p class="text-blue-500">正在检查数据完整性...</p>';
+            
+            try {
+                const resp = await fetch('http://localhost:3000/api/admin/data-integrity', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const result = await resp.json();
+                
+                if (!result.success) throw new Error(result.error);
+                
+                const d = result.data;
+                const statusColor = d.status === 'healthy' ? 'green' : 'orange';
+                const statusIcon = d.status === 'healthy' ? '✅' : '⚠️';
+                
+                let html = `<p class="font-medium text-${statusColor}-600 mb-2">${statusIcon} ${d.message}</p>`;
+                html += '<div class="grid grid-cols-2 gap-2 text-xs">';
+                html += `<div>用户总数: <b>${d.summary.users}</b></div>`;
+                html += `<div>订单总数: <b>${d.summary.orders}</b> (已删除: ${d.summary.ordersDeleted})</div>`;
+                html += `<div>门店总数: <b>${d.summary.stores}</b> (活跃: ${d.summary.storesActive})</div>`;
+                html += `<div>入驻申请: <b>${d.summary.storeApplications}</b> (待处理: ${d.summary.pendingApplications})</div>`;
+                html += `<div>总营收: <b>¥${(d.summary.finance?.totalRevenue || 0).toLocaleString()}</b></div>`;
+                html += `<div>实收金额: <b>¥${(d.summary.finance?.paidRevenue || 0).toLocaleString()}</b></div>`;
+                html += '</div>';
+                
+                if (d.issues && d.issues.length > 0) {
+                    html += '<div class="mt-3 pt-3 border-t"><p class="font-medium text-orange-600 text-sm mb-1">发现问题:</p>';
+                    html += d.issues.map(i => `<div class="text-xs text-orange-600">• [${i.type}] ${i.issue}</div>`).join('');
+                    html += '</div>';
+                }
+                
+                container.innerHTML = html;
+            } catch (e) {
+                container.innerHTML = `<p class="text-red-500">检查失败: ${e.message}</p>`;
+            }
+        };
+
+        window.exportData = async function(type) {
+            const token = localStorage.getItem('adminToken') || '';
+            try {
+                const resp = await fetch(`http://localhost:3000/api/admin/data-export?type=${type}`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const result = await resp.json();
+                
+                if (!result.success) throw new Error(result.error);
+                
+                // 触发浏览器下载
+                const blob = new Blob([JSON.stringify(result.data, null, 2)], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `dryclean-${type}-${Date.now()}.json`;
+                a.click();
+                URL.revokeObjectURL(url);
+                alert(`导出完成: ${result.data.counts ? JSON.stringify(result.data.counts) : type} 数据已下载`);
+            } catch (e) {
+                alert('导出失败: ' + e.message);
+            }
+        };
+
+        // 统计页面切换时自动加载数据
+        const originalShowContent = window.showContent;
+        window.showContent = function(sectionId) {
+            if (originalShowContent) originalShowContent(sectionId);
+            if (sectionId === 'users') loadUsers();
+            if (sectionId === 'members') loadMembers();
+            if (sectionId === 'statistics') loadStatistics();
+            if (sectionId === 'chain-list') loadChainList();
+            if (sectionId === 'chain-stores') loadChainStoresSelect();
+        };
+
+        // ================================================================
+        // 连锁企业管理
+        // ================================================================
+        
+        // 加载连锁列表
+        window.loadChainList = async function() {
+            const token = localStorage.getItem('adminToken') || '';
+            const keyword = document.getElementById('chain-search-input')?.value || '';
+            const tbody = document.getElementById('chain-list-tbody');
+            if (!tbody) return;
+            
+            try {
+                const params = new URLSearchParams({ pageSize: 100 });
+                if (keyword) params.append('keyword', keyword);
+                
+                const resp = await fetch(`http://localhost:3000/api/admin/chains?${params}`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const result = await resp.json();
+                
+                if (!result.success) throw new Error(result.error);
+                
+                const chains = result.data?.list || [];
+                if (!chains.length) {
+                    tbody.innerHTML = '<tr><td colspan="9" class="text-center text-gray-400 py-8"><i class="fa fa-inbox text-2xl mb-2"></i><p>暂无连锁企业数据</p></td></tr>';
+                    return;
+                }
+                
+                const planNames = { free: '免费版', basic: '基础版', pro: '专业版', enterprise: '企业版' };
+                tbody.innerHTML = chains.map(c => {
+                    const statusBadge = c.status === 'active' ? '<span class="px-2 py-1 text-xs rounded-full bg-green-100 text-green-700">活跃</span>' : '<span class="px-2 py-1 text-xs rounded-full bg-gray-100 text-gray-500">停用</span>';
+                    const plan = c.subscription?.plan || 'basic';
+                    return `<tr class="border-b hover:bg-gray-50">
+                        <td class="py-3 px-3 text-sm font-mono">${c.chainNo || '--'}</td>
+                        <td class="py-3 px-3 font-medium">${c.name || '--'}</td>
+                        <td class="py-3 px-3 text-sm text-gray-600">${c.contactPerson || '--'}<br><span class="text-xs">${c.adminPhone || ''}</span></td>
+                        <td class="py-3 px-3 text-sm">${c._storeCount || 0} (活跃${c._activeStoreCount || 0})</td>
+                        <td class="py-3 px-3 text-sm">${(c.stats?.totalOrders || 0).toLocaleString()}</td>
+                        <td class="py-3 px-3 text-sm">¥${(c.stats?.totalRevenue || 0).toLocaleString()}</td>
+                        <td class="py-3 px-3 text-sm">${planNames[plan] || plan}</td>
+                        <td class="py-3 px-3">${statusBadge}</td>
+                        <td class="py-3 px-3">
+                            <div class="flex gap-1">
+                                <button onclick="viewChainDetail('${c._id || c.chainNo}')" class="text-blue-600 hover:underline text-xs" title="查看详情"><i class="fa fa-eye"></i></button>
+                                <button onclick="deleteChain('${c._id || c.chainNo}','${c.name}')" class="text-red-500 hover:underline text-xs" title="删除"><i class="fa fa-trash"></i></button>
+                                <a href="chain-admin.html" target="_blank" class="text-indigo-600 hover:underline text-xs" title="打开连锁管理端"><i class="fa fa-external-link"></i></a>
+                            </div>
+                        </td>
+                    </tr>`;
+                }).join('');
+            } catch (e) {
+                console.error('[连锁列表] 加载失败:', e);
+                tbody.innerHTML = `<tr><td colspan="9" class="text-center text-red-400 py-8">加载失败: ${e.message}</td></tr>`;
+            }
+        };
+        
+        // 创建连锁企业
+        window.createChain = async function() {
+            const name = document.getElementById('chain-create-name').value.trim();
+            const phone = document.getElementById('chain-create-phone').value.trim();
+            const msgEl = document.getElementById('chain-create-msg');
+            
+            if (!name | !phone) {
+                msgEl.textContent = '请填写企业名称和管理员手机号'; msgEl.className = 'mt-3 text-sm text-red-600'; msgEl.classList.remove('hidden'); return;
+            }
+            
+            const data = {
+                name,
+                shortName: document.getElementById('chain-create-short').value.trim(),
+                adminPhone: phone,
+                contactPerson: document.getElementById('chain-create-contact').value.trim(),
+                address: document.getElementById('chain-create-address').value.trim(),
+                subscription: { plan: document.getElementById('chain-create-plan').value }
+            };
+            
+            const token = localStorage.getItem('adminToken') || '';
+            try {
+                const resp = await fetch('http://localhost:3000/api/admin/chains', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                    body: JSON.stringify(data)
+                });
+                const result = await resp.json();
+                
+                if (result.success) {
+                    msgEl.textContent = `连锁企业 "${name}" 创建成功！编号: ${result.data.chainNo}`;
+                    msgEl.className = 'mt-3 text-sm text-green-600'; msgEl.classList.remove('hidden');
+                    setTimeout(() => navigateToSection('chain-list'), 1000);
+                } else {
+                    throw new Error(result.error);
+                }
+            } catch (e) {
+                msgEl.textContent = '创建失败: ' + e.message;
+                msgEl.className = 'mt-3 text-sm text-red-600'; msgEl.classList.remove('hidden');
+            }
+        };
+        
+        // 查看连锁详情
+        window.viewChainDetail = async function(chainId) {
+            const token = localStorage.getItem('adminToken') || '';
+            try {
+                const resp = await fetch(`http://localhost:3000/api/admin/chains/${chainId}`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const result = await resp.json();
+                if (!result.success) throw new Error(result.error);
+                
+                const chain = result.data.chain;
+                const stores = result.data.stores || [];
+                const stats = result.data.stats;
+                
+                alert(`连锁企业: ${chain.name}
+编号: ${chain.chainNo}
+门店: ${stats?.totalStores || stores.length} 家 (活跃: ${stats?.activeStores || 0})
+总订单: ${stats?.totalOrders || 0}
+总营收: ¥${(stats?.totalRevenue || 0).toLocaleString()}
+管理员: ${result.data.admin?.name || '未设置'} (${result.data.admin?.phone || ''})`);
+            } catch (e) {
+                alert('获取详情失败: ' + e.message);
+            }
+        };
+        
+        // 删除连锁
+        window.deleteChain = async function(chainId, name) {
+            if (!confirm(`确定删除连锁企业 "${name}" ？\n所有门店将解除关联。`)) return;
+            
+            const token = localStorage.getItem('adminToken') || '';
+            try {
+                const resp = await fetch(`http://localhost:3000/api/admin/chains/${chainId}`, {
+                    method: 'DELETE',
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const result = await resp.json();
+                if (result.success) {
+                    alert('已删除');
+                    loadChainList();
+                } else {
+                    throw new Error(result.error);
+                }
+            } catch (e) {
+                alert('删除失败: ' + e.message);
+            }
+        };
+        
+        // 加载门店关联页面的连锁下拉列表
+        window.loadChainStoresSelect = async function() {
+            const token = localStorage.getItem('adminToken') || '';
+            const select = document.getElementById('chain-stores-select');
+            if (!select) return;
+            
+            // 保留第一个选项
+            select.innerHTML = '<option value="">选择连锁企业...</option>';
+            
+            try {
+                const resp = await fetch('http://localhost:3000/api/admin/chains?pageSize=100', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const result = await resp.json();
+                if (result.success && result.data?.list) {
+                    result.data.list.forEach(c => {
+                        const opt = document.createElement('option');
+                        opt.value = c._id || c.chainNo;
+                        opt.textContent = `${c.name} (${c.chainNo || ''})`;
+                        select.appendChild(opt);
+                    });
+                }
+            } catch (e) {
+                console.error('[连锁门店关联] 加载列表失败:', e);
+            }
+        };
+        
+        // 加载连锁的门店关联
+        window.loadChainStoreLinks = async function() {
+            const chainId = document.getElementById('chain-stores-select')?.value;
+            const linkedDiv = document.getElementById('chain-linked-stores');
+            const unlinkedDiv = document.getElementById('chain-unlinked-stores');
+            
+            if (!chainId) {
+                linkedDiv.innerHTML = '<p class="text-gray-400 text-sm text-center py-8">请先选择连锁企业</p>';
+                unlinkedDiv.innerHTML = '<p class="text-gray-400 text-sm text-center py-8">请先选择连锁企业</p>';
+                return;
+            }
+            
+            linkedDiv.innerHTML = '<p class="text-gray-400 text-sm text-center py-4"><i class="fa fa-spinner fa-spin"></i> 加载中...</p>';
+            unlinkedDiv.innerHTML = '<p class="text-gray-400 text-sm text-center py-4"><i class="fa fa-spinner fa-spin"></i> 加载中...</p>';
+            
+            const token = localStorage.getItem('adminToken') || '';
+            try {
+                // 获取连锁详情（含关联门店）
+                const [chainResp, unchainedResp] = await Promise.all([
+                    fetch(`http://localhost:3000/api/admin/chains/${chainId}`, {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    }),
+                    fetch(`http://localhost:3000/api/admin/unchained-stores`, {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    })
+                ]);
+                
+                const chainResult = await chainResp.json();
+                const unchainedResult = await unchainedResp.json();
+                
+                // 已关联门店
+                const linkedStores = chainResult.success ? (chainResult.data?.stores || []) : [];
+                if (linkedStores.length) {
+                    linkedDiv.innerHTML = linkedStores.map(s => `
+                        <div class="flex items-center justify-between p-2.5 border-b border-gray-100 hover:bg-gray-50">
+                            <div>
+                                <span class="text-sm font-medium">${s.name}</span>
+                                <span class="text-xs text-gray-400 ml-2">${s.storeNo || s._id}</span>
+                                <span class="text-xs ml-2 px-1.5 py-0.5 rounded ${s.status==='active'?'bg-green-100 text-green-600':'bg-gray-100 text-gray-500'}">${s.status==='active'?'活跃':'停用'}</span>
+                            </div>
+                            <button onclick="removeStoreFromChain('${s._id || s.storeNo}','${chainId}','${s.name}')" class="text-red-500 hover:underline text-xs">移出</button>
+                        </div>
+                    `).join('');
+                } else {
+                    linkedDiv.innerHTML = '<p class="text-gray-400 text-sm text-center py-8">暂无关联门店</p>';
+                }
+                
+                // 可关联门店
+                const unchainedStores = unchainedResult.success ? (unchainedResult.data || []) : [];
+                if (unchainedStores.length) {
+                    unlinkedDiv.innerHTML = unchainedStores.map(s => `
+                        <div class="flex items-center justify-between p-2.5 border-b border-gray-100 hover:bg-gray-50">
+                            <div>
+                                <span class="text-sm font-medium">${s.name}</span>
+                                <span class="text-xs text-gray-400 ml-2">${s.storeNo || s._id}</span>
+                                <span class="text-xs ml-2 px-1.5 py-0.5 rounded bg-gray-100 text-gray-500">${s.status}</span>
+                            </div>
+                            <button onclick="addStoreToChain('${s._id || s.storeNo}','${chainId}','${s.name}')" class="text-green-600 hover:underline text-xs">加入</button>
+                        </div>
+                    `).join('');
+                } else {
+                    unlinkedDiv.innerHTML = '<p class="text-gray-400 text-sm text-center py-8">没有可关联的门店</p>';
+                }
+            } catch (e) {
+                linkedDiv.innerHTML = `<p class="text-red-400 text-sm text-center py-4">加载失败: ${e.message}</p>`;
+                unlinkedDiv.innerHTML = '<p class="text-gray-400 text-sm text-center py-8">--</p>';
+            }
+        };
+        
+        // 门店加入连锁
+        window.addStoreToChain = async function(storeId, chainId, storeName) {
+            const token = localStorage.getItem('adminToken') || '';
+            try {
+                const resp = await fetch(`http://localhost:3000/api/admin/chains/${chainId}/stores/${storeId}`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const result = await resp.json();
+                if (result.success) {
+                    alert(`门店 "${result.data?.name || storeName}" 已加入连锁`);
+                    loadChainStoreLinks();
+                } else {
+                    throw new Error(result.error);
+                }
+            } catch (e) {
+                alert('操作失败: ' + e.message);
+            }
+        };
+        
+        // 门店移出连锁
+        window.removeStoreFromChain = async function(storeId, chainId, storeName) {
+            if (!confirm(`确定将门店 "${storeName}" 移出连锁？`)) return;
+            
+            const token = localStorage.getItem('adminToken') || '';
+            try {
+                const resp = await fetch(`http://localhost:3000/api/admin/chains/${chainId}/stores/${storeId}`, {
+                    method: 'DELETE',
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const result = await resp.json();
+                if (result.success) {
+                    alert(`门店 "${storeName}" 已移出连锁`);
+                    loadChainStoreLinks();
+                } else {
+                    throw new Error(result.error);
+                }
+            } catch (e) {
+                alert('操作失败: ' + e.message);
+            }
+        };
     </script>
 </body>
 </html>

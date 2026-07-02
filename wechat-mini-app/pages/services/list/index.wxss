@@ -1,6 +1,7 @@
 .container {
-  background-color: #f5f5f5;
+  background-color: #f5f7fa;
   min-height: 100vh;
+  padding-bottom: 40rpx;
 }
 
 .page-header {
@@ -10,15 +11,16 @@
 }
 
 .page-title {
-  font-size: 32rpx;
+  font-size: 36rpx;
   font-weight: bold;
   text-align: center;
 }
 
+/* 品类横向滚动 */
 .category-section {
   background-color: white;
   padding: 20rpx 0;
-  border-bottom: 2rpx solid #e5e5e5;
+  margin-bottom: 20rpx;
 }
 
 .category-scroll {
@@ -27,65 +29,142 @@
 }
 
 .category-item {
-  display: inline-block;
-  padding: 16rpx 32rpx;
-  margin-right: 20rpx;
+  display: inline-flex;
+  align-items: center;
+  gap: 8rpx;
+  padding: 16rpx 28rpx;
+  margin-right: 16rpx;
   border-radius: 24rpx;
   background-color: #f5f5f5;
+  border: 2rpx solid #e5e7eb;
+  transition: all 0.25s;
 }
 
-.category-text {
+.category-item.active {
+  border-color: transparent;
+  box-shadow: 0 2rpx 12rpx rgba(0, 0, 0, 0.15);
+}
+
+.category-name {
   font-size: 24rpx;
-  color: #666;
+  font-weight: 600;
 }
 
-.category-text.active {
-  background-color: #1e40af;
-  color: white;
-}
-
+/* 服务列表 */
 .service-list {
-  padding: 20rpx;
+  padding: 0 24rpx;
+  display: flex;
+  flex-direction: column;
+  gap: 16rpx;
 }
 
 .service-item {
   display: flex;
   align-items: center;
   background-color: white;
-  padding: 30rpx;
-  border-radius: 12rpx;
-  margin-bottom: 20rpx;
+  padding: 28rpx 24rpx;
+  border-radius: 16rpx;
+  box-shadow: 0 2rpx 12rpx rgba(0, 0, 0, 0.04);
+  transition: transform 0.2s;
+}
+
+.service-item:active {
+  transform: scale(0.99);
 }
 
 .service-icon {
-  font-size: 80rpx;
-  margin-right: 24rpx;
+  font-size: 64rpx;
+  margin-right: 20rpx;
+  flex-shrink: 0;
 }
 
 .service-info {
   flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6rpx;
 }
 
 .service-name {
   font-size: 28rpx;
-  font-weight: bold;
-  color: #333;
-  margin-bottom: 8rpx;
+  font-weight: 700;
+  color: #1f2937;
 }
 
 .service-desc {
   font-size: 24rpx;
-  color: #666;
-  margin-bottom: 8rpx;
+  color: #6b7280;
 }
 
-.service-price {
-  font-size: 32rpx;
-  font-weight: bold;
-  color: #e53e3e;
+.service-footer-row {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+  margin-top: 4rpx;
+}
+
+.service-price-hint {
+  font-size: 22rpx;
+  color: #3b82f6;
+  font-weight: 500;
+  padding: 4rpx 12rpx;
+  background: rgba(59, 130, 246, 0.08);
+  border-radius: 8rpx;
+}
+
+.service-unit {
+  font-size: 20rpx;
+  color: #9ca3af;
+}
+
+.service-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12rpx;
+  margin-left: 16rpx;
+}
+
+.book-btn {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  padding: 12rpx 24rpx;
+  border-radius: 20rpx;
+  box-shadow: 0 2rpx 8rpx rgba(16, 185, 129, 0.25);
+}
+
+.book-btn:active {
+  opacity: 0.9;
+  transform: scale(0.96);
+}
+
+.book-text {
+  font-size: 24rpx;
+  font-weight: 600;
+  color: #fff;
 }
 
 .service-arrow {
-  margin-left: 20rpx;
-  color: #999;
+}
+
+.arrow-icon {
+  font-size: 24rpx;
+  color: #d1d5db;
+}
+
+/* 空状态 */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 120rpx 0;
+  gap: 16rpx;
+}
+
+.empty-icon {
+  font-size: 80rpx;
+}
+
+.empty-text {
+  font-size: 28rpx;
+  color: #9ca3af;
 }

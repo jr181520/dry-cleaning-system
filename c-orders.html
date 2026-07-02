@@ -302,6 +302,7 @@
             'cleaning': { text: '清洗中', class: 'processing', icon: '🧺' },
             'cleaned': { text: '清洗完成', class: 'processing', icon: '✨' },
             'ready': { text: '待取件', class: 'ready', icon: '📦' },
+            'store_outbound': { text: '已出库', class: 'ready', icon: '📤' },
             'delivered': { text: '已送达', class: 'ready', icon: '✓' },
             'completed': { text: '已完成', class: 'completed', icon: '⭐' },
             'cancelled': { text: '已取消', class: 'cancelled', icon: '✕' }
@@ -319,13 +320,8 @@
             }
             console.log('用户已登录，userToken:', !!hasUserToken, 'authToken:', !!hasAuthToken);
             
-            // 启动统一同步管理器
-            if (UnifiedSync) {
-                UnifiedSync.start();
-            }
-            
-            // 同时启动旧版同步管理器（兼容）
-            OrderSyncManager.start();
+            // ⚠️ 轮询同步已禁用 — 页面加载时直接拉取订单，pageshow 事件处理返回刷新
+            // 如需启用轮询，取消下行注释：UnifiedSync.start();
             
             loadOrders();
             
@@ -642,18 +638,28 @@
             const deletedOrderIds = JSON.parse(localStorage.getItem('deleted_order_ids') || '[]');
             orders = orders.filter(o => !deletedOrderIds.includes(o.orderId));
             
-            // 筛选订单（兼容后端状态值）
+            // 筛选订单（兼容后端状态值 + 所有本地中间状态 + 配送状态）
             let filteredOrders = orders;
             if (currentTab === 'pending') {
-                filteredOrders = orders.filter(o => o.status === 'pending');
+                filteredOrders = orders.filter(o => o.status === 'pending' || o.status === 'paid');
             } else if (currentTab === 'processing') {
-                filteredOrders = orders.filter(o => ['paid', 'confirmed', 'processing', 'cleaning', 'cleaned', 'in_progress'].includes(o.status));
+                filteredOrders = orders.filter(o => ['paid', 'confirmed', 'received', 'processing', 'cleaning', 'cleaned', 'in_progress', 'delivering', 'delivering_back', 'store_outbound', 'outbound', 'awaiting_store_outbound', 'awaiting_pickup_scan'].includes(o.status));
             } else if (currentTab === 'ready') {
                 filteredOrders = orders.filter(o => o.status === 'ready');
             } else if (currentTab === 'completed') {
                 filteredOrders = orders.filter(o => ['completed', 'delivered'].includes(o.status));
             } else if (currentTab === 'cancelled') {
                 filteredOrders = orders.filter(o => o.status === 'cancelled');
+            }
+            
+            // 【修复】完整的已知状态列表，确保任何状态订单都能在对应tab中可见
+            const allKnownStatuses = ['pending', 'paid', 'confirmed', 'received', 'processing', 'cleaning', 'cleaned', 'in_progress', 'delivering', 'delivering_back', 'store_outbound', 'outbound', 'awaiting_store_outbound', 'awaiting_pickup_scan', 'ready', 'completed', 'delivered', 'cancelled'];
+            // 确保所有订单都能在某个tab中可见
+            const hiddenOrders = filteredOrders.filter(o => !allKnownStatuses.includes(o.status));
+            if (hiddenOrders.length > 0) {
+                console.warn('[c-orders] ⚠️ 发现未知状态的订单:', hiddenOrders.map(o => `${o.orderId}:${o.status}`));
+                // 未知状态订单合并到当前列表
+                filteredOrders = [...filteredOrders, ...hiddenOrders];
             }
             
             // 按创建时间倒序排列（最新的在前）

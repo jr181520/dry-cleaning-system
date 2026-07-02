@@ -787,4 +787,419 @@ router.post('/delivery/create', async (req, res) => {
   }
 });
 
+// ============================================
+// 会员管理
+// ============================================
+
+// 获取所有用户会员信息列表
+router.get('/members', async (req, res) => {
+  try {
+    const { page, pageSize, keyword, level } = req.query;
+    const result = await adminService.getMembers({
+      page: parseInt(page) || 1,
+      pageSize: parseInt(pageSize) || 20,
+      keyword,
+      level
+    });
+    res.json(result);
+  } catch (error) {
+    console.error('[管理员] 获取会员列表失败:', error);
+    res.status(500).json({
+      success: false,
+      error: 'server_error',
+      message: '获取会员列表失败'
+    });
+  }
+});
+
+// 获取单个用户会员详情
+router.get('/members/:userId', async (req, res) => {
+  try {
+    const result = await adminService.getMemberDetail(req.params.userId);
+    res.json(result);
+  } catch (error) {
+    console.error('[管理员] 获取会员详情失败:', error);
+    res.status(500).json({
+      success: false,
+      error: 'server_error',
+      message: '获取会员详情失败'
+    });
+  }
+});
+
+// ============================================
+// 多品类业务管理
+// ============================================
+
+// 获取所有启用的业务品类
+router.get('/business/categories', (req, res) => {
+  res.json({
+    success: true,
+    data: adminService.getBusinessCategories()
+  });
+});
+
+// 获取品类的业务统计概览
+router.get('/business/:category/stats', async (req, res) => {
+  try {
+    const result = await adminService.getCategoryStats(req.params.category);
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// 获取品类的订单列表
+router.get('/business/:category/orders', async (req, res) => {
+  try {
+    const { page, pageSize, status, startDate, endDate, keyword } = req.query;
+    const result = await adminService.getCategoryOrders(req.params.category, {
+      page: parseInt(page) || 1,
+      pageSize: parseInt(pageSize) || 20,
+      status, startDate, endDate, keyword
+    });
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// 获取品类的客户列表
+router.get('/business/:category/customers', async (req, res) => {
+  try {
+    const { page, pageSize, keyword } = req.query;
+    const result = await adminService.getCategoryCustomers(req.params.category, {
+      page: parseInt(page) || 1,
+      pageSize: parseInt(pageSize) || 20,
+      keyword
+    });
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// 获取品类的会员列表
+router.get('/business/:category/members', async (req, res) => {
+  try {
+    const { page, pageSize, level, keyword } = req.query;
+    const result = await adminService.getCategoryMembers(req.params.category, {
+      page: parseInt(page) || 1,
+      pageSize: parseInt(pageSize) || 20,
+      level, keyword
+    });
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// ============================================
+// 数据完整性校验
+// ============================================
+
+// 全量数据完整性检查
+router.get('/data-integrity', async (req, res) => {
+  try {
+    const result = await adminService.checkDataIntegrity();
+    res.json(result);
+  } catch (error) {
+    console.error('[管理员] 数据完整性检查失败:', error);
+    res.status(500).json({
+      success: false,
+      error: 'server_error',
+      message: '数据完整性检查失败'
+    });
+  }
+});
+
+// 数据导出（全量数据JSON）
+router.get('/data-export', async (req, res) => {
+  try {
+    const { type } = req.query; // users, orders, stores, all
+    const result = await adminService.exportData(type || 'all');
+    res.setHeader('Content-Type', 'application/json');
+    res.setHeader('Content-Disposition', `attachment; filename="dryclean-${type || 'all'}-${Date.now()}.json"`);
+    res.json(result);
+  } catch (error) {
+    console.error('[管理员] 数据导出失败:', error);
+    res.status(500).json({
+      success: false,
+      error: 'server_error',
+      message: '数据导出失败'
+    });
+  }
+});
+
+// ============================================
+// 连锁企业管理
+// ============================================
+
+// 创建连锁企业
+router.post('/chains', authMiddleware, requireRoles('admin'), async (req, res) => {
+  try {
+    const result = await adminService.createChain(req.body, req.user.id);
+    res.json(result);
+  } catch (error) {
+    console.error('[连锁管理] 创建失败:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// 获取连锁企业列表
+router.get('/chains', authMiddleware, requireRoles('admin', 'chain_admin'), async (req, res) => {
+  try {
+    const { page, pageSize, keyword, status } = req.query;
+    const result = await adminService.getChains({
+      page: parseInt(page) || 1,
+      pageSize: parseInt(pageSize) || 20,
+      keyword, status,
+      // chain_admin只能看自己的连锁
+      adminId: req.user.roles.includes('chain_admin') && !req.user.roles.includes('admin') ? req.user.id : undefined
+    });
+    res.json(result);
+  } catch (error) {
+    console.error('[连锁管理] 获取列表失败:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// 获取连锁企业详情
+router.get('/chains/:chainId', authMiddleware, requireRoles('admin', 'chain_admin'), async (req, res) => {
+  try {
+    const result = await adminService.getChainDetail(req.params.chainId);
+    res.json(result);
+  } catch (error) {
+    console.error('[连锁管理] 获取详情失败:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// 更新连锁企业信息
+router.put('/chains/:chainId', authMiddleware, requireRoles('admin'), async (req, res) => {
+  try {
+    const result = await adminService.updateChain(req.params.chainId, req.body);
+    res.json(result);
+  } catch (error) {
+    console.error('[连锁管理] 更新失败:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// 删除连锁企业
+router.delete('/chains/:chainId', authMiddleware, requireRoles('admin'), async (req, res) => {
+  try {
+    const result = await adminService.deleteChain(req.params.chainId);
+    res.json(result);
+  } catch (error) {
+    console.error('[连锁管理] 删除失败:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// 门店加入连锁
+router.post('/chains/:chainId/stores/:storeId', authMiddleware, requireRoles('admin'), async (req, res) => {
+  try {
+    const result = await adminService.setStoreToChain(req.params.storeId, req.params.chainId);
+    res.json(result);
+  } catch (error) {
+    console.error('[连锁管理] 门店加入失败:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// 门店移出连锁
+router.delete('/chains/:chainId/stores/:storeId', authMiddleware, requireRoles('admin'), async (req, res) => {
+  try {
+    const result = await adminService.removeStoreFromChain(req.params.storeId);
+    res.json(result);
+  } catch (error) {
+    console.error('[连锁管理] 门店移出失败:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// 连锁仪表盘
+router.get('/chains/:chainId/dashboard', authMiddleware, requireRoles('admin', 'chain_admin'), async (req, res) => {
+  try {
+    const result = await adminService.getChainDashboard(req.params.chainId);
+    res.json(result);
+  } catch (error) {
+    console.error('[连锁管理] 仪表盘失败:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// 连锁订单列表
+router.get('/chains/:chainId/orders', authMiddleware, requireRoles('admin', 'chain_admin'), async (req, res) => {
+  try {
+    const { page, pageSize, keyword, status, storeId, startDate, endDate } = req.query;
+    const result = await adminService.getChainOrders(req.params.chainId, {
+      page: parseInt(page) || 1,
+      pageSize: parseInt(pageSize) || 20,
+      keyword, status, storeId, startDate, endDate
+    });
+    res.json(result);
+  } catch (error) {
+    console.error('[连锁管理] 获取订单失败:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// 获取未关联连锁的门店列表
+router.get('/unchained-stores', authMiddleware, requireRoles('admin'), async (req, res) => {
+  try {
+    const result = await adminService.getUnchainedStores();
+    res.json(result);
+  } catch (error) {
+    console.error('[连锁管理] 获取未关联门店失败:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// ============================================
+// 资金管理
+// ============================================
+
+// 资金概览
+router.get('/chains/:chainId/finance/overview', authMiddleware, requireRoles('admin', 'chain_admin'), async (req, res) => {
+  try {
+    const result = await adminService.getChainFinanceOverview(req.params.chainId);
+    res.json(result);
+  } catch (error) {
+    console.error('[资金管理] 概览失败:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// 资金流水记录
+router.get('/chains/:chainId/finance/records', authMiddleware, requireRoles('admin', 'chain_admin'), async (req, res) => {
+  try {
+    const { page, pageSize, type, startDate, endDate } = req.query;
+    const result = await adminService.getChainFinanceRecords(req.params.chainId, {
+      page: parseInt(page) || 1,
+      pageSize: parseInt(pageSize) || 10,
+      type, startDate, endDate
+    });
+    res.json(result);
+  } catch (error) {
+    console.error('[资金管理] 流水记录失败:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// 门店资金统计
+router.get('/chains/:chainId/finance/stores', authMiddleware, requireRoles('admin', 'chain_admin'), async (req, res) => {
+  try {
+    const result = await adminService.getChainStoreFinance(req.params.chainId);
+    res.json(result);
+  } catch (error) {
+    console.error('[资金管理] 门店资金失败:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// 资金趋势
+router.get('/chains/:chainId/finance/trend', authMiddleware, requireRoles('admin', 'chain_admin'), async (req, res) => {
+  try {
+    const result = await adminService.getChainFinanceTrend(req.params.chainId);
+    res.json(result);
+  } catch (error) {
+    console.error('[资金管理] 趋势失败:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// ============================================
+// 结算中心
+// ============================================
+
+// 结算概览
+router.get('/chains/:chainId/settlement/overview', authMiddleware, requireRoles('admin', 'chain_admin'), async (req, res) => {
+  try {
+    const result = await adminService.getChainSettlementOverview(req.params.chainId);
+    res.json(result);
+  } catch (error) {
+    console.error('[结算中心] 概览失败:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// 结算单列表
+router.get('/chains/:chainId/settlements', authMiddleware, requireRoles('admin', 'chain_admin'), async (req, res) => {
+  try {
+    const { page, pageSize, status } = req.query;
+    const result = await adminService.getChainSettlements(req.params.chainId, {
+      page: parseInt(page) || 1,
+      pageSize: parseInt(pageSize) || 10,
+      status
+    });
+    res.json(result);
+  } catch (error) {
+    console.error('[结算中心] 列表失败:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// 创建结算单
+router.post('/chains/:chainId/settlements/create', authMiddleware, requireRoles('admin', 'chain_admin'), async (req, res) => {
+  try {
+    const { period, storeId, ratio, remark } = req.body;
+    const result = await adminService.createChainSettlement(req.params.chainId, {
+      period, storeId, ratio, remark
+    }, req.user);
+    res.json(result);
+  } catch (error) {
+    console.error('[结算中心] 创建失败:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// ============================================
+// 门店结算权限管理
+// ============================================
+
+// 获取门店结算权限列表
+router.get('/chains/:chainId/settlement/stores', authMiddleware, requireRoles('admin', 'chain_admin'), async (req, res) => {
+  try {
+    const result = await adminService.getSettlementStores(req.params.chainId);
+    res.json(result);
+  } catch (error) {
+    console.error('[结算权限] 获取门店列表失败:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// 更新门店结算权限
+router.put('/chains/:chainId/settlement/stores/:storeId', authMiddleware, requireRoles('admin', 'chain_admin'), async (req, res) => {
+  try {
+    const { storeType, terminalSettlementEnabled, settlementRatio } = req.body;
+    const result = await adminService.updateStoreSettlementConfig(
+      req.params.chainId, 
+      req.params.storeId, 
+      { storeType, terminalSettlementEnabled, settlementRatio }
+    );
+    res.json(result);
+  } catch (error) {
+    console.error('[结算权限] 更新门店配置失败:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// 批量更新门店结算权限
+router.post('/chains/:chainId/settlement/stores/batch-update', authMiddleware, requireRoles('admin', 'chain_admin'), async (req, res) => {
+  try {
+    const { storeIds, storeType, terminalSettlementEnabled, settlementRatio } = req.body;
+    const result = await adminService.batchUpdateStoreSettlementConfig(
+      req.params.chainId, 
+      storeIds, 
+      { storeType, terminalSettlementEnabled, settlementRatio }
+    );
+    res.json(result);
+  } catch (error) {
+    console.error('[结算权限] 批量更新门店配置失败:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 module.exports = router;

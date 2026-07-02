@@ -6,6 +6,7 @@
     "pages/order/detail/index",
     "pages/pickup/index",
     "pages/profile/index",
+    "pages/profile/edit/index",
     "pages/order/create/index",
     "pages/order/stores/index",
     "pages/order/delivery/index",

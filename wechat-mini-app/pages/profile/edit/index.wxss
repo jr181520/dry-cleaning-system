@@ -1,0 +1,166 @@
+/* 编辑资料页面样式 */
+
+.container {
+  min-height: 100vh;
+  background: #f5f5f5;
+  padding-bottom: 40rpx;
+}
+
+/* 编辑区块 */
+.edit-section {
+  background: #ffffff;
+  margin: 24rpx;
+  border-radius: 16rpx;
+  padding: 0 32rpx;
+  box-shadow: 0 2rpx 12rpx rgba(0, 0, 0, 0.06);
+}
+
+.section-title {
+  font-size: 26rpx;
+  color: #9ca3af;
+  padding: 24rpx 0 16rpx;
+  border-bottom: 1rpx solid #f3f4f6;
+}
+
+/* 头像编辑 */
+.avatar-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 32rpx 0;
+  position: relative;
+}
+
+.avatar-image {
+  width: 160rpx;
+  height: 160rpx;
+  border-radius: 50%;
+  background: #f3f4f6;
+  border: 4rpx solid #e5e7eb;
+}
+
+.avatar-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
+  border: none;
+}
+
+.avatar-placeholder-text {
+  font-size: 56rpx;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.avatar-mask {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-top: 16rpx;
+}
+
+.avatar-camera-icon {
+  font-size: 32rpx;
+}
+
+.avatar-tip {
+  font-size: 22rpx;
+  color: #9ca3af;
+  margin-top: 4rpx;
+}
+
+/* 表单 */
+.form-item {
+  display: flex;
+  align-items: center;
+  padding: 28rpx 0;
+  border-bottom: 1rpx solid #f3f4f6;
+}
+
+.form-item:last-child {
+  border-bottom: none;
+}
+
+.form-label {
+  width: 120rpx;
+  font-size: 28rpx;
+  color: #374151;
+  flex-shrink: 0;
+}
+
+.form-input {
+  flex: 1;
+  font-size: 28rpx;
+  color: #1f2937;
+  text-align: right;
+}
+
+.form-input::placeholder {
+  color: #c4c4c4;
+}
+
+.form-picker {
+  flex: 1;
+  font-size: 28rpx;
+  color: #1f2937;
+  text-align: right;
+}
+
+.form-picker.placeholder {
+  color: #c4c4c4;
+}
+
+/* 性别选择 */
+.gender-group {
+  flex: 1;
+  display: flex;
+  justify-content: flex-end;
+  gap: 16rpx;
+}
+
+.gender-option {
+  padding: 12rpx 32rpx;
+  border-radius: 32rpx;
+  font-size: 26rpx;
+  color: #6b7280;
+  background: #f3f4f6;
+  transition: all 0.3s ease;
+}
+
+.gender-option.active {
+  background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
+  color: #ffffff;
+}
+
+.gender-text {
+  font-size: 26rpx;
+}
+
+/* 保存按钮 */
+.save-area {
+  padding: 48rpx 24rpx;
+}
+
+.save-btn {
+  width: 100%;
+  height: 96rpx;
+  line-height: 96rpx;
+  background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
+  color: #ffffff;
+  font-size: 32rpx;
+  font-weight: 600;
+  border-radius: 48rpx;
+  border: none;
+  box-shadow: 0 8rpx 24rpx rgba(30, 64, 175, 0.3);
+}
+
+.save-btn::after {
+  display: none;
+}
+
+.save-btn[disabled] {
+  background: #d1d5db;
+  color: #9ca3af;
+  box-shadow: none;
+}

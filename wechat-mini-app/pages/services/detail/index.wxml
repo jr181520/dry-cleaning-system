@@ -3,7 +3,7 @@
   <view class="service-header">
     <view class="service-icon">{{service.icon}}</view>
     <text class="service-name">{{service.name}}</text>
-    <text class="service-price">¥{{service.price}}</text>
+    <text class="service-price-hint">价格由门店决定</text>
     <text class="service-desc">{{service.desc}}</text>
   </view>
 

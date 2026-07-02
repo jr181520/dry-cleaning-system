@@ -1,0 +1,581 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>选择跑腿服务</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #f5f5f5;
+      min-height: 100vh;
+      color: #333;
+    }
+
+    /* 顶部导航 */
+    .header {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 16px 20px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+    .header .back-btn {
+      width: 32px; height: 32px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 20px; cursor: pointer;
+    }
+    .header .title { font-size: 18px; font-weight: 600; }
+
+    /* 主内容 */
+    .container { max-width: 480px; margin: 0 auto; padding: 16px; }
+
+    /* 订单信息卡片 */
+    .order-card {
+      background: white;
+      border-radius: 12px;
+      padding: 16px;
+      margin-bottom: 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .order-card .order-no { font-size: 13px; color: #999; }
+    .order-card .order-id { font-size: 15px; font-weight: 600; color: #333; margin-top: 4px; }
+    .order-card .order-status {
+      background: #e8f5e9; color: #4caf50;
+      padding: 4px 12px; border-radius: 20px;
+      font-size: 13px; font-weight: 500;
+    }
+
+    /* 配送地址 */
+    .address-card {
+      background: white;
+      border-radius: 12px;
+      padding: 16px;
+      margin-bottom: 16px;
+    }
+    .address-card .section-title {
+      font-size: 15px; font-weight: 600; margin-bottom: 12px;
+      color: #333;
+    }
+    .address-row {
+      display: flex; align-items: center; gap: 8px;
+      font-size: 14px; color: #666;
+    }
+    .address-row i { color: #667eea; width: 16px; text-align: center; }
+
+    /* 配送模式切换 */
+    .mode-tabs {
+      background: white;
+      border-radius: 12px;
+      padding: 4px;
+      margin-bottom: 16px;
+      display: flex;
+      gap: 4px;
+    }
+    .mode-tab {
+      flex: 1;
+      padding: 10px;
+      text-align: center;
+      border-radius: 10px;
+      font-size: 14px;
+      cursor: pointer;
+      transition: all 0.3s;
+      border: none;
+      background: transparent;
+      color: #666;
+    }
+    .mode-tab.active {
+      background: linear-gradient(135deg, #667eea, #764ba2);
+      color: white;
+      font-weight: 600;
+    }
+    .mode-tab .tab-sub {
+      font-size: 11px;
+      opacity: 0.7;
+      margin-top: 2px;
+    }
+
+    /* 服务商列表 */
+    .providers-section .section-title {
+      font-size: 15px; font-weight: 600;
+      margin-bottom: 12px;
+      padding: 0 4px;
+    }
+    .provider-card {
+      background: white;
+      border-radius: 12px;
+      padding: 16px;
+      margin-bottom: 12px;
+      border: 2px solid transparent;
+      cursor: pointer;
+      transition: all 0.3s;
+      position: relative;
+    }
+    .provider-card:hover { border-color: #e0e0e0; }
+    .provider-card.selected { border-color: #667eea; background: #f8f9ff; }
+    .provider-card .provider-header {
+      display: flex; align-items: center; gap: 12px;
+      margin-bottom: 12px;
+    }
+    .provider-icon {
+      width: 48px; height: 48px;
+      border-radius: 12px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 24px;
+    }
+    .provider-info { flex: 1; }
+    .provider-name { font-size: 16px; font-weight: 600; }
+    .provider-meta { font-size: 12px; color: #999; margin-top: 2px; }
+    .provider-rating { color: #ff9800; font-size: 13px; }
+    .provider-rating i { margin-right: 2px; }
+
+    .provider-pricing {
+      display: flex; gap: 8px;
+      padding: 12px;
+      background: #f9f9f9;
+      border-radius: 8px;
+    }
+    .pricing-item {
+      flex: 1;
+      text-align: center;
+    }
+    .pricing-item .pricing-label {
+      font-size: 12px; color: #999;
+      margin-bottom: 4px;
+    }
+    .pricing-item .pricing-fee {
+      font-size: 20px; font-weight: 700;
+      color: #ff5722;
+    }
+    .pricing-item .pricing-fee .unit {
+      font-size: 13px; font-weight: 400;
+    }
+    .pricing-item .pricing-original {
+      font-size: 12px; color: #999; text-decoration: line-through;
+    }
+    .provider-discount-tag {
+      position: absolute; top: 12px; right: 12px;
+      background: #ff5722; color: white;
+      font-size: 11px; padding: 2px 8px;
+      border-radius: 10px;
+      font-weight: 500;
+    }
+    .provider-check {
+      position: absolute; top: 12px; right: 12px;
+      width: 24px; height: 24px;
+      border-radius: 50%;
+      background: #667eea;
+      color: white;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 12px;
+      opacity: 0;
+      transition: all 0.3s;
+    }
+    .provider-card.selected .provider-check { opacity: 1; }
+    .provider-card.selected .provider-discount-tag { display: none; }
+
+    /* 底部操作 */
+    .footer-bar {
+      position: sticky; bottom: 0;
+      background: white;
+      padding: 16px 20px;
+      border-top: 1px solid #f0f0f0;
+      display: flex; gap: 12px;
+    }
+    .footer-bar .total-info {
+      flex: 1;
+      display: flex; flex-direction: column;
+      justify-content: center;
+    }
+    .total-label { font-size: 12px; color: #999; }
+    .total-fee { font-size: 22px; font-weight: 700; color: #ff5722; }
+    .total-fee .unit { font-size: 14px; font-weight: 400; }
+    .btn-confirm {
+      background: linear-gradient(135deg, #667eea, #764ba2);
+      color: white; border: none;
+      padding: 14px 32px;
+      border-radius: 12px;
+      font-size: 16px; font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s;
+      white-space: nowrap;
+    }
+    .btn-confirm:disabled {
+      opacity: 0.5; cursor: not-allowed;
+    }
+    .btn-confirm:not(:disabled):active {
+      transform: scale(0.96);
+    }
+
+    /* 空状态 */
+    .empty-state {
+      text-align: center; padding: 40px 20px;
+      color: #999;
+    }
+    .empty-state .empty-icon { font-size: 48px; margin-bottom: 12px; }
+    .empty-state .empty-text { font-size: 14px; }
+
+    /* 加载动画 */
+    .loading-spinner {
+      text-align: center; padding: 40px 0;
+    }
+    .spinner-circle {
+      width: 36px; height: 36px;
+      border: 3px solid #e0e0e0;
+      border-top-color: #667eea;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin: 0 auto 12px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .error-banner {
+      background: #fff3f3; color: #d32f2f;
+      padding: 12px 16px; border-radius: 8px;
+      font-size: 13px; margin-bottom: 16px;
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <!-- 顶部导航 -->
+  <div class="header">
+    <div class="back-btn" onclick="history.back()"><i class="fas fa-arrow-left"></i></div>
+    <div class="title">选择跑腿服务</div>
+  </div>
+
+  <div class="container">
+    <!-- 订单信息 -->
+    <div class="order-card" id="orderCard">
+      <div>
+        <div class="order-no">订单编号</div>
+        <div class="order-id" id="orderNo">-</div>
+      </div>
+      <div class="order-status">待取件</div>
+    </div>
+
+    <!-- 配送地址 -->
+    <div class="address-card" id="addressCard">
+      <div class="section-title">📦 配送信息</div>
+      <div class="address-row" id="addressDisplay">
+        <i class="fas fa-map-marker-alt"></i>
+        <span id="deliveryAddr">请在上一步填写配送地址</span>
+      </div>
+    </div>
+
+    <!-- 配送模式切换 -->
+    <div class="mode-tabs">
+      <button class="mode-tab active" onclick="switchMode('solo')">
+        一对一专送
+        <div class="tab-sub">专属骑手 · 最快送达</div>
+      </button>
+      <button class="mode-tab" onclick="switchMode('shared')">
+        拼单配送
+        <div class="tab-sub">多人分摊 · 更省钱</div>
+      </button>
+    </div>
+
+    <!-- 错误提示 -->
+    <div class="error-banner" id="errorBanner"></div>
+
+    <!-- 服务商列表 -->
+    <div class="providers-section" id="providersSection">
+      <div class="section-title">选择配送平台</div>
+      <div class="loading-spinner" id="loadingSpinner">
+        <div class="spinner-circle"></div>
+        <div style="color:#999;font-size:13px;">正在获取报价...</div>
+      </div>
+      <div id="providersList"></div>
+    </div>
+  </div>
+
+  <!-- 底部操作栏 -->
+  <div class="footer-bar" id="footerBar">
+    <div class="total-info">
+      <div class="total-label" id="totalLabel">选择服务商查看费用</div>
+      <div class="total-fee" id="totalFee">¥0.00</div>
+    </div>
+    <button class="btn-confirm" id="confirmBtn" disabled onclick="confirmAndPay()">
+      确认并支付
+    </button>
+  </div>
+
+  <script>
+    // ===== 状态管理 =====
+    let selectedProvider = null;
+    let selectedPricing = null;   // { type: 'solo'|'shared', fee, ... }
+    let deliveryMode = 'solo';
+    let providers = [];
+    let orderId = null;
+    let deliveryAddress = '';
+    let deliveryContact = '';
+    let deliveryPhone = '';
+
+    // ===== URL参数解析 =====
+    (function init() {
+      const params = new URLSearchParams(window.location.search);
+      orderId = params.get('orderId') || params.get('id') || '';
+
+      if (!orderId) {
+        showError('缺少订单ID，请从订单详情页进入');
+        document.getElementById('loadingSpinner').style.display = 'none';
+        return;
+      }
+
+      // 获取配送地址（从 localStorage 或配置）
+      const savedInfo = JSON.parse(localStorage.getItem('userDeliveryInfo') || '{}');
+      deliveryAddress = params.get('address') || savedInfo.deliveryAddress || '';
+      deliveryContact = params.get('contact') || savedInfo.deliveryContact || '';
+      deliveryPhone = params.get('phone') || savedInfo.deliveryPhone || '';
+
+      // 显示订单编号
+      document.getElementById('orderNo').textContent = orderId.length > 20 ? orderId.substring(0, 20) + '...' : orderId;
+
+      // 显示配送地址
+      if (deliveryAddress) {
+        document.getElementById('deliveryAddr').textContent =
+          `${deliveryAddress} · ${deliveryContact || ''} ${deliveryPhone || ''}`;
+      }
+
+      // 加载报价
+      loadQuotes();
+    })();
+
+    // ===== 切换配送模式 =====
+    function switchMode(mode) {
+      deliveryMode = mode;
+      document.querySelectorAll('.mode-tab').forEach(tab => {
+        tab.classList.toggle('active', tab.textContent.includes(mode === 'solo' ? '一对一' : '拼单'));
+      });
+      document.getElementById('totalLabel').textContent =
+        mode === 'solo' ? '一对一专送费用' : '拼单配送费用（预估）';
+      updateTotalFee();
+      renderProviders();
+    }
+
+    // ===== 加载报价 =====
+    async function loadQuotes() {
+      document.getElementById('loadingSpinner').style.display = 'block';
+      document.getElementById('errorBanner').style.display = 'none';
+
+      try {
+        const response = await fetch('http://localhost:3000/api/delivery/quotes', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            pickup: { latitude: 30.5, longitude: 114.3 },
+            delivery: { latitude: 30.6, longitude: 114.4 },
+            distance: 3,
+            isNewUser: Math.random() > 0.5
+          })
+        });
+
+        const result = await response.json();
+        if (result.success && result.data && result.data.length > 0) {
+          providers = result.data;
+          renderProviders();
+          updateTotalFee();
+        } else {
+          // 使用本地模拟数据
+          useFallbackProviders();
+        }
+      } catch (error) {
+        console.log('[跑腿选择] API不可用，使用本地数据:', error.message);
+        useFallbackProviders();
+      }
+
+      document.getElementById('loadingSpinner').style.display = 'none';
+    }
+
+    // ===== 本地回退数据 =====
+    function useFallbackProviders() {
+      providers = [
+        {
+          id: 'meituan', name: '美团跑腿', icon: '🛵',
+          rating: 4.9, distance: 3.0, distanceUnit: 'km',
+          estimatedTime: '25-40分钟',
+          hasDiscount: true, discountInfo: '新用户首单减¥3',
+          pricing: {
+            solo: { originalFee: 11, discount: 3, actualFee: 8 },
+            shared: { originalFee: 7.15, discount: 0, actualFee: 7.15 }
+          }
+        },
+        {
+          id: 'jd', name: '京东秒送', icon: '🚚',
+          rating: 4.8, distance: 3.0, distanceUnit: 'km',
+          estimatedTime: '30-45分钟',
+          hasDiscount: true, discountInfo: '平日85折',
+          pricing: {
+            solo: { originalFee: 12, discount: 1.8, actualFee: 10.2 },
+            shared: { originalFee: 7.2, discount: 0, actualFee: 7.2 }
+          }
+        },
+        {
+          id: 'sf', name: '顺丰跑腿', icon: '✈️',
+          rating: 4.9, distance: 3.0, distanceUnit: 'km',
+          estimatedTime: '20-35分钟',
+          hasDiscount: true, discountInfo: '满¥50减¥5',
+          pricing: {
+            solo: { originalFee: 12, discount: 5, actualFee: 7 },
+            shared: { originalFee: 8.4, discount: 0, actualFee: 8.4 }
+          }
+        },
+        {
+          id: 'taobao', name: '淘宝闪购', icon: '🛒',
+          rating: 4.7, distance: 3.0, distanceUnit: 'km',
+          estimatedTime: '25-40分钟',
+          hasDiscount: true, discountInfo: '限时优惠¥3',
+          pricing: {
+            solo: { originalFee: 10.4, discount: 3, actualFee: 7.4 },
+            shared: { originalFee: 6.45, discount: 0, actualFee: 6.45 }
+          }
+        }
+      ];
+      renderProviders();
+      updateTotalFee();
+    }
+
+    // ===== 渲染服务商列表 =====
+    function renderProviders() {
+      const container = document.getElementById('providersList');
+      if (!providers.length) {
+        container.innerHTML = '<div class="empty-state"><div class="empty-icon">🚫</div><div class="empty-text">暂无可用服务商</div></div>';
+        return;
+      }
+
+      container.innerHTML = providers.map(p => {
+        const pricing = deliveryMode === 'shared' ? p.pricing.shared : p.pricing.solo;
+        const isSelected = selectedProvider === p.id;
+        const iconBg = {
+          'meituan': '#FFF9C4', 'jd': '#FFE0B2', 'sf': '#E3F2FD', 'taobao': '#F3E5F5'
+        }[p.id] || '#f0f0f0';
+
+        return `
+          <div class="provider-card ${isSelected ? 'selected' : ''}"
+               onclick="selectProvider('${p.id}')">
+            ${p.hasDiscount && !isSelected
+              ? `<div class="provider-discount-tag">${p.discountInfo}</div>`
+              : `<div class="provider-check"><i class="fas fa-check"></i></div>`
+            }
+            <div class="provider-header">
+              <div class="provider-icon" style="background: ${iconBg}">${p.icon}</div>
+              <div class="provider-info">
+                <div class="provider-name">${p.name}</div>
+                <div class="provider-meta">${p.estimatedTime} · ${p.distance}${p.distanceUnit}</div>
+              </div>
+              <div class="provider-rating">⭐ ${p.rating}</div>
+            </div>
+            <div class="provider-pricing">
+              <div class="pricing-item">
+                <div class="pricing-label">配送费</div>
+                <div class="pricing-fee">
+                  <span class="unit">¥</span>${pricing.actualFee}
+                </div>
+                ${pricing.discount > 0
+                  ? `<div class="pricing-original">¥${pricing.originalFee}</div>`
+                  : ''
+                }
+              </div>
+              ${p.hasDiscount && isSelected
+                ? `<div class="pricing-item">
+                    <div class="pricing-label">优惠</div>
+                    <div class="pricing-fee" style="color:#4caf50;">-¥${pricing.discount}</div>
+                  </div>`
+                : ''
+              }
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    // ===== 选择服务商 =====
+    function selectProvider(providerId) {
+      selectedProvider = providerId;
+      renderProviders();
+      updateTotalFee();
+    }
+
+    // ===== 更新合计费用 =====
+    function updateTotalFee() {
+      const confirmBtn = document.getElementById('confirmBtn');
+      const totalFeeEl = document.getElementById('totalFee');
+
+      if (!selectedProvider || !providers.length) {
+        totalFeeEl.innerHTML = '<span class="unit">¥</span>0.00';
+        confirmBtn.disabled = true;
+        return;
+      }
+
+      const provider = providers.find(p => p.id === selectedProvider);
+      if (!provider) return;
+
+      const pricing = deliveryMode === 'shared' ? provider.pricing.shared : provider.pricing.solo;
+      totalFeeEl.innerHTML = `<span class="unit">¥</span>${pricing.actualFee}`;
+      confirmBtn.disabled = false;
+      selectedPricing = { provider: selectedProvider, type: deliveryMode, fee: pricing.actualFee, ...pricing };
+    }
+
+    // ===== 确认并支付 =====
+    async function confirmAndPay() {
+      if (!selectedProvider) {
+        showError('请先选择配送服务商');
+        return;
+      }
+
+      const confirmBtn = document.getElementById('confirmBtn');
+      confirmBtn.disabled = true;
+      confirmBtn.textContent = '处理中...';
+
+      // 先提交取件方式到后端
+      try {
+        const pickupResponse = await fetch(`http://localhost:3000/api/cleaning/orders/${orderId}/pickup-method`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + (localStorage.getItem('authToken') || '')
+          },
+          body: JSON.stringify({
+            method: 'home_delivery',
+            address: deliveryAddress,
+            contactName: deliveryContact,
+            contactPhone: deliveryPhone
+          })
+        });
+
+        if (!pickupResponse.ok) {
+          console.warn('[跑腿选择] 取件方式提交失败，继续本地流程');
+        }
+      } catch (error) {
+        console.warn('[跑腿选择] API不可用，使用本地流程:', error.message);
+      }
+
+      // 跳转到支付页面
+      const params = new URLSearchParams({
+        orderId: orderId,
+        type: 'delivery',
+        provider: selectedProvider,
+        fee: selectedPricing?.fee || 0,
+        mode: deliveryMode
+      });
+      window.location.href = `c-payment.html?${params.toString()}`;
+    }
+
+    // ===== 工具函数 =====
+    function showError(msg) {
+      const banner = document.getElementById('errorBanner');
+      banner.textContent = msg;
+      banner.style.display = 'block';
+      setTimeout(() => { banner.style.display = 'none'; }, 4000);
+    }
+  </script>
+</body>
+</html>

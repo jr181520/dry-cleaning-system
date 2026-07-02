@@ -15,6 +15,9 @@
     <!-- QRCode 生成库 -->
     <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
     
+    <!-- html5-qrcode 相机扫码库（移动端扫码） -->
+    <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+    
     <!-- MQTT.js for real-time events（异步加载，失败不影响页面） -->
     <script src="https://unpkg.com/mqtt@5.3.0/dist/mqtt.min.js" async onload="window.__mqttLoaded=true" onerror="console.warn('[MQTT] mqtt.js 加载失败，实时事件将使用轮询模式')"></script>
     
@@ -27,9 +30,14 @@
     <!-- 订单实时事件模块（MQTT WebSocket） -->
     <script src="js/order-event-client.js"></script>
     
+    <!-- 跨端数据同步客户端 -->
+    <script src="js/cross-sync-client.js"></script>
+    
     <!-- 门店自提模块 -->
     <script src="js/store-pickup.js"></script>
     <script src="js/store-pickup-m.js"></script>
+    <!-- 店面配置（服务类别/价格/促销） -->
+    <script src="js/store-config.js"></script>
     
     <!-- CDN 容灾脚本 -->
     <script>
@@ -91,6 +99,12 @@
             // 关闭侧边栏
             closeSidebar();
             
+            // 关闭用户下拉菜单（如果打开）
+            const userDropdown = document.getElementById('user-dropdown');
+            if (userDropdown && !userDropdown.classList.contains('hidden')) {
+                userDropdown.classList.add('hidden');
+            }
+            
             // 隐藏所有内容区块
             const contentSections = document.querySelectorAll('.content-section');
             contentSections.forEach(section => {
@@ -105,6 +119,19 @@
             } else {
                 console.log('【导航】找不到页面:', target + '-content');
             }
+            
+            // 更新所有导航链接的高亮状态（侧边栏 href + 底部导航 data-nav）
+            document.querySelectorAll('.nav-link').forEach(link => {
+                const href = link.getAttribute('href') || '';
+                const dataNav = link.getAttribute('data-nav') || '';
+                if (href === '#' + target || dataNav === target) {
+                    link.classList.add('text-primary');
+                    link.classList.remove('text-gray-600');
+                } else {
+                    link.classList.remove('text-primary');
+                    link.classList.add('text-gray-600');
+                }
+            });
             
             // 特殊处理
             if (target === 'logout') {
@@ -129,7 +156,63 @@
                     updateLightSystemBadge();
                 }, 100);
             }
+            
+            // 跳转到设置时初始化门店设置界面
+            if (target === 'settings') {
+                setTimeout(function() {
+                    if (typeof initStoreSettings === 'function') initStoreSettings();
+                }, 100);
+            }
         }
+        
+        // 应用门店角色权限（移动端）
+        function applyRoleAccessMobile() {
+            try {
+                var storeUser = JSON.parse(localStorage.getItem('storeUser') || 'null');
+                if (!storeUser || !storeUser.roles) return;
+                
+                var roles = storeUser.roles;
+                var isOwnerOrAdmin = roles.includes('store_owner') || roles.includes('admin');
+                
+                // 需要权限控制的菜单（店员不能访问）
+                var restrictedMenus = {
+                    '#settlement': isOwnerOrAdmin,
+                    '#statistics': isOwnerOrAdmin,
+                    '#settings': isOwnerOrAdmin
+                };
+                
+                Object.keys(restrictedMenus).forEach(function(href) {
+                    var allowed = restrictedMenus[href];
+                    var link = document.querySelector('a.nav-link[href="' + href + '"]');
+                    if (link) {
+                        var li = link.closest('li');
+                        if (li) {
+                            li.style.display = allowed ? '' : 'none';
+                        }
+                    }
+                });
+                
+                console.log('[角色权限已应用] 角色:', roles, '店长/管理员:', isOwnerOrAdmin);
+            } catch (e) {
+                console.warn('[角色权限] 应用失败:', e);
+            }
+        }
+        
+        // 监听 hash 变化作为安全回退（兜底底部导航/书签/分享链接）
+        window.addEventListener('hashchange', () => {
+            const hash = window.location.hash.replace('#', '');
+            if (hash && hash !== 'logout') {
+                navigateTo(hash);
+            }
+        });
+        
+        // 页面加载时，如果 URL 带 hash 则自动导航到对应页面
+        (function initHashRoute() {
+            const hash = window.location.hash.replace('#', '');
+            if (hash && hash !== 'logout') {
+                navigateTo(hash);
+            }
+        })();
         
         // M端灯条请求处理状态管理（基于订单ID的Map）
         const processedLightRequests = new Map(); // 格式: { requestId -> processedAt }
@@ -448,12 +531,180 @@
             .light-bar-pulse {
                 animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
             }
+            
+            /* 灯条动画 */
+            @keyframes lightBarPulse {
+                0%, 100% { 
+                    background-color: #f59e0b;
+                    box-shadow: 0 0 5px #f59e0b;
+                }
+                50% { 
+                    background-color: #fbbf24;
+                    box-shadow: 0 0 15px #fbbf24;
+                }
+            }
+        }
+        
+        /* ========== 全局搜索 ========== */
+        .search-container-m {
+            position: relative;
+            z-index: 10;  /* 不高于 fixed 的 header/nav（z-40），避免干扰底部导航触摸事件 */
+        }
+        .search-results-dropdown {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            margin-top: 8px;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
+            max-height: 60vh;
+            overflow-y: auto;
+            border: 1px solid #e5e7eb;
+            animation: searchSlideDownM 0.2s ease-out forwards;
+            scrollbar-width: thin;
+        }
+        @keyframes searchSlideDownM {
+            from { opacity: 0; transform: translateY(-8px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .search-result-item-m {
+            cursor: pointer;
+            transition: background-color 0.15s ease;
+            padding: 12px 16px;
+            border-bottom: 1px solid #f3f4f6;
+        }
+        .search-result-item-m:active {
+            background-color: #eff6ff;
+        }
+        .search-result-item-m:last-child {
+            border-bottom: none;
+        }
+        .search-highlight-m {
+            background-color: #fef3c7;
+            border-radius: 2px;
+            padding: 0 1px;
+        }
+        
+        /* ========== 相机扫码取景器样式 ========== */
+        #camera-scanner-modal {
+            position: fixed;
+            inset: 0;
+            z-index: 9999;
+            background: #000;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+        #camera-scanner-modal.hidden {
+            display: none;
+        }
+        #camera-scanner-view {
+            width: 100%;
+            max-width: 480px;
+            border-radius: 12px;
+            overflow: hidden;
+            position: relative;
+        }
+        #camera-scanner-view video {
+            width: 100%;
+            height: auto;
+            display: block;
+            border-radius: 12px;
+        }
+        /* 扫描线动画 */
+        .scan-line {
+            position: absolute;
+            left: 10%;
+            width: 80%;
+            height: 2px;
+            background: linear-gradient(90deg, transparent, #4ade80, transparent);
+            box-shadow: 0 0 8px #4ade80;
+            animation: scanLineMove 2s ease-in-out infinite;
+            z-index: 10;
+            top: 20%;
+        }
+        @keyframes scanLineMove {
+            0%, 100% { top: 20%; }
+            50% { top: 75%; }
+        }
+        /* 四角扫描框 */
+        .scan-corners {
+            position: absolute;
+            inset: 10%;
+            z-index: 9;
+            pointer-events: none;
+        }
+        .scan-corners::before,
+        .scan-corners::after {
+            content: '';
+            position: absolute;
+            width: 30px;
+            height: 30px;
+            border-color: #4ade80;
+            border-style: solid;
+        }
+        .scan-corners::before {
+            top: 0;
+            left: 0;
+            border-width: 3px 0 0 3px;
+            border-radius: 4px 0 0 0;
+        }
+        .scan-corners::after {
+            top: 0;
+            right: 0;
+            border-width: 3px 3px 0 0;
+            border-radius: 0 4px 0 0;
+        }
+        .scan-corners-bottom {
+            position: absolute;
+            inset: 10%;
+            z-index: 9;
+            pointer-events: none;
+        }
+        .scan-corners-bottom::before,
+        .scan-corners-bottom::after {
+            content: '';
+            position: absolute;
+            width: 30px;
+            height: 30px;
+            border-color: #4ade80;
+            border-style: solid;
+            bottom: 0;
+        }
+        .scan-corners-bottom::before {
+            left: 0;
+            border-width: 0 0 3px 3px;
+            border-radius: 0 0 0 4px;
+        }
+        .scan-corners-bottom::after {
+            right: 0;
+            border-width: 0 3px 3px 0;
+            border-radius: 0 0 4px 0;
+        }
+        /* 选择条码格式下拉框 */
+        #camera-barcode-select {
+            background: rgba(255,255,255,0.15);
+            border: 1px solid rgba(255,255,255,0.3);
+            color: #fff;
+            padding: 6px 12px;
+            border-radius: 8px;
+            font-size: 13px;
+            text-align: center;
+            outline: none;
+            backdrop-filter: blur(4px);
+        }
+        #camera-barcode-select option {
+            background: #1f2937;
+            color: #fff;
         }
     </style>
 </head>
 <body class="bg-gray-50 min-h-screen">
     <!-- 顶部导航栏 -->
-    <header class="fixed top-0 left-0 right-0 bg-white shadow-md z-40">
+    <header class="fixed top-0 left-0 right-0 bg-white shadow-md z-50">
         <div class="flex items-center justify-between p-4">
             <div class="flex items-center space-x-2">
                 <button id="menu-btn" class="p-2 rounded-lg hover:bg-gray-100 transition-all duration-300 ease-in-out" onclick="toggleSidebar()">
@@ -475,7 +726,7 @@
                 </div>
                 <div class="flex items-center space-x-2">
                     <div class="relative">
-                        <button id="user-menu-btn" onclick="toggleUserMenu()" class="flex items-center space-x-2 p-2 rounded-lg hover:bg-gray-100 transition-all duration-300 ease-in-out">
+                        <button id="user-menu-btn" onclick="event.stopPropagation(); if(window.toggleUserMenu)window.toggleUserMenu();else console.error('toggleUserMenu 未定义');" class="flex items-center space-x-2 p-2 rounded-lg hover:bg-gray-100 transition-all duration-300 ease-in-out" style="pointer-events: auto; touch-action: manipulation; -webkit-tap-highlight-color: transparent;">
                             <div class="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-white">
                                 <i class="fa fa-user"></i>
                             </div>
@@ -484,7 +735,7 @@
                         </button>
                         
                         <!-- 用户下拉菜单 -->
-                        <div id="user-dropdown" class="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-lg border border-gray-200 hidden z-50">
+                        <div id="user-dropdown" class="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-lg border border-gray-200 hidden" style="z-index: 9999; pointer-events: auto;">
                             <!-- 当前用户信息 -->
                             <div class="p-4 border-b border-gray-200">
                                 <div class="flex items-center space-x-3">
@@ -499,28 +750,28 @@
                             </div>
                             
                             <!-- 菜单选项 -->
-                            <div class="py-2">
-                                <button onclick="switchStoreAccount()" class="w-full flex items-center space-x-3 px-4 py-3 text-gray-700 hover:bg-blue-50 hover:text-primary transition-all duration-300">
+                            <div class="py-2" style="pointer-events: auto;">
+                                <button onclick="event.stopPropagation(); window.switchStoreAccount();" class="w-full flex items-center space-x-3 px-4 py-3 text-gray-700 hover:bg-blue-50 hover:text-primary transition-all duration-300" style="pointer-events: auto; touch-action: manipulation; -webkit-tap-highlight-color: transparent;">
                                     <i class="fa fa-exchange w-5"></i>
                                     <span>切换账号</span>
                                 </button>
-                                <button onclick="viewProfile()" class="w-full flex items-center space-x-3 px-4 py-3 text-gray-700 hover:bg-blue-50 hover:text-primary transition-all duration-300">
+                                <button onclick="event.stopPropagation(); window.viewProfile();" class="w-full flex items-center space-x-3 px-4 py-3 text-gray-700 hover:bg-blue-50 hover:text-primary transition-all duration-300" style="pointer-events: auto; touch-action: manipulation; -webkit-tap-highlight-color: transparent;">
                                     <i class="fa fa-id-card w-5"></i>
                                     <span>个人信息</span>
                                 </button>
-                                <button onclick="openSettings()" class="w-full flex items-center space-x-3 px-4 py-3 text-gray-700 hover:bg-blue-50 hover:text-primary transition-all duration-300">
+                                <button onclick="event.stopPropagation(); window.openSettings();" class="w-full flex items-center space-x-3 px-4 py-3 text-gray-700 hover:bg-blue-50 hover:text-primary transition-all duration-300" style="pointer-events: auto; touch-action: manipulation; -webkit-tap-highlight-color: transparent;">
                                     <i class="fa fa-cog w-5"></i>
                                     <span>系统设置</span>
                                 </button>
-                                <button onclick="showStoreQRModal()" class="w-full flex items-center space-x-3 px-4 py-3 text-gray-700 hover:bg-blue-50 hover:text-primary transition-all duration-300">
+                                <button onclick="event.stopPropagation(); window.showStoreQRModal();" class="w-full flex items-center space-x-3 px-4 py-3 text-gray-700 hover:bg-blue-50 hover:text-primary transition-all duration-300" style="pointer-events: auto; touch-action: manipulation; -webkit-tap-highlight-color: transparent;">
                                     <i class="fa fa-qrcode w-5"></i>
                                     <span>门店二维码</span>
                                 </button>
                             </div>
                             
                             <!-- 退出登录 -->
-                            <div class="border-t border-gray-200 py-2">
-                                <button onclick="logout()" class="w-full flex items-center space-x-3 px-4 py-3 text-red-600 hover:bg-red-50 transition-all duration-300">
+                            <div class="border-t border-gray-200 py-2" style="pointer-events: auto;">
+                                <button onclick="event.stopPropagation(); window.logout();" class="w-full flex items-center space-x-3 px-4 py-3 text-red-600 hover:bg-red-50 transition-all duration-300" style="pointer-events: auto; touch-action: manipulation; -webkit-tap-highlight-color: transparent;">
                                     <i class="fa fa-sign-out w-5"></i>
                                     <span>退出登录</span>
                                 </button>
@@ -618,7 +869,28 @@
     <div id="sidebar-overlay" style="position: fixed; inset: 0; background: rgba(0, 0, 0, 0.5); z-index: 40; display: none;" onclick="closeSidebar()"></div>
 
     <!-- 主内容区 -->
-    <main class="pt-16 pb-20">
+    <main class="pt-20 pb-20">
+        <!-- 🌐 全局搜索栏（在仪表盘和所有页面顶部始终可见） -->
+        <div class="search-container-m px-4 mb-4">
+            <div class="flex gap-0">
+                <select id="global-search-type-m" class="bg-white border border-gray-300 rounded-l-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent flex-shrink-0">
+                    <option value="all">全部</option>
+                    <option value="order">订单</option>
+                    <option value="customer">客户</option>
+                    <option value="item">物品</option>
+                </select>
+                <div class="relative flex-1">
+                    <input type="text" id="global-search-input-m" placeholder="搜索订单号/客户/物品..." class="w-full pl-9 pr-4 py-2.5 border-t border-b border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent bg-white">
+                    <i class="fa fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 text-sm"></i>
+                </div>
+                <button id="global-search-btn-m" class="bg-primary text-white px-4 py-2.5 border border-primary rounded-r-lg hover:bg-primary/90 transition-colors flex-shrink-0">
+                    <i class="fa fa-search"></i>
+                </button>
+            </div>
+            <!-- 搜索结果下拉 -->
+            <div id="global-search-results-m" class="search-results-dropdown hidden"></div>
+        </div>
+
         <!-- 仪表盘 -->
         <div id="dashboard-content" class="content-section p-4">
             <div class="mb-6">
@@ -686,11 +958,11 @@
                         </div>
                         <span class="text-xs text-gray-700">完成订单</span>
                     </button>
-                    <button class="flex flex-col items-center p-3 rounded-lg hover:bg-gray-50 transition-all duration-300 ease-in-out">
-                        <div class="w-12 h-12 rounded-full bg-yellow-100 flex items-center justify-center text-warning mb-2">
-                            <i class="fa fa-qrcode"></i>
+                    <button onclick="scanAndManageOrder()" class="flex flex-col items-center p-3 rounded-lg hover:bg-gray-50 transition-all duration-300 ease-in-out">
+                        <div class="w-12 h-12 rounded-full bg-gradient-to-br from-yellow-100 to-orange-100 flex items-center justify-center text-warning mb-2">
+                            <i class="fa fa-camera"></i>
                         </div>
-                        <span class="text-xs text-gray-700">扫码入库</span>
+                        <span class="text-xs text-gray-700">扫一扫</span>
                     </button>
                     <button class="flex flex-col items-center p-3 rounded-lg hover:bg-gray-50 transition-all duration-300 ease-in-out">
                         <div class="w-12 h-12 rounded-full bg-purple-100 flex items-center justify-center text-purple mb-2">
@@ -698,6 +970,45 @@
                         </div>
                         <span class="text-xs text-gray-700">新增客户</span>
                     </button>
+                </div>
+            </div>
+
+            <!-- 灯条快速测试 -->
+            <div id="light-test-panel" class="bg-gradient-to-r from-yellow-50 to-orange-50 rounded-xl shadow-card p-4 border-2 border-yellow-300 mb-6">
+                <div class="flex items-center justify-between mb-3">
+                    <div class="flex items-center">
+                        <div class="w-8 h-8 rounded-lg bg-yellow-100 flex items-center justify-center mr-2">
+                            <i class="fa fa-lightbulb-o text-yellow-600 text-lg"></i>
+                        </div>
+                        <div>
+                            <h3 class="text-base font-semibold text-gray-800">灯条快速测试</h3>
+                            <p class="text-xs text-gray-600">MQTT同步控制灯条</p>
+                        </div>
+                    </div>
+                    <select id="light-store-id-select-m" class="border border-gray-300 rounded-lg px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-yellow-500">
+                        <option value="ST001" selected>ST001</option>
+                    </select>
+                </div>
+                <div class="grid grid-cols-2 gap-2">
+                    <button id="quick-test-on-btn-m" class="bg-green-500 hover:bg-green-600 text-white px-3 py-2 rounded-lg transition-all text-sm flex items-center justify-center space-x-1">
+                        <i class="fa fa-lightbulb-o"></i>
+                        <span>点亮灯条</span>
+                    </button>
+                    <button id="quick-test-off-btn-m" class="bg-red-500 hover:bg-red-600 text-white px-3 py-2 rounded-lg transition-all text-sm flex items-center justify-center space-x-1">
+                        <i class="fa fa-power-off"></i>
+                        <span>关闭灯条</span>
+                    </button>
+                    <button id="quick-test-pulse-btn-m" class="bg-yellow-500 hover:bg-yellow-600 text-white px-3 py-2 rounded-lg transition-all text-sm flex items-center justify-center space-x-1">
+                        <i class="fa fa-bell"></i>
+                        <span>闪烁提醒</span>
+                    </button>
+                    <button id="quick-test-check-btn-m" class="bg-blue-500 hover:bg-blue-600 text-white px-3 py-2 rounded-lg transition-all text-sm flex items-center justify-center space-x-1">
+                        <i class="fa fa-refresh"></i>
+                        <span>检查终端</span>
+                    </button>
+                </div>
+                <div id="light-test-log-m" class="mt-3 p-2 bg-white/70 rounded-lg text-xs font-mono max-h-24 overflow-y-auto">
+                    <div class="text-gray-500">[等待操作...]</div>
                 </div>
             </div>
 
@@ -784,6 +1095,7 @@
                                 <th class="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">客户</th>
                                 <th class="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">金额</th>
                                 <th class="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">状态</th>
+                                <th class="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">创建时间</th>
                                 <th class="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">操作</th>
                             </tr>
                         </thead>
@@ -795,6 +1107,7 @@
                                 <td class="py-3 px-4">
                                     <span class="px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs font-medium">已完成</span>
                                 </td>
+                                <td class="py-3 px-4 text-xs text-gray-600 whitespace-nowrap">07-21 10:30</td>
                                 <td class="py-3 px-4">
                                     <button class="text-primary hover:text-primary/80 text-sm font-medium transition-all duration-300 ease-in-out">查看</button>
                                 </td>
@@ -806,6 +1119,7 @@
                                 <td class="py-3 px-4">
                                     <span class="px-2 py-1 bg-yellow-100 text-yellow-800 rounded-full text-xs font-medium">处理中</span>
                                 </td>
+                                <td class="py-3 px-4 text-xs text-gray-600 whitespace-nowrap">07-21 09:15</td>
                                 <td class="py-3 px-4">
                                     <button class="text-primary hover:text-primary/80 text-sm font-medium transition-all duration-300 ease-in-out">查看</button>
                                 </td>
@@ -817,6 +1131,7 @@
                                 <td class="py-3 px-4">
                                     <span class="px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-xs font-medium">待处理</span>
                                 </td>
+                                <td class="py-3 px-4 text-xs text-gray-600 whitespace-nowrap">07-20 16:45</td>
                                 <td class="py-3 px-4">
                                     <button class="text-primary hover:text-primary/80 text-sm font-medium transition-all duration-300 ease-in-out">查看</button>
                                 </td>
@@ -1051,7 +1366,23 @@
                 <!-- 物品筛选 -->
                 <div class="flex flex-col sm:flex-row gap-3 mb-4">
                     <div class="flex-1">
-                        <input type="text" id="scan-item-input" placeholder="📷 扫描物品标签条码..." class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">
+                        <!-- 模式切换开关 -->
+                        <div class="flex items-center gap-2 mb-2">
+                            <span class="text-xs font-medium" id="scan-mode-label">📷 扫码模式</span>
+                            <label class="relative inline-flex items-center cursor-pointer">
+                                <input type="checkbox" id="search-mode-toggle" class="sr-only peer" onchange="toggleSearchMode()">
+                                <div class="w-9 h-5 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-primary rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary"></div>
+                            </label>
+                            <span class="text-xs text-gray-400" id="search-mode-hint">手输搜索</span>
+                        </div>
+                        <!-- 输入框 + 搜索按钮 -->
+                        <div class="flex gap-2">
+                            <input type="search" id="scan-item-input" placeholder="📷 扫描物品标签条码..." class="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">
+                            <button id="scan-action-btn" onclick="handleScanAction()" class="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors flex items-center gap-1 flex-shrink-0">
+                                <i class="fa fa-barcode"></i>
+                                <span>扫码</span>
+                            </button>
+                        </div>
                     </div>
                     <select id="item-filter-status" class="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary">
                         <option value="">全部状态</option>
@@ -1077,13 +1408,23 @@
                     <span class="text-sm text-gray-500">扫描物品标签完成出库</span>
                 </div>
                 
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div class="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-primary transition-colors cursor-pointer" onclick="startScanOutbound()">
-                        <div class="text-5xl mb-3 text-gray-400">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <!-- 相机扫码 -->
+                    <div class="border-2 border-dashed border-primary/30 rounded-lg p-6 text-center hover:border-primary transition-colors cursor-pointer bg-primary/5" onclick="startCameraScan()">
+                        <div class="text-4xl mb-2 text-primary">
+                            <i class="fa fa-camera"></i>
+                        </div>
+                        <p class="text-primary font-semibold text-sm">📷 相机扫码</p>
+                        <p class="text-xs text-gray-400 mt-1">使用手机相机扫描条码</p>
+                    </div>
+                    
+                    <!-- 手输扫码 -->
+                    <div class="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-primary transition-colors cursor-pointer" onclick="startScanOutbound()">
+                        <div class="text-4xl mb-2 text-gray-400">
                             <i class="fa fa-barcode"></i>
                         </div>
-                        <p class="text-gray-600 font-medium">点击开始扫描</p>
-                        <p class="text-xs text-gray-400 mt-1">或直接输入物品条码号</p>
+                        <p class="text-gray-600 font-medium text-sm">手输条码</p>
+                        <p class="text-xs text-gray-400 mt-1">输入物品条码号出库</p>
                     </div>
                     
                     <div class="border border-gray-200 rounded-lg p-4">
@@ -1689,60 +2030,38 @@
             </div>
         </div>
 
-        <!-- 系统设置 -->
+        <!-- 系统设置 / 门店设置 -->
         <div id="settings-content" class="content-section hidden p-4">
             <div class="mb-6">
-                <h2 class="text-xl font-bold text-gray-800">系统设置</h2>
-                <p class="text-gray-600">管理系统设置</p>
+                <h2 class="text-xl font-bold text-gray-800">门店设置</h2>
+                <p class="text-gray-600">管理服务类别、价格和促销优惠</p>
             </div>
-
-            <div class="bg-white rounded-xl shadow-card p-4 border border-gray-200">
-                <h3 class="text-lg font-semibold text-gray-800 mb-4">基本设置</h3>
-                <div class="space-y-4">
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">门店名称</label>
-                        <input type="text" value="旗舰店" class="w-full border border-gray-300 rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all duration-300 ease-in-out">
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">联系电话</label>
-                        <input type="text" value="010-12345678" class="w-full border border-gray-300 rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all duration-300 ease-in-out">
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">营业时间</label>
-                        <input type="text" value="09:00-21:00" class="w-full border border-gray-300 rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all duration-300 ease-in-out">
-                    </div>
-                    <div class="pt-4">
-                        <button class="bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary/90 transition-all duration-300 ease-in-out shadow-btn hover:shadow-btn-hover">
-                            保存设置
-                        </button>
-                    </div>
-                </div>
-            </div>
+            <div id="store-settings-root"></div>
         </div>
     </main>
 
     <!-- 底部导航栏 -->
-    <nav class="fixed bottom-0 left-0 right-0 bg-white shadow-md z-40">
-        <div class="flex items-center justify-around p-2">
-            <a href="#dashboard" class="nav-link flex flex-col items-center p-2 rounded-lg text-primary">
+    <nav class="fixed bottom-0 left-0 right-0 bg-white shadow-md border-t border-gray-200" style="z-index: 999; padding-bottom: env(safe-area-inset-bottom, 0px); pointer-events: auto;">
+        <div class="flex items-center justify-around" style="pointer-events: auto;">
+            <a href="javascript:void(0)" data-nav="dashboard" onclick="navigateTo('dashboard'); return false;" class="nav-link flex flex-col items-center px-3 py-2 rounded-lg text-primary" style="pointer-events: auto; -webkit-tap-highlight-color: transparent; touch-action: manipulation;">
                 <i class="fa fa-dashboard text-lg"></i>
-                <span class="text-xs mt-1">仪表盘</span>
+                <span class="text-xs mt-0.5">仪表盘</span>
             </a>
-            <a href="#orders" class="nav-link flex flex-col items-center p-2 rounded-lg text-gray-600 hover:text-primary transition-all duration-300 ease-in-out">
+            <a href="javascript:void(0)" data-nav="orders" onclick="navigateTo('orders'); return false;" class="nav-link flex flex-col items-center px-3 py-2 rounded-lg text-gray-600" style="pointer-events: auto; -webkit-tap-highlight-color: transparent; touch-action: manipulation;">
                 <i class="fa fa-shopping-cart text-lg"></i>
-                <span class="text-xs mt-1">订单</span>
+                <span class="text-xs mt-0.5">订单</span>
             </a>
-            <a href="#inventory" class="nav-link flex flex-col items-center p-2 rounded-lg text-gray-600 hover:text-primary transition-all duration-300 ease-in-out">
+            <a href="javascript:void(0)" data-nav="inventory" onclick="navigateTo('inventory'); return false;" class="nav-link flex flex-col items-center px-3 py-2 rounded-lg text-gray-600" style="pointer-events: auto; -webkit-tap-highlight-color: transparent; touch-action: manipulation;">
                 <i class="fa fa-list text-lg"></i>
-                <span class="text-xs mt-1">库存</span>
+                <span class="text-xs mt-0.5">库存</span>
             </a>
-            <a href="#customers" class="nav-link flex flex-col items-center p-2 rounded-lg text-gray-600 hover:text-primary transition-all duration-300 ease-in-out">
+            <a href="javascript:void(0)" data-nav="customers" onclick="navigateTo('customers'); return false;" class="nav-link flex flex-col items-center px-3 py-2 rounded-lg text-gray-600" style="pointer-events: auto; -webkit-tap-highlight-color: transparent; touch-action: manipulation;">
                 <i class="fa fa-users text-lg"></i>
-                <span class="text-xs mt-1">客户</span>
+                <span class="text-xs mt-0.5">客户</span>
             </a>
-            <a href="#settings" class="nav-link flex flex-col items-center p-2 rounded-lg text-gray-600 hover:text-primary transition-all duration-300 ease-in-out">
+            <a href="javascript:void(0)" data-nav="settings" onclick="navigateTo('settings'); return false;" class="nav-link flex flex-col items-center px-3 py-2 rounded-lg text-gray-600" style="pointer-events: auto; -webkit-tap-highlight-color: transparent; touch-action: manipulation;">
                 <i class="fa fa-cog text-lg"></i>
-                <span class="text-xs mt-1">设置</span>
+                <span class="text-xs mt-0.5">设置</span>
             </a>
         </div>
     </nav>
@@ -1755,7 +2074,7 @@
     </div>
 
     <!-- 通知下拉菜单 -->
-    <div id="notification-dropdown" class="fixed top-16 right-4 w-80 bg-white rounded-lg shadow-lg border border-gray-200 z-50 hidden">
+    <div id="notification-dropdown" class="fixed top-16 right-4 w-80 bg-white rounded-lg shadow-lg border border-gray-200 z-30 hidden">
         <div class="p-4 border-b border-gray-200">
             <h3 class="font-medium text-gray-800">消息通知</h3>
         </div>
@@ -1767,7 +2086,148 @@
         </div>
     </div>
 
+    <!-- ========== 用户菜单功能 - 独立脚本块，不受其他脚本错误影响 ========== -->
     <script>
+        function toggleUserMenu() {
+            console.log('【用户菜单】toggleUserMenu 被调用');
+            var dropdown = document.getElementById('user-dropdown');
+            if (!dropdown) {
+                console.error('【用户菜单】找不到 user-dropdown 元素!');
+                return;
+            }
+            var isOpening = dropdown.classList.contains('hidden');
+            console.log('【用户菜单】当前状态:', isOpening ? '关闭→即将打开' : '打开→即将关闭');
+            dropdown.classList.toggle('hidden');
+            if (isOpening) {
+                var currentStore = JSON.parse(localStorage.getItem('currentStore') || '{}');
+                var storeUser = JSON.parse(localStorage.getItem('storeUser') || '{}');
+                var userName = document.getElementById('dropdown-user-name');
+                var userStore = document.getElementById('dropdown-user-store');
+                var headerUserName = document.getElementById('current-user-name');
+                if (userName) userName.textContent = storeUser.name || currentStore.name || currentStore.storeName || '店员';
+                if (userStore) userStore.textContent = '门店: ' + (currentStore.storeId || 'ST001') + ' ' + (currentStore.name || currentStore.storeName || '');
+                if (headerUserName) headerUserName.textContent = storeUser.name || currentStore.name || currentStore.storeName || '店员';
+            }
+        }
+        window.toggleUserMenu = toggleUserMenu;
+
+        // ===== 以下函数为大脚本块备用桩（stub），大脚本块成功加载后会覆盖 =====
+        // 关闭门店模态框（通用）
+        window.closeStoreAccountModal = function() {
+            console.log('【桩】closeStoreAccountModal');
+            var modal = document.getElementById('store-account-modal');
+            if (modal) { modal.style.display = 'none'; modal.innerHTML = ''; }
+        };
+        // 选择门店
+        window.selectStoreAccount = function(storeId, storeName, address, phone) {
+            console.log('【桩】selectStoreAccount:', storeId, storeName);
+            var storeData = { storeId: storeId, name: storeName, storeName: storeName, address: address, phone: phone, loginTime: new Date().toISOString() };
+            localStorage.setItem('currentStore', JSON.stringify(storeData));
+            localStorage.setItem('storeUser', JSON.stringify({ username: storeId, id: storeId, name: storeName, storeName: storeName, role: 'store_manager', storeId: storeId }));
+            localStorage.removeItem('guestModeHandled');
+            window.closeStoreAccountModal();
+            alert('已切换到门店：' + storeName + '（' + storeId + '）');
+            location.reload();
+        };
+        // 切换门店账号
+        window.switchStoreAccount = function() {
+            console.log('【桩】switchStoreAccount');
+            var dd = document.getElementById('user-dropdown');
+            if (dd) dd.classList.add('hidden');
+            var accounts = [
+                { storeId: 'ST001', storeName: '朝阳区干洗店', address: '北京市朝阳区XX路123号', phone: '010-12345678' },
+                { storeId: 'ST002', storeName: '海淀区干洗店', address: '北京市海淀区XX路456号', phone: '010-23456789' },
+                { storeId: 'ST003', storeName: '西城区干洗店', address: '北京市西城区XX路789号', phone: '010-34567890' }
+            ];
+            var cur = JSON.parse(localStorage.getItem('currentStore') || '{}');
+            var h = '<div style="padding:20px;max-height:70vh;overflow-y:auto;position:relative;">';
+            h += '<button onclick="window.closeStoreAccountModal()" style="position:absolute;top:8px;right:8px;width:32px;height:32px;border-radius:50%;border:none;background:#f3f4f6;color:#666;font-size:20px;cursor:pointer;">×</button>';
+            h += '<h3 style="font-size:18px;font-weight:bold;margin-bottom:20px;text-align:center;">切换门店账号</h3>';
+            accounts.forEach(function(s) {
+                var isCur = cur.storeId === s.storeId;
+                h += '<div onclick="window.selectStoreAccount(\'' + s.storeId + '\',\'' + s.storeName + '\',\'' + s.address + '\',\'' + s.phone + '\')" style="cursor:pointer;border:2px solid ' + (isCur ? '#3b82f6' : '#e5e7eb') + ';border-radius:12px;padding:15px;margin-bottom:12px;' + (isCur ? 'background:#eff6ff;' : '') + '">';
+                h += '<div style="font-weight:600;color:#1f2937;">' + s.storeName + (isCur ? ' <span style="font-size:12px;color:#3b82f6;">当前 ✓</span>' : '') + '</div>';
+                h += '<div style="font-size:12px;color:#6b7280;">' + s.storeId + ' | ' + s.address + '</div>';
+                h += '<div style="font-size:12px;color:#6b7280;">' + s.phone + '</div></div>';
+            });
+            h += '<button onclick="window.closeStoreAccountModal()" style="display:block;width:100%;padding:12px;margin-top:10px;background:#f3f4f6;color:#6b7280;border:none;border-radius:8px;cursor:pointer;">取消</button></div>';
+            var modal = document.getElementById('store-account-modal');
+            if (!modal) {
+                modal = document.createElement('div');
+                modal.id = 'store-account-modal';
+                modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;';
+                modal.onclick = function(e) { if (e.target === modal) window.closeStoreAccountModal(); };
+                document.body.appendChild(modal);
+            }
+            var mc = document.createElement('div');
+            mc.style.cssText = 'background:white;border-radius:16px;max-width:450px;width:100%;max-height:90vh;overflow:hidden;box-shadow:0 20px 25px -5px rgba(0,0,0,0.1);';
+            mc.innerHTML = h;
+            modal.innerHTML = '';
+            modal.appendChild(mc);
+            modal.style.display = 'flex';
+        };
+        // 个人信息
+        window.viewProfile = function() {
+            console.log('【桩】viewProfile');
+            var dd = document.getElementById('user-dropdown');
+            if (dd) dd.classList.add('hidden');
+            var s = JSON.parse(localStorage.getItem('storeUser') || '{}');
+            var c = JSON.parse(localStorage.getItem('currentStore') || '{}');
+            alert('员工: ' + (s.name || c.storeName || '未设置') + '\n门店: ' + (c.storeId || 'ST001') + ' ' + (c.storeName || '') + '\n角色: 店员');
+        };
+        window.closeProfileModal = function() {
+            var m = document.getElementById('profile-modal');
+            if (m) m.style.display = 'none';
+        };
+        // 系统设置
+        window.openSettings = function() {
+            var dd = document.getElementById('user-dropdown');
+            if (dd) dd.classList.add('hidden');
+            alert('系统设置功能开发中...');
+        };
+        // 退出登录
+        window.logout = function() {
+            var dd = document.getElementById('user-dropdown');
+            if (dd) dd.classList.add('hidden');
+            if (confirm('确定要退出登录吗？')) {
+                localStorage.removeItem('storeUser');
+                localStorage.removeItem('currentStore');
+                window.location.href = 'm-login.html';
+            }
+        };
+        // 门店二维码
+        window.showStoreQRModal = function() {
+            var dd = document.getElementById('user-dropdown');
+            if (dd) dd.classList.add('hidden');
+            alert('门店二维码功能开发中...');
+        };
+        // 更新用户下拉菜单信息（从localStorage读取正确的门店ID和名称）
+        window.updateUserDropdownInfo = function() {
+            try {
+                var storeUser = JSON.parse(localStorage.getItem('storeUser') || '{}');
+                var currentStore = JSON.parse(localStorage.getItem('currentStore') || '{}');
+                var storeId = currentStore.storeId || storeUser.storeId || '';
+                var storeName = currentStore.name || currentStore.storeName || storeUser.storeName || '门店管理';
+                
+                var displayNameEl = document.getElementById('user-display-name');
+                if (displayNameEl) {
+                    displayNameEl.textContent = storeName;
+                }
+                var roleEl = document.getElementById('user-role-badge');
+                if (roleEl) {
+                    roleEl.textContent = '门店 #' + storeId;
+                }
+                console.log('[用户菜单] 下拉信息已更新:', storeName, storeId);
+            } catch (e) {
+                console.warn('[用户菜单] updateUserDropdownInfo 失败:', e.message);
+            }
+        };
+    </script>
+
+    <script>
+        console.log('【大脚本块】开始执行...', new Date().toLocaleTimeString());
+        window.__bigScriptStarted = true;
+        var __bigScriptStartTime = Date.now();
         // ========================================
         // 全局函数（必须在 DOM 加载前就定义）
         // ========================================
@@ -1779,8 +2239,8 @@
         let syncInterval = null;
         const SYNC_INTERVAL = 8000; // 8秒同步一次
         
-        // 自动检测API基础地址
-        const API_BASE_URL = `http://localhost:${window.location.port || 3002}`;
+        // 自动检测API基础地址（与 index.html 一致，后端运行在端口 3000）
+        const API_BASE_URL = window.location.port ? `http://localhost:${window.location.port}` : 'http://localhost:3000';
         
         window.initDataSync = function() {
             console.log('【同步管理器】M端已改用统一的OrderSyncManager，此函数已停用');
@@ -1924,50 +2384,21 @@
         
         // ========================================
         // 用户菜单和账号切换
+        // （toggleUserMenu 和 updateUserDropdownInfo 已移至独立脚本块）
         // ========================================
-        
-        // 切换用户下拉菜单
-        window.toggleUserMenu = function() {
-            const dropdown = document.getElementById('user-dropdown');
-            if (dropdown) {
-                dropdown.classList.toggle('hidden');
-                
-                // 如果菜单打开，更新当前用户信息
-                if (!dropdown.classList.contains('hidden')) {
-                    updateUserDropdownInfo();
-                }
-            }
-        }
-        
-        // 更新用户下拉菜单信息
-        function updateUserDropdownInfo() {
-            const currentStore = JSON.parse(localStorage.getItem('currentStore') || '{}');
-            const storeUser = JSON.parse(localStorage.getItem('storeUser') || '{}');
-            
-            const userName = document.getElementById('dropdown-user-name');
-            const userStore = document.getElementById('dropdown-user-store');
-            const headerUserName = document.getElementById('current-user-name');
-            
-            if (userName) {
-                userName.textContent = storeUser.name || currentStore.storeName || '店员';
-            }
-            if (userStore) {
-                userStore.textContent = `门店: ${currentStore.storeId || 'ST001'} ${currentStore.storeName || ''}`;
-            }
-            if (headerUserName) {
-                headerUserName.textContent = storeUser.name || currentStore.storeName || '店员';
-            }
-        }
         
         // 切换门店账号
         window.switchStoreAccount = function() {
-            // 隐藏下拉菜单
-            const dropdown = document.getElementById('user-dropdown');
-            if (dropdown) {
-                dropdown.classList.add('hidden');
-            }
+            console.log('【用户菜单】switchStoreAccount 被调用');
             
-            // 门店账号列表
+            try {
+                // 隐藏下拉菜单
+                const dropdown = document.getElementById('user-dropdown');
+                if (dropdown) {
+                    dropdown.classList.add('hidden');
+                }
+                
+                // 门店账号列表
             const storeAccounts = [
                 { storeId: 'ST001', storeName: '朝阳区干洗店', address: '北京市朝阳区XX路123号', phone: '010-12345678' },
                 { storeId: 'ST002', storeName: '海淀区干洗店', address: '北京市海淀区XX路456号', phone: '010-23456789' },
@@ -2034,12 +2465,20 @@
             modal.innerHTML = '';
             modal.appendChild(modalContent);
             modal.style.display = 'flex';
+            
+            console.log('【用户菜单】门店选择模态框已显示');
+            
+            } catch (error) {
+                console.error('【用户菜单】switchStoreAccount 出错:', error);
+                alert('切换账号时出错：' + error.message);
+            }
         }
         
         // 选择门店账号
         window.selectStoreAccount = function(storeId, storeName, address, phone) {
             const storeData = {
                 storeId: storeId,
+                name: storeName,
                 storeName: storeName,
                 address: address,
                 phone: phone,
@@ -2054,6 +2493,7 @@
                 username: storeId,  // 用于登录检查
                 id: storeId,
                 name: storeName,
+                storeName: storeName,  // ← index.html 兼容字段
                 role: 'store_manager',
                 storeId: storeId
             };
@@ -2091,7 +2531,7 @@
             // 更新 header 中的门店名称
             const sidebarStoreName = document.querySelector('#sidebar h2.font-semibold');
             if (sidebarStoreName) {
-                sidebarStoreName.textContent = currentStore.storeName || storeUser.storeName || '干洗门店';
+                sidebarStoreName.textContent = currentStore.storeName || currentStore.name || storeUser.storeName || '干洗门店';
             }
             
             // 更新侧边栏副标题
@@ -2103,7 +2543,7 @@
             // 更新 header 顶部的门店显示
             const headerStoreDisplay = document.getElementById('header-store-display');
             if (headerStoreDisplay) {
-                headerStoreDisplay.textContent = `${currentStore.storeId || storeUser.storeId || 'ST001'} | ${currentStore.storeName || storeUser.storeName || '干洗门店'}`;
+                headerStoreDisplay.textContent = `${currentStore.storeId || storeUser.storeId || 'ST001'} | ${currentStore.storeName || currentStore.name || storeUser.storeName || '干洗门店'}`;
             }
         }
         
@@ -2126,7 +2566,7 @@
                         <div style="width: 80px; height: 80px; border-radius: 50%; background-color: #1e40af; display: inline-flex; align-items: center; justify-content: center; margin-bottom: 12px;">
                             <i class="fa fa-user" style="font-size: 36px; color: white;"></i>
                         </div>
-                        <div style="font-size: 18px; font-weight: 600; color: #1f2937;">${storeUser.name || currentStore.storeName || '店员'}</div>
+                        <div style="font-size: 18px; font-weight: 600; color: #1f2937;">${storeUser.name || currentStore.name || currentStore.storeName || '店员'}</div>
                         <div style="font-size: 12px; color: #6b7280; margin-top: 4px;">门店管理员</div>
                     </div>
                     
@@ -2137,7 +2577,7 @@
                         </div>
                         <div style="margin-bottom: 12px;">
                             <div style="font-size: 12px; color: #6b7280; margin-bottom: 4px;">门店名称</div>
-                            <div style="font-size: 14px; color: #1f2937; font-weight: 500;">${currentStore.storeName || '朝阳区干洗店'}</div>
+                            <div style="font-size: 14px; color: #1f2937; font-weight: 500;">${currentStore.name || currentStore.storeName || '朝阳区干洗店'}</div>
                         </div>
                         <div style="margin-bottom: 12px;">
                             <div style="font-size: 12px; color: #6b7280; margin-bottom: 4px;">门店地址</div>
@@ -2181,13 +2621,13 @@
             }
         }
         
-        // 打开系统设置
+        // 打开系统设置（跳转到门店设置页）
         window.openSettings = function() {
-            const dropdown = document.getElementById('user-dropdown');
+            var dropdown = document.getElementById('user-dropdown');
             if (dropdown) {
                 dropdown.classList.add('hidden');
             }
-            alert('系统设置功能开发中...');
+            navigateTo('settings');
         }
         
         // 退出登录
@@ -2220,7 +2660,7 @@
             const storeUser = JSON.parse(localStorage.getItem('storeUser') || '{}');
             return {
                 storeId: currentStore.storeId || storeUser.storeId || 'ST001',
-                storeName: currentStore.storeName || storeUser.storeName || '干洗门店',
+                storeName: currentStore.name || currentStore.storeName || storeUser.storeName || '干洗门店',
                 storeAddress: currentStore.storeAddress || currentStore.address || ''
             };
         }
@@ -3047,8 +3487,49 @@
             const desc = document.getElementById('customer-request-desc');
             const list = document.getElementById('requested-items-list');
             
-            // 获取物品列表（兼容不同格式）
-            const items = request.items || [];
+            // 获取物品列表 — 若请求中未包含完整物品列表，从订单中提取所有未处理物品
+            let items = request.items || [];
+            if (items.length === 0) {
+                // 尝试从localStorage查找完整订单
+                const storeOrders = JSON.parse(localStorage.getItem('store_orders') || '[]');
+                const allOrders = JSON.parse(localStorage.getItem('orders') || '[]');
+                const ordersMap = {};
+                [...storeOrders, ...allOrders].forEach(function(o) {
+                    const key = o.orderId || o.id;
+                    if (key && !ordersMap[key]) ordersMap[key] = o;
+                });
+                const order = ordersMap[request.orderId];
+                if (order && (order.items || []).length > 0) {
+                    const TERMINAL_STATUSES = ['out', 'customer_picked_up', 'completed', 'checked_out', 'picked_up'];
+                    items = (order.items || order.services || []).map((item, idx) => {
+                        const isTerminal = TERMINAL_STATUSES.includes(item.status) || TERMINAL_STATUSES.includes(item.itemStatus);
+                        return {
+                            itemId: (order.orderId || order.id) + '-' + idx,
+                            itemName: item.name || item.serviceName || ('物品' + (idx + 1)),
+                            lampIndex: idx,
+                            orderId: request.orderId,
+                            customerName: order.customerName || order.contact?.name || '客户',
+                            storeId: request.storeId,
+                            timestamp: Date.now(),
+                            status: isTerminal ? 'terminal' : 'active'
+                        };
+                    }).filter(item => item.status !== 'terminal');
+                    console.log('【M端】从订单提取物品列表:', items.length, '件');
+                }
+                // 如果还没有物品，创建一个默认物品避免UI为空
+                if (items.length === 0) {
+                    items = [{
+                        itemId: request.orderId + '-0',
+                        itemName: '等待取件的物品',
+                        lampIndex: 0,
+                        orderId: request.orderId,
+                        customerName: request.customerName || '客户',
+                        storeId: request.storeId,
+                        timestamp: Date.now(),
+                        status: 'active'
+                    }];
+                }
+            }
             
             if (panel) {
                 panel.classList.remove('hidden');
@@ -3200,12 +3681,13 @@
             const currentStore = JSON.parse(localStorage.getItem('currentStore') || '{}');
             const storeId = currentStore.storeId || 'ST002';
             
-            // 获取门店订单
+            // 获取门店订单（含API搜索结果缓存）
             const storeOrders = JSON.parse(localStorage.getItem('store_orders') || '[]');
             const orders = JSON.parse(localStorage.getItem('orders') || '[]');
+            const apiSearchOrders = JSON.parse(localStorage.getItem('api_search_orders') || '[]');
             
             // 合并并筛选待取件订单
-            const allOrders = [...storeOrders, ...orders];
+            const allOrders = [...storeOrders, ...orders, ...apiSearchOrders];
             const TERMINAL_STATUSES = ['out', 'customer_picked_up', 'completed', 'checked_out', 'picked_up'];
             const pendingPickupOrders = allOrders.filter(order => {
                 const orderStoreId = order.storeId || (order.store ? order.store.id : null);
@@ -3244,7 +3726,12 @@
                 const orderId = order.orderId || order.id || order._id;
                 const items = order.items || order.services || [];
                 const customerName = order.contact?.name || order.customerName || '客户';
-                const createTime = order.createTime || (order.createdAt ? new Date(order.createdAt).toLocaleString() : '');
+                // 优先显示灯条触发时间，没有灯条时回退到订单创建时间
+                const orderLamps = activeLamps.filter(l => l.orderId === orderId);
+                const lampTimes = orderLamps.map(l => l.timestamp).filter(Boolean);
+                const displayTime = lampTimes.length > 0
+                    ? `灯条触发: ${new Date(Math.min(...lampTimes)).toLocaleString()}`
+                    : (order.createTime || (order.createdAt ? `下单: ${new Date(order.createdAt).toLocaleString()}` : ''));
                 
                 // 收集待出库物品时保留原始索引，避免过滤后index错位
                 // 【双重过滤】同时检查 status 和 itemStatus，防止任一字段残留导致已出库物品仍显示
@@ -3262,13 +3749,13 @@
                 if (pendingItems.length === 0) return '';
                 
                 return `
-                    <div class="border border-gray-200 rounded-lg p-4 mb-4 bg-gray-50">
+                    <div class="pickup-item-card border border-gray-200 rounded-lg p-4 mb-4 bg-gray-50 transition-all duration-300" data-order-id="${orderId}">
                         <div class="flex items-center justify-between mb-3">
                             <div>
                                 <span class="font-semibold text-gray-800">${customerName}</span>
                                 <span class="text-xs text-gray-500 ml-2">订单: ${orderId}</span>
                             </div>
-                            <span class="text-xs text-gray-400">${createTime}</span>
+                            <span class="text-xs text-gray-400">${displayTime}</span>
                         </div>
                         <div class="space-y-2">
                             ${pendingItems.map(({ item, _origIdx }) => {
@@ -3438,31 +3925,35 @@
                 }
             } catch(e) {}
             
-            // 直接更新订单状态为已完成
-            _updateOrderStatusLocal(orderId, 'completed');
+            // 直接更新订单状态为已出库
+            _updateOrderStatusLocal(orderId, 'store_outbound');
             
-            showToast('订单所有物品已出库，订单已完成', 'success');
+            showToast('订单所有物品已出库', 'success');
             refreshPickupItems();
         };
         
 
         
         // 更新订单状态（纯本地操作，供出库/完成流程调用）
+        // 【修复】防止C端不识别store_outbound状态导致订单消失
         function _updateOrderStatusLocal(orderId, newStatus) {
             const storeOrders = JSON.parse(localStorage.getItem('store_orders') || '[]');
             const orders = JSON.parse(localStorage.getItem('orders') || '[]');
             
-            const updateArr = (arr) => {
+            // store_outbound → C端orders保持为ready（C端筛选兼容）
+            const cEndStatus = (newStatus === 'store_outbound') ? 'ready' : newStatus;
+            
+            const updateArr = (arr, targetStatus) => {
                 const idx = arr.findIndex(o => (o.orderId || o.id || o._id) === orderId);
                 if (idx > -1) {
-                    arr[idx].status = newStatus;
+                    arr[idx].status = targetStatus;
                     arr[idx].completedAt = new Date().toISOString();
                     arr[idx].updatedAt = new Date().toISOString();
                 }
             };
             
-            updateArr(storeOrders);
-            updateArr(orders);
+            updateArr(storeOrders, newStatus);     // 管理端保留 store_outbound
+            updateArr(orders, cEndStatus);          // C端映射为 ready
             
             localStorage.setItem('store_orders', JSON.stringify(storeOrders));
             localStorage.setItem('orders', JSON.stringify(orders));
@@ -3497,7 +3988,7 @@
                 const allOut = items.every(item => ['out','customer_picked_up','completed','checked_out','picked_up'].includes(item.status) || ['out','customer_picked_up','completed','checked_out','picked_up'].includes(item.itemStatus));
                 
                 if (allOut && items.length > 0) {
-                    _updateOrderStatusLocal(orderId, 'completed');
+                    _updateOrderStatusLocal(orderId, 'store_outbound');
                     
                     // 防并发：同一订单2秒内不重复发送
                     const lockKey = orderId;
@@ -3512,7 +4003,7 @@
                     // 异步同步到后端（带错误日志）
                     const itemsForApi = items.map(item => ({
                         ...item,
-                        status: item.status || 'completed',
+                        status: item.status || 'store_outbound',
                         itemStatus: item.itemStatus || 'checked_out'
                     }));
                     setTimeout(() => {
@@ -3520,8 +4011,8 @@
                             method: 'PUT',
                             headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-cache' },
                             body: JSON.stringify({ 
-                                status: 'completed',
-                                note: ORDER_STATUS.completed?.text || '已完成',
+                                status: 'store_outbound',
+                                note: '已出库',
                                 userId: 'store_staff',
                                 items: itemsForApi
                             })
@@ -3530,14 +4021,14 @@
                                 const errBody = await res.text();
                                 console.error(`[checkOrderComplete] ❌ API返回错误(${res.status}): ${errBody}`, 'orderId:', orderId);
                             } else {
-                                console.log(`[checkOrderComplete] ✅ API同步成功: ${orderId} → completed`);
+                                console.log(`[checkOrderComplete] ✅ API同步成功: ${orderId} → store_outbound`);
                             }
                         }).catch(err => {
                             console.error('[checkOrderComplete] ❌ 网络错误:', err.message, 'orderId:', orderId);
                         });
                     }, 50);
                     
-                    showToast('订单所有物品已出库，订单已完成', 'success');
+                    showToast('订单所有物品已出库', 'success');
                     
                     // 通知C端
                     localStorage.setItem('store_light_response', JSON.stringify({
@@ -3549,36 +4040,595 @@
             }
         }
         
-        // 开始扫描出库
-        window.startScanOutbound = function() {
-            const input = document.getElementById('scan-item-input');
-            input.focus();
-            
-            input.addEventListener('keypress', function(e) {
-                if (e.key === 'Enter') {
-                    const barcode = input.value.trim();
-                    if (barcode) {
-                        processBarcodeOutbound(barcode);
-                        input.value = '';
-                    }
-                }
-            });
+        // ========================================
+        // 📷 相机扫码（手机相机扫描条码/二维码）
+        // ========================================
+        let html5QrCode = null;
+        let cameraFacingMode = 'environment'; // environment=后置, user=前置
+        let isCameraScanning = false;
+        let flashOn = false;
+        let cameraScanMode = 'outbound'; // 'outbound'=扫码出库 | 'manage'=扫一扫订单管理
+        
+        // 扫一扫：扫描条码后进入订单管理面板（可入库/状态更新/出库）
+        window.scanAndManageOrder = function() {
+            cameraScanMode = 'manage';
+            // 更新取景器标题
+            const titleEl = document.querySelector('#camera-scanner-modal span');
+            if (titleEl) titleEl.textContent = '📷 扫一扫 · 订单管理';
+            startCameraScan();
         };
         
-        // 处理条码出库
-        function processBarcodeOutbound(barcode) {
-            // 模拟：根据条码查找物品并出库
-            const activeLamps = JSON.parse(localStorage.getItem('activeLamps') || '[]');
+        // 启动相机扫码（出库模式，从扫码出库区域触发）
+        window.startCameraScan = async function() {
+            const modal = document.getElementById('camera-scanner-modal');
+            if (!modal) return;
             
-            // 查找匹配的物品
-            const matchingLamp = activeLamps.find(l => 
-                l.itemId.includes(barcode) || l.itemName.includes(barcode)
+            // 检查html5-qrcode是否已加载
+            if (typeof Html5Qrcode === 'undefined') {
+                showToast('⚠️ 扫码库加载中，请稍后再试', 'warning');
+                return;
+            }
+            
+            // 设置为出库模式
+            cameraScanMode = 'outbound';
+            const titleEl = document.querySelector('#camera-scanner-modal span');
+            if (titleEl) titleEl.textContent = '📷 扫描物品条码 · 出库';
+            
+            modal.classList.remove('hidden');
+            
+            // 延迟初始化避免DOM未渲染
+            setTimeout(async () => {
+                try {
+                    await initCameraScanner();
+                } catch (error) {
+                    console.error('[相机扫码] 初始化失败:', error);
+                    showToast('❌ 相机启动失败: ' + error.message, 'error');
+                    modal.classList.add('hidden');
+                }
+            }, 300);
+        };
+        
+        // 初始化html5-qrcode扫描器
+        async function initCameraScanner() {
+            if (isCameraScanning) return;
+            
+            const readerElement = document.getElementById('camera-reader');
+            if (!readerElement) return;
+            
+            // 清空旧实例
+            if (html5QrCode) {
+                await html5QrCode.stop().catch(() => {});
+                html5QrCode.clear();
+                html5QrCode = null;
+            }
+            
+            readerElement.innerHTML = '';
+            html5QrCode = new Html5Qrcode('camera-reader');
+            
+            const barcodeSelect = document.getElementById('camera-barcode-select');
+            const barcodeFormat = barcodeSelect ? barcodeSelect.value : 'code_128';
+            
+            // 解码尝试配置（支持多种格式）
+            const formatsToSupport = [
+                barcodeFormat,
+                'code_128', 'code_39', 'ean_13', 'ean_8',
+                'upc_a', 'upc_e', 'itf', 'codabar'
+            ];
+            const uniqueFormats = [...new Set(formatsToSupport)];
+            
+            const config = {
+                fps: 10,
+                qrbox: { width: 250, height: 150 },
+                aspectRatio: 1,
+                disableFlip: false,
+                formatsToSupport: uniqueFormats,
+                rememberLastUsedCamera: false
+            };
+            
+            // 相机权限请求后的回调
+            const qrCodeSuccessCallback = (decodedText, decodedResult) => {
+                // 防止重复触发
+                if (!isCameraScanning) return;
+                
+                const resultDiv = document.getElementById('camera-scan-result');
+                if (resultDiv) {
+                    resultDiv.style.display = 'block';
+                    resultDiv.textContent = '识别成功 ✓';
+                }
+                
+                // 播放短振动（移动端触觉反馈）
+                if (navigator.vibrate) {
+                    navigator.vibrate(50);
+                }
+                
+                console.log('[相机扫码] 识别结果:', decodedText);
+                
+                // 处理扫描结果：执行出库
+                handleCameraScanResult(decodedText);
+                
+                // 短暂显示结果后隐藏
+                setTimeout(() => {
+                    if (resultDiv) resultDiv.style.display = 'none';
+                }, 1500);
+            };
+            
+            try {
+                await html5QrCode.start(
+                    { facingMode: cameraFacingMode },
+                    config,
+                    qrCodeSuccessCallback,
+                    () => {} // 忽略扫描中的帧失败回调
+                );
+                
+                isCameraScanning = true;
+                console.log('[相机扫码] 相机已启动, 格式:', barcodeFormat);
+            } catch (error) {
+                isCameraScanning = false;
+                throw error;
+            }
+        }
+        
+        // 处理相机扫码结果
+        async function handleCameraScanResult(barcode) {
+            if (!barcode || !barcode.trim()) return;
+            
+            const trimmedBarcode = barcode.trim();
+            const currentStore = JSON.parse(localStorage.getItem('currentStore') || '{}');
+            const storeId = currentStore.storeId || 'ST001';
+            
+            if (cameraScanMode === 'manage') {
+                // ===== 扫一扫模式：查找订单 → 打开管理面板 =====
+                await handleScanForManage(trimmedBarcode, storeId);
+            } else {
+                // ===== 出库模式：扫码直接出库 =====
+                const input = document.getElementById('scan-item-input');
+                if (input) {
+                    input.value = trimmedBarcode;
+                }
+                
+                try {
+                    await processBarcodeOutbound(trimmedBarcode);
+                } catch (e) {
+                    showToast('⚠️ 出库处理异常: ' + e.message, 'warning');
+                }
+                
+                // 出库完成后继续扫描（延迟一下避免重复）
+                setTimeout(() => {
+                    if (isCameraScanning && html5QrCode) {
+                        console.log('[相机扫码] 继续扫描中...');
+                    }
+                }, 2000);
+            }
+        }
+        
+        // 扫一扫模式：通过条码查找订单并打开管理面板
+        async function handleScanForManage(barcode, storeId) {
+            try {
+                // 1. 通过API查找条码对应的物品和订单
+                const response = await fetch(`${API_BASE_URL}/api/cleaning/items/barcode/${encodeURIComponent(barcode)}?storeId=${storeId}`);
+                const result = await response.json();
+                
+                if (!result.success || !result.data || !result.data.found) {
+                    showToast(`❌ 未找到条码"${barcode}"对应的物品`, 'warning');
+                    return; // 继续扫描
+                }
+                
+                const { orderId, orderNo, item, customer } = result.data;
+                const itemName = item.name || '未知物品';
+                
+                // 2. 显示扫描成功
+                const resultDiv = document.getElementById('camera-scan-result');
+                if (resultDiv) {
+                    resultDiv.style.display = 'block';
+                    resultDiv.innerHTML = `识别成功 ✓<br><span style="font-size:12px;font-weight:400;">订单: ${orderNo} · ${itemName}</span>`;
+                }
+                
+                // 3. 停止相机
+                await stopCameraScanAndCleanup();
+                
+                // 短暂延迟后隐藏结果提示
+                setTimeout(() => {
+                    if (resultDiv) resultDiv.style.display = 'none';
+                }, 1200);
+                
+                // 4. 确保订单在 localStorage 中存在（manageOrderItems 需要）
+                await ensureOrderInCache(orderId, orderNo, storeId, customer);
+                
+                // 5. 打开订单管理面板（弹窗覆盖全屏，无需切换页面）
+                showToast(`✅ 找到订单 ${orderNo}，已打开管理面板`, 'success');
+                
+                // 延迟确保DOM稳定后打开面板
+                setTimeout(() => {
+                    if (typeof manageOrderItems === 'function') {
+                        manageOrderItems(orderId);
+                    }
+                }, 400);
+                
+            } catch (error) {
+                console.error('[扫一扫] 查找订单失败:', error);
+                showToast(`❌ 网络错误: ${error.message}`, 'error');
+            }
+        }
+        
+        // 确保订单在 localStorage 缓存中
+        async function ensureOrderInCache(orderId, orderNo, storeId, customer) {
+            // 先检查本地是否已有
+            const storeOrders = JSON.parse(localStorage.getItem('store_orders') || '[]');
+            const cOrders = JSON.parse(localStorage.getItem('orders') || '[]');
+            
+            const findById = (list, id) => list.find(o => 
+                o.orderId === id || o.id === id || o._id === id || o.orderNo === id || o.orderNo === orderNo
             );
             
-            if (matchingLamp) {
-                outboundItem(matchingLamp.orderId, matchingLamp.itemIndex, matchingLamp.itemName);
+            if (findById(storeOrders, orderId) || findById(cOrders, orderId)) {
+                return; // 已有缓存，无需fetch
+            }
+            
+            // 从API获取完整订单数据
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/cleaning/orders/${encodeURIComponent(orderId)}`);
+                const result = await response.json();
+                
+                if (result.success && result.data) {
+                    const apiOrder = result.data;
+                    // 字段标准化
+                    if (!apiOrder.orderId) apiOrder.orderId = apiOrder._id || orderId;
+                    if (!apiOrder.orderNo) apiOrder.orderNo = orderNo;
+                    
+                    // 存入 store_orders
+                    storeOrders.push(apiOrder);
+                    localStorage.setItem('store_orders', JSON.stringify(storeOrders));
+                }
+            } catch (e) {
+                // API获取失败，用barcode API返回的最小数据构建订单对象
+                const minimalOrder = {
+                    orderId: orderId,
+                    orderNo: orderNo,
+                    storeId: storeId,
+                    customerName: customer?.name || '',
+                    customerPhone: customer?.phone || '',
+                    status: 'pending',
+                    items: [],
+                    createdAt: new Date().toISOString()
+                };
+                storeOrders.push(minimalOrder);
+                localStorage.setItem('store_orders', JSON.stringify(storeOrders));
+            }
+        }
+        
+        // 停止相机并清理（供管理模式使用）
+        async function stopCameraScanAndCleanup() {
+            const modal = document.getElementById('camera-scanner-modal');
+            if (modal) {
+                modal.classList.add('hidden');
+            }
+            
+            if (html5QrCode && isCameraScanning) {
+                await html5QrCode.stop().catch(() => {});
+                html5QrCode.clear();
+                html5QrCode = null;
+                isCameraScanning = false;
+                flashOn = false;
+            }
+            
+            // 恢复默认模式
+            cameraScanMode = 'outbound';
+        }
+        
+        // 停止相机扫码
+        window.stopCameraScan = function() {
+            const modal = document.getElementById('camera-scanner-modal');
+            if (modal) {
+                modal.classList.add('hidden');
+            }
+            
+            // 恢复默认模式
+            cameraScanMode = 'outbound';
+            
+            if (html5QrCode && isCameraScanning) {
+                html5QrCode.stop().then(() => {
+                    html5QrCode.clear();
+                    html5QrCode = null;
+                    isCameraScanning = false;
+                    flashOn = false;
+                    console.log('[相机扫码] 相机已关闭');
+                }).catch(err => {
+                    console.warn('[相机扫码] 关闭失败:', err);
+                    isCameraScanning = false;
+                    flashOn = false;
+                });
+            }
+        };
+        
+        // 切换前后摄像头
+        window.switchCameraFacing = async function() {
+            if (!isCameraScanning || !html5QrCode) return;
+            
+            cameraFacingMode = cameraFacingMode === 'environment' ? 'user' : 'environment';
+            
+            try {
+                await html5QrCode.stop();
+                html5QrCode.clear();
+                isCameraScanning = false;
+                flashOn = false;
+                // 更新手电筒按钮状态
+                const flashBtn = document.getElementById('camera-flash-btn');
+                if (flashBtn) flashBtn.style.color = '#fff';
+                
+                // 重新启动
+                await initCameraScanner();
+                showToast(`已切换到${cameraFacingMode === 'environment' ? '后置' : '前置'}摄像头`, 'info');
+            } catch (e) {
+                showToast('切换摄像头失败: ' + e.message, 'error');
+            }
+        };
+        
+        // 切换手电筒
+        window.toggleFlashlight = function() {
+            if (!html5QrCode) return;
+            
+            try {
+                flashOn = !flashOn;
+                // html5-qrcode 的 applyVideoConstraints 方法可以控制手电筒
+                if (html5QrCode.applyVideoConstraints) {
+                    html5QrCode.applyVideoConstraints({
+                        advanced: [{ torch: flashOn }]
+                    }).catch(() => {
+                        // 降级方案：使用 track 级别控制
+                        html5QrCode.applyVideoConstraints({
+                            torch: flashOn
+                        }).catch(() => {});
+                    });
+                }
+                
+                const flashBtn = document.getElementById('camera-flash-btn');
+                if (flashBtn) {
+                    flashBtn.style.color = flashOn ? '#fbbf24' : '#fff';
+                    flashBtn.innerHTML = flashOn 
+                        ? '<i class="fa fa-bolt mr-1"></i>关闭手电' 
+                        : '<i class="fa fa-bolt mr-1"></i>手电筒';
+                }
+            } catch (e) {
+                console.warn('[相机扫码] 手电筒切换失败:', e);
+            }
+        };
+        
+        // 切换条码格式后重新启动
+        window.restartCameraScan = async function() {
+            if (!isCameraScanning || !html5QrCode) return;
+            
+            try {
+                await html5QrCode.stop();
+                html5QrCode.clear();
+                isCameraScanning = false;
+                await initCameraScanner();
+            } catch (e) {
+                console.warn('[相机扫码] 切换格式后重启失败:', e);
+            }
+        };
+        
+        // 搜索模式：false=扫码模式, true=手输订单号搜索模式
+        let isManualSearchMode = false;
+        
+        // ========================================
+        // 全局输入框操作（Enter键 + 搜索/扫码按钮）
+        // ========================================
+        
+        // 处理搜索/扫码按钮点击
+        window.handleScanAction = function() {
+            const input = document.getElementById('scan-item-input');
+            const value = (input ? input.value.trim() : '');
+            if (!value) {
+                showToast(isManualSearchMode ? '请先输入订单号或编号' : '请先输入物品条码', 'warning');
+                return;
+            }
+            
+            if (isManualSearchMode) {
+                searchOrderManual(value);
             } else {
-                showToast(`未找到条码"${barcode}"对应的物品`, 'warning');
+                processBarcodeOutbound(value);
+            }
+            input.value = '';
+        };
+        
+        // 切换搜索模式（更新UI + 按钮）
+        window.toggleSearchMode = function() {
+            isManualSearchMode = !isManualSearchMode;
+            const input = document.getElementById('scan-item-input');
+            const label = document.getElementById('scan-mode-label');
+            const hint = document.getElementById('search-mode-hint');
+            const actionBtn = document.getElementById('scan-action-btn');
+            
+            if (isManualSearchMode) {
+                input.placeholder = '🔍 输入订单号或订单编号搜索...';
+                label.innerHTML = '🔍 搜索模式';
+                label.className = 'text-xs text-primary font-medium';
+                hint.textContent = '扫码模式';
+                hint.className = 'text-xs text-gray-400';
+                if (actionBtn) {
+                    actionBtn.innerHTML = '<i class="fa fa-search mr-1"></i><span>搜索</span>';
+                    actionBtn.className = 'px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors flex items-center gap-1 flex-shrink-0';
+                }
+            } else {
+                input.placeholder = '📷 扫描物品标签条码...';
+                label.innerHTML = '📷 扫码模式';
+                label.className = 'text-xs text-gray-500';
+                hint.textContent = '手输搜索';
+                hint.className = 'text-xs text-gray-400';
+                if (actionBtn) {
+                    actionBtn.innerHTML = '<i class="fa fa-barcode mr-1"></i><span>扫码出库</span>';
+                    actionBtn.className = 'px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors flex items-center gap-1 flex-shrink-0';
+                }
+            }
+            input.value = '';
+            input.focus();
+        };
+        
+        // 全局Enter键监听（始终生效，无需手动绑定）
+        (function initEnterKeyListener() {
+            document.addEventListener('keydown', function(e) {
+                if (e.key !== 'Enter') return;
+                
+                const input = document.getElementById('scan-item-input');
+                if (!input || document.activeElement !== input) return;
+                
+                const value = input.value.trim();
+                if (!value) return;
+                
+                e.preventDefault();
+                input.value = '';
+                
+                if (isManualSearchMode) {
+                    searchOrderManual(value);
+                } else {
+                    processBarcodeOutbound(value);
+                }
+            });
+        })();
+        
+        // 开始扫描出库（聚焦输入框，移动端会自动弹出键盘）
+        window.startScanOutbound = function() {
+            const input = document.getElementById('scan-item-input');
+            if (input) {
+                input.focus();
+                // 移动端：scroll to input
+                input.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+        };
+        
+        // 手输订单号搜索
+        async function searchOrderManual(keyword) {
+            const currentStore = JSON.parse(localStorage.getItem('currentStore') || '{}');
+            const storeId = currentStore.storeId || 'ST001';
+            
+            // 显示加载状态
+            showToast('🔍 正在搜索订单...', 'info');
+            
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/cleaning/orders/search/${encodeURIComponent(keyword)}?storeId=${storeId}`);
+                const result = await response.json();
+                
+                if (result.success && result.data && result.data.found) {
+                    const order = result.data;
+                    const orderId = order.orderId || order.orderNo;
+                    
+                    // 1. 将查到的订单数据暂存，让 viewOrder 能访问到
+                    const apiOrders = JSON.parse(localStorage.getItem('api_search_orders') || '[]');
+                    const existingIdx = apiOrders.findIndex(o => o.orderId === orderId);
+                    if (existingIdx >= 0) {
+                        apiOrders[existingIdx] = order;
+                    } else {
+                        apiOrders.push(order);
+                    }
+                    localStorage.setItem('api_search_orders', JSON.stringify(apiOrders));
+                    
+                    // 2. 刷新待取物品列表
+                    if (typeof loadStorePickupOrders === 'function') {
+                        await loadStorePickupOrders();
+                    }
+                    
+                    // 3. 短暂延迟后高亮物品
+                    setTimeout(() => {
+                        highlightOrderItems(order);
+                    }, 600);
+                    
+                    // 4. 打开订单详情弹窗
+                    viewOrder(orderId);
+                    
+                    showToast(`✅ 找到订单: ${order.orderNo || orderId}，共${order.items?.length || 0}件物品`, 'success');
+                } else {
+                    showToast(`❌ ${result.data?.message || '未找到该订单'}`, 'warning');
+                }
+            } catch (error) {
+                showToast(`❌ 搜索失败: ${error.message}`, 'error');
+            }
+        }
+        
+        // 高亮显示搜索到的订单物品
+        function highlightOrderItems(order) {
+            const itemsList = document.getElementById('pickup-items-list');
+            if (!itemsList) return;
+            
+            // 为找到的物品添加高亮效果
+            const allItemCards = itemsList.querySelectorAll('.pickup-item-card');
+            let foundCount = 0;
+            
+            allItemCards.forEach(card => {
+                const orderIdAttr = card.getAttribute('data-order-id');
+                if (orderIdAttr === order.orderId || orderIdAttr === order.orderNo) {
+                    card.classList.add('ring-2', 'ring-primary', 'bg-blue-50');
+                    card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    foundCount++;
+                    
+                    // 3秒后移除高亮
+                    setTimeout(() => {
+                        card.classList.remove('ring-2', 'ring-primary', 'bg-blue-50');
+                    }, 3000);
+                }
+            });
+            
+            if (foundCount === 0) {
+                showToast('⚠️ 该订单的物品未在待取列表中，请刷新后再试', 'warning');
+            }
+        }
+        
+        // 处理条码出库（调用后端API查找物品）
+        async function processBarcodeOutbound(barcode) {
+            const currentStore = JSON.parse(localStorage.getItem('currentStore') || '{}');
+            const storeId = currentStore.storeId || 'ST001';
+            
+            try {
+                // 1. 先通过后端API搜索条码
+                const response = await fetch(`${API_BASE_URL}/api/cleaning/items/barcode/${encodeURIComponent(barcode)}?storeId=${storeId}`);
+                const result = await response.json();
+                
+                if (result.success && result.data && result.data.found) {
+                    const { orderId, item, orderNo } = result.data;
+                    const itemName = item.name || '未知物品';
+                    
+                    // 2. 如果物品状态是 ready/lighted，执行出库
+                    if (['ready', 'lighted', 'cleaned'].includes(item.status)) {
+                        await window.updateItemStatus(orderId, item.index, 'out');
+                        showToast(`✅ 物品"${itemName}"已出库 (订单: ${orderNo || orderId})`, 'success');
+                        refreshPickupItems();
+                    } else if (['out', 'checked_out', 'customer_picked_up', 'completed'].includes(item.status)) {
+                        showToast(`⚠️ 物品"${itemName}"已经出库过了`, 'warning');
+                    } else {
+                        showToast(`📋 找到物品"${itemName}"，当前状态: ${item.status}`, 'info');
+                    }
+                } else {
+                    // 3. 后端没找到，回退到本地搜索
+                    const activeLamps = JSON.parse(localStorage.getItem('activeLamps') || '[]');
+                    const matchingLamp = activeLamps.find(l => 
+                        l.itemId && l.itemId.includes(barcode) || 
+                        l.itemName && l.itemName.includes(barcode)
+                    );
+                    
+                    if (matchingLamp) {
+                        await window.updateItemStatus(matchingLamp.orderId, matchingLamp.itemIndex, 'out');
+                        showToast(`✅ 物品"${matchingLamp.itemName}"已出库`, 'success');
+                        refreshPickupItems();
+                    } else {
+                        showToast(`❌ 未找到条码"${barcode}"对应的物品`, 'warning');
+                    }
+                }
+            } catch (error) {
+                console.error('[扫码出库] API请求失败:', error);
+                
+                // 网络失败时回退到本地搜索
+                const activeLamps = JSON.parse(localStorage.getItem('activeLamps') || '[]');
+                const matchingLamp = activeLamps.find(l => 
+                    l.itemId && l.itemId.includes(barcode) || 
+                    l.itemName && l.itemName.includes(barcode)
+                );
+                
+                if (matchingLamp) {
+                    await window.updateItemStatus(matchingLamp.orderId, matchingLamp.itemIndex, 'out');
+                    showToast(`✅ 物品"${matchingLamp.itemName}"已出库 (离线模式)`, 'success');
+                    refreshPickupItems();
+                } else {
+                    showToast(`❌ 搜索失败: ${error.message}`, 'error');
+                }
             }
         }
         
@@ -3959,6 +5009,336 @@
         // ========================================
         
         // ========================================
+        // 🔍 全局搜索功能（与 index.html 仪表盘一致）
+        // ========================================
+        let searchDebounceTimerM = null;
+        let searchAbortControllerM = null;
+        
+        function initGlobalSearchM() {
+            console.log('[全局搜索M] initGlobalSearchM 开始初始化...');
+            
+            const searchInput = document.getElementById('global-search-input-m');
+            const searchType = document.getElementById('global-search-type-m');
+            const searchBtn = document.getElementById('global-search-btn-m');
+            const searchResults = document.getElementById('global-search-results-m');
+            
+            console.log('[全局搜索M] 元素检测:', {
+                searchInput: !!searchInput,
+                searchType: !!searchType,
+                searchBtn: !!searchBtn,
+                searchResults: !!searchResults
+            });
+            
+            if (!searchInput || !searchType || !searchResults) {
+                console.error('[全局搜索M] 关键元素缺失，初始化失败！');
+                return;
+            }
+            
+            console.log('[全局搜索M] 元素齐全，绑定事件监听器...');
+            
+            // 点击搜索按钮
+            if (searchBtn) {
+                searchBtn.addEventListener('click', () => {
+                    console.log('[全局搜索M] 搜索按钮被点击');
+                    const keyword = searchInput.value.trim();
+                    if (keyword) {
+                        clearTimeout(searchDebounceTimerM);
+                        performSearchM(keyword, searchType.value);
+                    } else {
+                        console.log('[全局搜索M] 搜索关键词为空，忽略');
+                    }
+                });
+            }
+            
+            // 回车键搜索（与 index.html 一致）
+            searchInput.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    console.log('[全局搜索M] 回车键搜索');
+                    e.preventDefault();
+                    clearTimeout(searchDebounceTimerM);
+                    const keyword = searchInput.value.trim();
+                    if (keyword) {
+                        performSearchM(keyword, searchType.value);
+                    } else {
+                        console.log('[全局搜索M] 搜索关键词为空，忽略');
+                    }
+                }
+            });
+            
+            // 实时搜索（防抖 300ms）
+            searchInput.addEventListener('input', () => {
+                clearTimeout(searchDebounceTimerM);
+                const keyword = searchInput.value.trim();
+                
+                if (!keyword) {
+                    searchResults.classList.add('hidden');
+                    searchResults.innerHTML = '';
+                    return;
+                }
+                
+                console.log('[全局搜索M] 输入变化，300ms后搜索:', keyword);
+                
+                searchDebounceTimerM = setTimeout(() => {
+                    performSearchM(keyword, searchType.value);
+                }, 300);
+            });
+            
+            // 切换搜索类型时重新搜索
+            searchType.addEventListener('change', () => {
+                const keyword = searchInput.value.trim();
+                if (keyword) {
+                    console.log('[全局搜索M] 搜索类型切换:', searchType.value);
+                    clearTimeout(searchDebounceTimerM);
+                    performSearchM(keyword, searchType.value);
+                }
+            });
+            
+            console.log('[全局搜索M] 初始化完成！事件监听器已绑定。API_BASE_URL =', API_BASE_URL);
+            
+            // 点击外部关闭搜索结果
+            document.addEventListener('click', (e) => {
+                const isInsideSearch = e.target.closest('#global-search-results-m') ||
+                                       e.target.closest('#global-search-input-m') ||
+                                       e.target.closest('#global-search-btn-m') ||
+                                       e.target.closest('#global-search-type-m');
+                if (!isInsideSearch) {
+                    searchResults.classList.add('hidden');
+                }
+            });
+            
+            // Escape 关闭搜索（与 index.html 一致）
+            searchInput.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape') {
+                    searchResults.classList.add('hidden');
+                    searchInput.blur();
+                }
+            });
+            
+            // 触控滚动穿透修复
+            searchResults.addEventListener('touchmove', (e) => {
+                e.stopPropagation();
+            }, { passive: false });
+        }
+        
+        async function performSearchM(keyword, type) {
+            const searchResults = document.getElementById('global-search-results-m');
+            if (!searchResults) return;
+            
+            // 取消上一个请求
+            if (searchAbortControllerM) {
+                searchAbortControllerM.abort();
+            }
+            searchAbortControllerM = new AbortController();
+            const signal = searchAbortControllerM.signal;
+            
+            searchResults.innerHTML = '<div style="padding:16px;text-align:center;color:#6b7280;"><i class="fa fa-spinner fa-spin"></i> 搜索中...</div>';
+            searchResults.classList.remove('hidden');
+            
+            try {
+                const currentStore = JSON.parse(localStorage.getItem('currentStore') || '{}');
+                const storeUser = JSON.parse(localStorage.getItem('storeUser') || '{}');
+                const storeId = currentStore.storeId || storeUser.storeId || '';
+                
+                const params = new URLSearchParams({ keyword, type });
+                if (storeId) params.append('storeId', storeId);
+                
+                const url = `${API_BASE_URL}/api/cleaning/search?${params.toString()}`;
+                console.log('[全局搜索M] 请求:', url);
+                
+                const response = await fetch(url, { signal });
+                console.log('[全局搜索M] 状态:', response.status, response.statusText);
+                
+                const result = await response.json();
+                console.log('[全局搜索M] 结果:', result.success, '订单:', result.data?.orders?.length || 0, '客户:', result.data?.customers?.length || 0, '物品:', result.data?.items?.length || 0);
+                
+                if (signal.aborted) {
+                    console.log('[全局搜索M] 请求已被取消');
+                    return;
+                }
+                
+                if (!result.success) {
+                    console.warn('[全局搜索M] 后端返回失败:', result.error || '未知错误');
+                    searchResults.innerHTML = '<div style="padding:16px;text-align:center;color:#9ca3af;">⚠️ 搜索失败: ' + (result.error || '请重试') + '</div>';
+                    return;
+                }
+                
+                renderSearchResultsM(result.data, keyword);
+            } catch (error) {
+                if (error.name === 'AbortError') {
+                    console.log('[全局搜索M] 请求已中止');
+                    return;
+                }
+                console.error('[全局搜索M] 失败:', error.message, 'URL:', API_BASE_URL);
+                searchResults.innerHTML = '<div style="padding:16px;text-align:center;color:#9ca3af;">⚠️ 搜索失败，请检查: 后端服务是否在 ' + API_BASE_URL + ' 运行</div>';
+            }
+        }
+        
+        function highlightTextM(text, keyword) {
+            if (!text || !keyword) return text || '';
+            const escaped = keyword.replace(/[.*+?^${}()|[\]\\\\]/g, '\\\\$&');
+            const regex = new RegExp(`(${escaped})`, 'gi');
+            return String(text).replace(regex, '<span class="search-highlight-m">$1</span>');
+        }
+        
+        function renderSearchResultsM(data, keyword) {
+            const searchResults = document.getElementById('global-search-results-m');
+            if (!searchResults) return;
+            
+            const { orders = [], customers = [], items = [] } = data;
+            const totalCount = orders.length + customers.length + items.length;
+            
+            if (totalCount === 0) {
+                searchResults.innerHTML = `<div class="px-4 py-8 text-center text-gray-400"><i class="fa fa-search text-2xl mb-2 block"></i><p class="text-sm">未找到与"${keyword}"相关的记录</p></div>`;
+                return;
+            }
+            
+            let html = '';
+            
+            // === 订单结果（与 index.html 一致的样式） ===
+            if (orders.length > 0) {
+                html += `<div class="px-3 py-2 bg-gray-50 text-xs text-gray-500 font-semibold border-b border-gray-100">📋 订单 (${orders.length})</div>`;
+                orders.forEach(order => {
+                    const statusMap = {
+                        'pending': '待处理', 'paid': '已支付', 'received': '已收件',
+                        'processing': '处理中', 'cleaning': '清洗中', 'cleaned': '已清洗',
+                        'ready': '待取件', 'completed': '已完成', 'cancelled': '已取消',
+                        'awaiting_pickup_scan': '待取件扫码', 'awaiting_store_outbound': '待出库',
+                        'store_outbound': '已出库'
+                    };
+                    const statusText = statusMap[order.status] || order.status;
+                    const statusColor = {
+                        'pending': 'bg-yellow-100 text-yellow-800', 'paid': 'bg-blue-100 text-blue-800',
+                        'received': 'bg-indigo-100 text-indigo-800', 'ready': 'bg-green-100 text-green-800',
+                        'completed': 'bg-gray-100 text-gray-800', 'cancelled': 'bg-red-100 text-red-800',
+                        'cleaning': 'bg-purple-100 text-purple-800', 'cleaned': 'bg-teal-100 text-teal-800',
+                        'store_outbound': 'bg-cyan-100 text-cyan-800'
+                    };
+                    const statusClass = statusColor[order.status] || 'bg-gray-100 text-gray-700';
+                    
+                    const safeOrderNo = (order.orderNo || '').replace(/'/g, "\\'");
+                    html += `<div class="search-result-item-m px-4 py-3 border-b border-gray-100" onclick="openGlobalSearchResultM('order','${order.orderId}','${safeOrderNo}')">
+                        <div class="flex items-center justify-between">
+                            <div class="flex-1 min-w-0">
+                                <div class="text-sm font-medium text-gray-800 truncate">${highlightTextM(order.orderNo || order.orderId, keyword)}</div>
+                                <div class="text-xs text-gray-500 mt-1">
+                                    ${order.customerName ? highlightTextM(order.customerName, keyword) + ' · ' : ''}
+                                    ${order.customerPhone ? highlightTextM(order.customerPhone, keyword) + ' · ' : ''}
+                                    ${order.itemCount}件物品
+                                </div>
+                            </div>
+                            <span class="px-2 py-0.5 rounded-full text-xs font-medium ml-2 whitespace-nowrap ${statusClass}">${statusText}</span>
+                        </div>
+                        ${order.totalAmount ? `<div class="text-xs text-primary font-medium mt-1">¥${Number(order.totalAmount).toFixed(2)}</div>` : ''}
+                    </div>`;
+                });
+            }
+            
+            // === 客户结果 ===
+            if (customers.length > 0) {
+                html += `<div class="px-3 py-2 bg-gray-50 text-xs text-gray-500 font-semibold border-b border-gray-100">👤 客户 (${customers.length})</div>`;
+                customers.forEach(customer => {
+                    const safeCustomerName = (customer.name || '').replace(/'/g, "\\'");
+                    html += `<div class="search-result-item-m px-4 py-3 border-b border-gray-100" onclick="openGlobalSearchResultM('customer','${customer.userId}','${safeCustomerName}')">
+                        <div class="flex items-center">
+                            <div class="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 mr-3 flex-shrink-0">
+                                <i class="fa fa-user text-xs"></i>
+                            </div>
+                            <div class="flex-1 min-w-0">
+                                <div class="text-sm font-medium text-gray-800">${highlightTextM(customer.name || '未设置姓名', keyword)}</div>
+                                <div class="text-xs text-gray-500">${highlightTextM(customer.phone, keyword)}</div>
+                            </div>
+                            <i class="fa fa-chevron-right text-gray-300 text-xs ml-2"></i>
+                        </div>
+                    </div>`;
+                });
+            }
+            
+            // === 物品结果 ===
+            if (items.length > 0) {
+                html += `<div class="px-3 py-2 bg-gray-50 text-xs text-gray-500 font-semibold border-b border-gray-100">👕 物品 (${items.length})</div>`;
+                const itemStatusMap = { 'pending': '待入库', 'in': '已入库', 'washing': '清洗中', 'clean': '已清洗', 'ready': '待取件', 'out': '已出库', 'completed': '已完成' };
+                items.forEach(item => {
+                    const st = itemStatusMap[item.status] || '';
+                    const safeItemOrderNo = (item.orderNo || '').replace(/'/g, "\\'");
+                    html += `<div class="search-result-item-m px-4 py-3 border-b border-gray-100" onclick="openGlobalSearchResultM('order','${item.orderId}','${safeItemOrderNo}')">
+                        <div class="flex items-center justify-between">
+                            <div class="flex-1 min-w-0">
+                                <div class="text-sm font-medium text-gray-800">${highlightTextM(item.name, keyword)}</div>
+                                <div class="text-xs text-gray-500 mt-1">
+                                    订单: ${highlightTextM(item.orderNo, keyword)} · 客户: ${item.customerName || '-'}
+                                </div>
+                            </div>
+                            ${item.barcode ? `<span class="text-xs text-gray-400 font-mono ml-2">${item.barcode}</span>` : ''}
+                            ${st ? `<span class="px-2 py-0.5 bg-gray-100 text-gray-600 rounded-full text-xs ml-2">${st}</span>` : ''}
+                        </div>
+                    </div>`;
+                });
+            }
+            
+            searchResults.innerHTML = html;
+            searchResults.classList.remove('hidden');
+        }
+        
+        // 点击搜索结果 → 跳转到对应面板并打开详情（与 index.html 一致）
+        window.openGlobalSearchResultM = function(resultType, id, displayName) {
+            const searchResults = document.getElementById('global-search-results-m');
+            const searchInput = document.getElementById('global-search-input-m');
+            
+            // 关闭搜索结果
+            if (searchResults) searchResults.classList.add('hidden');
+            if (searchInput) searchInput.value = '';
+            
+            if (resultType === 'order') {
+                // 跳转到订单管理
+                navigateTo('orders');
+                // 先从 API 加载完整订单数据，再打开详情
+                setTimeout(async () => {
+                    try {
+                        const response = await fetch(`${API_BASE_URL}/api/cleaning/orders/${encodeURIComponent(id)}`);
+                        const result = await response.json();
+                        if (result.success && result.data) {
+                            // 将 API 返回的订单数据缓存到 localStorage，供 viewOrder 使用
+                            const apiOrders = JSON.parse(localStorage.getItem('api_search_orders') || '[]');
+                            const exists = apiOrders.findIndex(o => o.orderId === id || o._id === id || o.orderNo === id);
+                            if (exists >= 0) {
+                                apiOrders[exists] = result.data;
+                            } else {
+                                apiOrders.unshift(result.data);
+                            }
+                            localStorage.setItem('api_search_orders', JSON.stringify(apiOrders.slice(0, 50)));
+                            showOrderDetail(id);
+                        } else {
+                            // 兜底：填充订单搜索框触发搜索
+                            const orderSearch = document.querySelector('#orders-content input[type="text"]');
+                            if (orderSearch) {
+                                orderSearch.value = displayName || id;
+                                orderSearch.dispatchEvent(new Event('input', { bubbles: true }));
+                            }
+                        }
+                    } catch (err) {
+                        console.error('[搜索跳转] 获取订单详情失败:', err);
+                        // 兜底
+                        const orderSearch = document.querySelector('#orders-content input[type="text"]');
+                        if (orderSearch) {
+                            orderSearch.value = displayName || id;
+                            orderSearch.dispatchEvent(new Event('input', { bubbles: true }));
+                        }
+                    }
+                }, 300);
+            } else if (resultType === 'customer') {
+                // 跳转到客户管理
+                navigateTo('customers');
+                setTimeout(() => {
+                    const custSearch = document.querySelector('#customers-content input[type="text"]');
+                    if (custSearch && displayName) {
+                        custSearch.value = displayName;
+                        custSearch.dispatchEvent(new Event('input', { bubbles: true }));
+                    }
+                }, 300);
+            }
+        };
+        
+        // ========================================
         // DOM 加载完成后执行
         // ========================================
         document.addEventListener('DOMContentLoaded', function() {
@@ -4027,6 +5407,7 @@
                         localStorage.setItem('currentStore', JSON.stringify({
                             storeId: defaultStore.storeId,
                             name: defaultStore.storeName,
+                            storeName: defaultStore.storeName,
                             address: '门店地址'
                         }));
                     }
@@ -4035,13 +5416,18 @@
                 // 确保currentStore存在
                 const currentStore = localStorage.getItem('currentStore');
                 if (!currentStore || currentStore === '{}') {
+                    const resolvedName = storeUserObj.storeName || storeUserObj.name || '干洗店';
                     localStorage.setItem('currentStore', JSON.stringify({
                         storeId: storeUserObj.storeId || 'ST002',
-                        name: storeUserObj.storeName || storeUserObj.storeName || '干洗店',
+                        name: resolvedName,
+                        storeName: resolvedName,
                         address: '门店地址'
                     }));
                 }
             }
+            
+            // 应用角色权限（门店端）
+            applyRoleAccessMobile();
             
             // 显示当前日期
             const currentDate = new Date();
@@ -4051,20 +5437,22 @@
             // 加载用户订单
             loadStoreOrders();
             
-            // 启动数据同步管理器（M端使用store_orders）
-            OrderSyncManager.start();
+            // ⚠️ 轮询同步已禁用 — MQTT WebSocket (OrderEventClient) 接管实时推送
+            // 如需启用轮询，取消下行注释：OrderSyncManager.start();
             
-            // 监听同步完成事件
+            // 监听同步完成事件（保留兼容，MQTT 事件也会触发）
             window.addEventListener('ordersSynced', (e) => {
                 console.log('M端订单已同步，刷新列表...');
                 loadStoreOrders();
             });
 
+            // 提取门店ID（外层作用域，供后续代码使用）
+            const _storeUser = JSON.parse(localStorage.getItem('storeUser') || '{}');
+            const _currentStore = JSON.parse(localStorage.getItem('currentStore') || '{}');
+            const myStoreId = _currentStore.storeId || _storeUser.storeId || 'ST002';
+
             // 启动订单实时事件监听（MQTT WebSocket）
             try {
-                const storeUser = JSON.parse(localStorage.getItem('storeUser') || '{}');
-                const currentStore = JSON.parse(localStorage.getItem('currentStore') || '{}');
-                const myStoreId = currentStore.storeId || storeUser.storeId || 'ST002';
                 
                 if (typeof OrderEventClient !== 'undefined') {
                     OrderEventClient.start({
@@ -4109,6 +5497,75 @@
             // 启动灯条请求实时检测（每2秒检测一次）
             startLightRequestPolling();
             
+            // 启动跨端数据同步（index ↔ m-index ↔ C端 ↔ 微信小程序）
+            try {
+                if (typeof CrossSyncClient !== 'undefined') {
+                    CrossSyncClient.start({
+                        type: 'store',
+                        storeId: myStoreId,
+                        onRemoteOperation: (event) => {
+                            // 收到总后台（index）或 C端 的操作
+                            console.log('[M端同步] 收到对端操作:', event.source, event.operation);
+                            const op = event.operation;
+                            if (op && (op.type === 'create' || op.type === 'pay' || op.type === 'status_change' || op.type === 'cancel')) {
+                                // 刷新订单列表
+                                loadStoreOrders();
+                            }
+                            // 显示通知
+                            if (op && op.orderNo) {
+                                const sourceName = event.source === 'index' ? '总后台' : event.source === 'c-end' ? 'C端客户' : event.source;
+                                showOrderNotification(`${sourceName}操作`, `订单 ${op.orderNo} ${op.action || op.type}`);
+                            }
+                        },
+                        onSyncStatusChange: (statusData) => {
+                            // 更新 M 端同步状态指示（复用现有的 MQTT 状态 UI）
+                            const dot = document.getElementById('mqtt-status-dot');
+                            const text = document.getElementById('mqtt-status-text');
+                            const badge = document.getElementById('mqtt-status-badge');
+                            if (!dot || !text) return;
+
+                            const adminOnline = statusData.peerOnline?.admin || false;
+                            const mqttOk = statusData.mqttConnected !== false;
+
+                            if (mqttOk && adminOnline) {
+                                dot.className = 'w-1.5 h-1.5 rounded-full bg-green-500';
+                                text.textContent = '全同步';
+                                if (badge) {
+                                    badge.className = 'px-2 py-1 text-xs font-medium rounded-full hidden sm:inline-flex items-center gap-1 bg-green-50 text-green-700';
+                                    badge.title = 'MQTT实时 + 总后台在线，全通道数据同步正常';
+                                }
+                            } else if (mqttOk && !adminOnline) {
+                                dot.className = 'w-1.5 h-1.5 rounded-full bg-yellow-500';
+                                text.textContent = '后台离线';
+                                if (badge) {
+                                    badge.className = 'px-2 py-1 text-xs font-medium rounded-full hidden sm:inline-flex items-center gap-1 bg-yellow-50 text-yellow-700';
+                                    badge.title = 'MQTT在线但总后台离线';
+                                }
+                            } else {
+                                dot.className = 'w-1.5 h-1.5 rounded-full bg-gray-400';
+                                text.textContent = '轮询中';
+                                if (badge) {
+                                    badge.className = 'px-2 py-1 text-xs font-medium rounded-full hidden sm:inline-flex items-center gap-1 bg-gray-100 text-gray-500';
+                                    badge.title = '使用轮询同步';
+                                }
+                            }
+                        },
+                        onPeerOnline: (peerType) => {
+                            console.log('[M端同步] 对端上线:', peerType);
+                            if (peerType === 'admin') {
+                                showOrderNotification('总后台已上线', '数据将实时同步');
+                            }
+                        },
+                        onPeerOffline: (peerType) => {
+                            console.log('[M端同步] 对端下线:', peerType);
+                        }
+                    });
+                    console.log('[M端同步] 跨端同步客户端已启动, StoreID:', myStoreId);
+                }
+            } catch (e) {
+                console.warn('[M端同步] 初始化失败:', e.message);
+            }
+            
             // 初始化客服中心
             initCustomerService();
             
@@ -4134,6 +5591,13 @@
                 if (e.key === 'orders' || e.key === 'store_orders') {
                     console.log('【同步】检测到其他页面更新了订单数据，重新加载...');
                     loadStoreOrders();
+                    // 同步刷新灯条管理列表（跨标签页同步核心）
+                    if (typeof refreshPickupItems === 'function') {
+                        refreshPickupItems();
+                    }
+                    if (typeof loadStorePickupOrders === 'function') {
+                        loadStorePickupOrders();
+                    }
                 }
                 
                 // 监听C端门店自提灯条请求
@@ -4343,11 +5807,14 @@
             
             // 绑定事件
             function bindEvents() {
-                // 导航链接点击事件
+                // 导航链接点击事件（仅处理侧边栏 #hash 链接，跳过底部导航的 javascript:void(0)）
                 navLinks.forEach(link => {
                     link.addEventListener('click', (e) => {
+                        const href = link.getAttribute('href') || '';
+                        // 跳过非 # 开头的链接（如底部导航的 javascript:void(0)），这些由 navigateTo() 处理
+                        if (!href.startsWith('#')) return;
                         e.preventDefault();
-                        const target = link.getAttribute('href').substring(1);
+                        const target = href.substring(1);
                         console.log('【测试4】导航链接被点击:', target);
                         switchSection(target);
                         // 关闭侧边栏
@@ -4378,6 +5845,17 @@
                     document.addEventListener('click', (e) => {
                         if (!notificationBtn.contains(e.target) && !notificationDropdown.contains(e.target)) {
                             notificationDropdown.classList.add('hidden');
+                        }
+                    });
+                }
+                
+                // 用户菜单：点击外部关闭下拉
+                const userMenuBtn = document.getElementById('user-menu-btn');
+                const userDropdown = document.getElementById('user-dropdown');
+                if (userMenuBtn && userDropdown) {
+                    document.addEventListener('click', (e) => {
+                        if (!userMenuBtn.contains(e.target) && !userDropdown.contains(e.target)) {
+                            userDropdown.classList.add('hidden');
                         }
                     });
                 }
@@ -4528,9 +6006,29 @@
             initNotifications();
             initMessageCenter();
             initWLEDControlMobile();
+            initLightTestPanelM();
+            
+            // 📷 相机扫码：ESC键关闭相机取景器
+            document.addEventListener('keydown', function(e) {
+                if (e.key === 'Escape') {
+                    const modal = document.getElementById('camera-scanner-modal');
+                    if (modal && !modal.classList.contains('hidden')) {
+                        stopCameraScan();
+                    }
+                }
+            });
+            
+            initGlobalSearchM();
             
             // 默认为仪表盘
             switchSection('dashboard');
+        });
+        
+        // 📷 页面卸载时清理相机资源
+        window.addEventListener('beforeunload', function() {
+            if (html5QrCode && isCameraScanning) {
+                html5QrCode.stop().catch(() => {});
+            }
         });
         
         // ==================== 结算中心功能 ====================
@@ -5005,16 +6503,37 @@
                             mergedItems = apiItems;
                         }
                         
-                        // 合并订单字段：本地 status 优先（保护M端操作过的状态）
-                        myOrders[existIdx] = {
-                            ...apiOrder,           // API 数据作为基底
-                            ...localOrder,         // 本地数据覆盖
-                            items: mergedItems,
-                            services: mergedItems,
-                            // 本地状态优先（M端操作过的状态不会丢失）
-                            status: localOrder.status || apiOrder.status,
-                            updatedAt: localOrder.updatedAt || apiOrder.updatedAt
-                        };
+                        // 【核心修复】智能合并：根据 updatedAt 时间戳决定覆盖顺序
+                        //   - API更新时：apiOrder后展开 → 防数据倒退（C端最新状态优先）
+                        //   - 本地更新时：localOrder后展开 → 防数据丢失（M端操作痕迹优先）
+                        //   - 无论哪种：先展开的兜底独有字段，后展开的覆盖同名字段
+                        const apiTime = apiOrder.updatedAt ? new Date(apiOrder.updatedAt).getTime() : 0;
+                        const localTime = localOrder.updatedAt ? new Date(localOrder.updatedAt).getTime() : 0;
+                        const apiIsNewer = apiTime > 0 && apiTime >= localTime;
+                        
+                        if (apiIsNewer) {
+                            myOrders[existIdx] = {
+                                ...localOrder,                    // 兜底：保留本地独有字段（不掉数据）
+                                ...apiOrder,                      // 覆盖：API/C端最新数据优先（不倒退）
+                                items: mergedItems,
+                                services: mergedItems,
+                                status: apiOrder.status || localOrder.status,
+                                updatedAt: apiOrder.updatedAt || localOrder.updatedAt
+                            };
+                        } else {
+                            myOrders[existIdx] = {
+                                ...apiOrder,                      // 兜底：保留API字段
+                                ...localOrder,                    // 覆盖：本地最新数据优先（不掉M端操作痕迹）
+                                items: mergedItems,
+                                services: mergedItems,
+                                status: localOrder.status || apiOrder.status,
+                                updatedAt: localOrder.updatedAt || apiOrder.updatedAt
+                            };
+                        }
+                        
+                        if (apiIsNewer && localTime > 0) {
+                            console.log('[门店订单] ⚠️ API数据更新，覆盖同名字段但保留本地独有数据 (API:', apiOrder.updatedAt, ', 本地:', localOrder.updatedAt, ')');
+                        }
                         console.log('[门店订单] 合并本地缓存订单:', localOrder.orderId || localOrder.id, '本地状态:', localOrder.status);
                     }
                 });
@@ -5143,9 +6662,15 @@
                 return;
             }
             
-            // 排序：待处理 > 清洗中 > 清洗完成 > 待取件 > 其他
-            const statusPriority = { paid: 0, cleaning: 1, cleaned: 2, ready: 3, pending: 4, processing: 5, completed: 6, cancelled: 7 };
-            myOrders.sort((a, b) => (statusPriority[a.status] || 99) - (statusPriority[b.status] || 99));
+            // 按创建时间倒序排列（最近创建的在前）
+            myOrders.sort((a, b) => {
+                const ta = a.createdAt || a.createTime || a.created || '';
+                const tb = b.createdAt || b.createTime || b.created || '';
+                if (!ta && !tb) return 0;
+                if (!ta) return 1;
+                if (!tb) return -1;
+                return new Date(tb) - new Date(ta);
+            });
             
             tableBody.innerHTML = myOrders.map(order => {
                 // 确保使用稳定的订单ID（兼容API返回的_id/orderNo和本地orderId）
@@ -5189,6 +6714,13 @@
                     }
                 }
                 
+                // 格式化创建时间
+                const createTime = order.createdAt || order.createTime || order.created || '';
+                const displayTime = createTime ? (typeof createTime === 'string' ? createTime.replace('T', ' ').slice(0, 16) : new Date(createTime).toLocaleString('zh-CN', {month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'})) : '—';
+                
+                // 服务项目摘要（显示在客户名下方）
+                const itemsSummary = order.items ? order.items.map(i => i.name || i.serviceName || '服务').slice(0, 2).join('、') : order.services ? order.services.map(s => s.name).slice(0, 2).join('、') : '';
+                
                 return `
                     <tr class="hover:bg-gray-50 transition-all duration-200 ease-in-out">
                         <td class="py-3 px-4 text-sm text-gray-800 font-medium">${oid}</td>
@@ -5196,11 +6728,9 @@
                             <div>${order.customerName || order.contact?.name || '客户'}</div>
                             <div class="text-xs text-gray-500">${order.customerPhone || order.contact?.phone || ''}</div>
                         </td>
-                        <td class="py-3 px-4 text-sm text-gray-800">
-                            <div>${order.items ? order.items.map(i => i.name || i.serviceName || '服务').join(', ') : order.services ? order.services.map(s => s.name).join(', ') : '服务项目'}</div>
-                        </td>
                         <td class="py-3 px-4 text-sm font-semibold text-primary">¥${order.total || order.amounts?.total || order.fees?.total || calculateOrderTotal(order) || 0}</td>
                         <td class="py-3 px-4">${getStatusDisplay(order.status)}</td>
+                        <td class="py-3 px-4 text-xs text-gray-600 whitespace-nowrap">${displayTime}</td>
                         <td class="py-3 px-4">
                             <div class="flex flex-wrap gap-1">
                                 ${actionButtons}
@@ -5698,13 +7228,29 @@
             const userOrders = JSON.parse(localStorage.getItem('orders') || '[]');
             const adminOrders = JSON.parse(localStorage.getItem('admin_orders') || '[]');
             const allOrders = JSON.parse(localStorage.getItem('all_orders') || '[]');
-            const order = storeOrders.find(o => o.orderId === orderId || o.id === orderId || o._id === orderId || o.orderNo === orderId)
+            const apiSearchOrders = JSON.parse(localStorage.getItem('api_search_orders') || '[]');
+            
+            let order = storeOrders.find(o => o.orderId === orderId || o.id === orderId || o._id === orderId || o.orderNo === orderId)
                 || userOrders.find(o => o.orderId === orderId || o.id === orderId || o._id === orderId || o.orderNo === orderId)
                 || adminOrders.find(o => o.orderId === orderId || o.id === orderId || o._id === orderId || o.orderNo === orderId)
-                || allOrders.find(o => o.orderId === orderId || o.id === orderId || o._id === orderId || o.orderNo === orderId);
+                || allOrders.find(o => o.orderId === orderId || o.id === orderId || o._id === orderId || o.orderNo === orderId)
+                || apiSearchOrders.find(o => o.orderId === orderId || o.orderId === orderId || o._id === orderId || o.orderNo === orderId);
+            
+            // 如果是从API搜索缓存中找到的，需要做字段兼容转换
+            if (!order) {
+                // 尝试放宽匹配（仅通过orderNo匹配）
+                order = apiSearchOrders.find(o => o.orderId === orderId || o.orderNo === orderId);
+            }
+            
+            if (order && order.customer && !order.customerName) {
+                // API搜索结果字段转换
+                order.customerName = order.customer.name || order.customerName || '';
+                order.customerPhone = order.customer.phone || order.customerPhone || '';
+                if (!order.orderId) order.orderId = order.orderNo;
+            }
             
             if (!order) {
-                alert('未找到订单');
+                showToast('未找到该订单，请刷新后重试', 'warning');
                 return;
             }
             
@@ -5802,22 +7348,44 @@
                                 </div>
                             </div>
                             
+                            <!-- 【修复】配送状态与物品实际出库状态联动 -->
                             <div style="margin-bottom: 12px;">
                                 <span style="font-weight: 500;">配送状态：</span>
-                                <span class="px-2 py-1 rounded text-xs font-semibold ${
-                                    order.deliveryStatus === 'dispatched' ? 'bg-blue-100 text-blue-800' :
-                                    order.deliveryStatus === 'picking' ? 'bg-yellow-100 text-yellow-800' :
-                                    order.deliveryStatus === 'delivering' ? 'bg-orange-100 text-orange-800' :
-                                    order.deliveryStatus === 'completed' ? 'bg-green-100 text-green-800' :
-                                    'bg-gray-100 text-gray-800'
-                                }">
-                                    ${order.deliveryStatus === 'dispatched' ? '🔄 已派单，等待取件' :
-                                      order.deliveryStatus === 'picking' ? '🚴 骑手取件中' :
-                                      order.deliveryStatus === 'delivering' ? '📦 配送中' :
-                                      order.deliveryStatus === 'completed' ? '✅ 配送完成' :
-                                      order.deliveryStatus === 'outbound' ? '📦 已出库' :
-                                      '⏳ 等待分配'}
-                                </span>
+                                ${(() => {
+                                    const items = order.items || order.services || [];
+                                    const cStatus = order.deliveryStatus || (order.courier && order.courier.status) || 'pending';
+                                    const courierPickupStatuses = ['courier_picked_up','courier_delivering','customer_received'];
+                                    const deliveringStatuses = ['courier_delivering','customer_received'];
+                                    const receivedStatuses = ['customer_received','completed'];
+                                    const outboundStatuses = ['ready','out','checked_out','courier_waiting','courier_picked_up','courier_delivering','customer_received'];
+                                    
+                                    const anyItemOut = items.length === 0 || items.some(i => outboundStatuses.includes(i.status));
+                                    const anyItemPickedUp = items.length > 0 && items.some(i => courierPickupStatuses.includes(i.status));
+                                    const anyItemDelivering = items.length > 0 && items.some(i => deliveringStatuses.includes(i.status));
+                                    const allItemsReceived = items.length > 0 && items.every(i => receivedStatuses.includes(i.status));
+                                    
+                                    let statusText, statusClass;
+                                    if (allItemsReceived) {
+                                        statusText = '✅ 配送完成（用户已收货）';
+                                        statusClass = 'bg-green-100 text-green-800';
+                                    } else if (anyItemDelivering) {
+                                        statusText = '📦 骑手配送中';
+                                        statusClass = 'bg-orange-100 text-orange-800';
+                                    } else if (anyItemPickedUp) {
+                                        statusText = '🚴 骑手已取件';
+                                        statusClass = 'bg-yellow-100 text-yellow-800';
+                                    } else if (anyItemOut || order.deliveryStatus === 'outbound' || order.outboundTime) {
+                                        statusText = '⏳ 等待骑手取件';
+                                        statusClass = 'bg-blue-100 text-blue-800';
+                                    } else if (cStatus === 'dispatched') {
+                                        statusText = '🔄 已派单（等待物品出库）';
+                                        statusClass = 'bg-gray-100 text-gray-800';
+                                    } else {
+                                        statusText = '⏳ 等待配送分配';
+                                        statusClass = 'bg-gray-100 text-gray-800';
+                                    }
+                                    return `<span class="px-2 py-1 rounded text-xs font-semibold ${statusClass}">${statusText}</span>`;
+                                })()}
                                 
                                 <!-- 物品状态与配送状态同步显示 -->
                                 <div style="margin-top: 8px; font-size: 11px; color: #92400e;">
@@ -5838,25 +7406,105 @@
                                 </div>
                             </div>
                             
-                            <!-- 出库按钮（骑手到达或订单就绪时显示） -->
-                            ${order.status === 'ready' && (order.deliveryStatus === 'picking' || order.deliveryStatus === 'arrived' || order.deliveryStatus === 'dispatched' || order.deliveryStatus === 'pending') ? `
+                            <!-- 配送进度追踪条（物品感知版本） -->
+                            <div style="margin-bottom: 10px;">
+                                <div style="font-weight: 500; font-size: 11px; margin-bottom: 8px;">配送进度追踪：</div>
+                                ${(() => {
+                                    const items = order.items || order.services || [];
+                                    const cProg = (order.courier && order.courier.progress) || 0;
+                                    const ds = order.deliveryStatus || (order.courier && order.courier.status) || 'pending';
+                                    
+                                    // 物品级状态汇总
+                                    const outboundStatuses = ['ready','out','checked_out','courier_waiting','courier_picked_up','courier_delivering','customer_received'];
+                                    const courierPickupStatuses = ['courier_picked_up','courier_delivering','customer_received'];
+                                    const deliveringStatuses = ['courier_delivering','customer_received'];
+                                    const receivedStatuses = ['customer_received','completed'];
+                                    
+                                    const anyItemOut = items.length === 0 || items.some(i => outboundStatuses.includes(i.status));
+                                    const anyItemPickedUp = items.length > 0 && items.some(i => courierPickupStatuses.includes(i.status));
+                                    const anyItemDelivering = items.length > 0 && items.some(i => deliveringStatuses.includes(i.status));
+                                    const allItemsReceived = items.length > 0 && items.every(i => receivedStatuses.includes(i.status));
+                                    const isOutbound = order.deliveryStatus === 'outbound' || !!order.outboundTime;
+                                    
+                                    // 进度步骤必须与物品状态挂钩
+                                    const s1 = true;
+                                    const s2 = (anyItemOut || isOutbound) && (cProg >= 15 || ds === 'picking' || ds === 'delivering' || ds === 'completed' || ds === 'delivered' || ds === 'dispatched');
+                                    const s3 = (anyItemPickedUp || anyItemDelivering) && (cProg >= 40 || ds === 'delivering' || ds === 'completed' || ds === 'delivered');
+                                    const s4 = allItemsReceived && (ds === 'completed' || ds === 'delivered');
+                                    
+                                    let pw;
+                                    if (s4) { pw = 100; }
+                                    else if (s3) { pw = 65; }
+                                    else if (s2) { pw = 35; }
+                                    else { pw = 5; }
+                                    if (cProg > 0 && s2) { pw = Math.max(pw, Math.min(65, cProg)); }
+                                    
+                                    return `
+                                    <div style="font-size: 11px; color: #6b7280; margin-bottom: 6px;">
+                                        <i class="fa fa-box"></i> 出库进度：${items.length > 0 ? `${items.filter(i => outboundStatuses.includes(i.status)).length}/${items.length} 件已出库 · ${items.filter(i => receivedStatuses.includes(i.status)).length} 件已收货` : '无物品'}
+                                    </div>
+                                    <div style="position: relative; padding: 0 4px;">
+                                        <div style="position: absolute; top: 12px; left: 20px; right: 20px; height: 3px; background: #e5e7eb; border-radius: 2px;"></div>
+                                        <div style="position: absolute; top: 12px; left: 20px; height: 3px; background: #f59e0b; border-radius: 2px; width: calc(${pw}% - 20px); transition: width 0.5s ease;"></div>
+                                        <div style="display: flex; justify-content: space-between; position: relative; z-index: 1;">
+                                            <div style="text-align: center; width: 48px;">
+                                                <div style="width: 20px; height: 20px; border-radius: 50%; background: ${s1 ? '#f59e0b' : '#e5e7eb'}; color: ${s1 ? 'white' : '#9ca3af'}; font-size: 10px; line-height: 20px; margin: 0 auto; font-weight: bold;">1</div>
+                                                <div style="font-size: 9px; margin-top: 2px; color: ${s1 ? '#92400e' : '#9ca3af'}; font-weight: ${s1 ? '600' : '400'};">待出库</div>
+                                            </div>
+                                            <div style="text-align: center; width: 48px;">
+                                                <div style="width: 20px; height: 20px; border-radius: 50%; background: ${s2 ? '#f59e0b' : '#e5e7eb'}; color: ${s2 ? 'white' : '#9ca3af'}; font-size: 10px; line-height: 20px; margin: 0 auto; font-weight: bold;">2</div>
+                                                <div style="font-size: 9px; margin-top: 2px; color: ${s2 ? '#92400e' : '#9ca3af'}; font-weight: ${s2 ? '600' : '400'};">取件中</div>
+                                            </div>
+                                            <div style="text-align: center; width: 48px;">
+                                                <div style="width: 20px; height: 20px; border-radius: 50%; background: ${s3 ? '#f59e0b' : '#e5e7eb'}; color: ${s3 ? 'white' : '#9ca3af'}; font-size: 10px; line-height: 20px; margin: 0 auto; font-weight: bold;">3</div>
+                                                <div style="font-size: 9px; margin-top: 2px; color: ${s3 ? '#92400e' : '#9ca3af'}; font-weight: ${s3 ? '600' : '400'};">配送中</div>
+                                            </div>
+                                            <div style="text-align: center; width: 48px;">
+                                                <div style="width: 20px; height: 20px; border-radius: 50%; background: ${s4 ? '#10b981' : '#e5e7eb'}; color: ${s4 ? 'white' : '#9ca3af'}; font-size: 10px; line-height: 20px; margin: 0 auto; font-weight: bold;">✓</div>
+                                                <div style="font-size: 9px; margin-top: 2px; color: ${s4 ? '#166534' : '#9ca3af'}; font-weight: ${s4 ? '600' : '400'};">已送达</div>
+                                            </div>
+                                        </div>
+                                    </div>`;
+                                })()}
+                            </div>
+                            
+                            <!-- 出库按钮（订单就绪 + 物品已出库状态 + 骑手到达时显示） -->
+                            ${(() => {
+                                const outStatuses = ['ready','out','checked_out','courier_waiting','courier_picked_up','courier_delivering','customer_received'];
+                                const items = order.items || order.services || [];
+                                const anyReady = items.length === 0 || items.some(i => outStatuses.includes(i.status));
+                                const cStatus = order.deliveryStatus || 'pending';
+                                if (order.status === 'ready' && anyReady && (cStatus === 'picking' || cStatus === 'arrived' || cStatus === 'dispatched' || cStatus === 'pending')) {
+                                    return `
                             <div style="margin-top: 12px; padding-top: 12px; border-top: 1px dashed #d97706;">
                                 <button onclick="confirmPickup('${order.orderId}', 'courier')" 
                                         style="width: 100%; padding: 12px; background: linear-gradient(135deg, #dc2626, #b91c1c); color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 600;">
                                     📦 确认出库（交给骑手）
                                 </button>
-                            </div>
-                            ` : ''}
+                            </div>`;
+                                }
+                                return '';
+                            })()}
                             
-                            <!-- 配送完成确认收货按钮（骑手送达后显示） -->
-                            ${order.deliveryStatus === 'completed' || (order.items || []).some(i => i.status === 'courier_delivering') ? `
+                            <!-- 配送完成确认收货按钮（骑手配送中或模拟器送达，且物品未全部确认收货时显示） -->
+                            ${(() => {
+                                const items = order.items || order.services || [];
+                                const receivedStatuses = ['customer_received','completed'];
+                                const deliveringStatuses = ['courier_delivering','customer_received'];
+                                const anyDelivering = items.some(i => deliveringStatuses.includes(i.status));
+                                const allReceived = items.length > 0 && items.every(i => receivedStatuses.includes(i.status));
+                                const cStatus = order.deliveryStatus || 'pending';
+                                if (!allReceived && (cStatus === 'completed' || anyDelivering)) {
+                                    return `
                             <div style="margin-top: 12px; padding-top: 12px; border-top: 1px dashed #d97706;">
                                 <button onclick="confirmCourierReceipt('${order.orderId}')" 
                                         style="width: 100%; padding: 12px; background: linear-gradient(135deg, #10b981, #059669); color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 600;">
                                     ✓ 确认收货（用户已收件）
                                 </button>
-                            </div>
-                            ` : ''}
+                            </div>`;
+                                }
+                                return '';
+                            })()}
                             
                             <!-- 已出库状态 -->
                             ${order.deliveryStatus === 'outbound' || order.outboundTime ? `
@@ -5934,6 +7582,8 @@
             modalContent.innerHTML = html;
             modal.innerHTML = '';
             modal.appendChild(modalContent);
+            // 重置内联样式（closeOrderDetail 设置了 style.display='none'，内联样式优先级高于 class）
+            modal.style.display = 'flex';
             modal.classList.remove('hidden');
         }
         
@@ -5973,19 +7623,14 @@
                 return '';
             }
             
-            // 确保所有物品都有状态字段
-            items.forEach((item, idx) => {
-                if (!item.status) {
-                    // 优先使用 itemStatus（灯条/出库流程），否则用订单状态
-                    item.status = item.itemStatus || order.status || 'pending';
-                }
-            });
+            // 【修复】不再直接修改源数据中的 item.status。
+            // 状态推断在 map 循环中通过 orderToItemMapping 完成，与 index.html 保持一致。
             
             let itemsHtml = items.map((item, index) => {
                 const name = item.name || item.serviceName || '物品' + (index + 1);
                 // 【修复】区分物品自身状态和订单级状态回退
                 const knownStatuses = ['pending','received','cleaning','cleaned','ready','completed','checked_out',
-                    'customer_picked_up','courier_waiting','courier_picked_up','courier_delivering','customer_received'];
+                    'customer_picked_up','courier_waiting','courier_picked_up','courier_delivering','customer_received','out'];
                 const hasOwnStatus = !!item.status && knownStatuses.includes(item.status);
                 let itemStatus;
                 if (hasOwnStatus) {
@@ -6011,9 +7656,10 @@
                 let statusOptions, statusLabels, statusColors;
                 
                 if (isCourier) {
-                    // 跑腿配送模式的状态选项
+                    // 跑腿配送模式的状态选项（【修复】补全out/checked_out出库状态）
                     statusOptions = [
                         'pending', 'received', 'cleaning', 'cleaned', 'ready',
+                        'out',
                         'courier_waiting', 'courier_picked_up', 'courier_delivering', 
                         'customer_received', 'completed'
                     ];
@@ -6023,6 +7669,7 @@
                         'cleaning': '清洗中',
                         'cleaned': '已清洗',
                         'ready': '待取件',
+                        'out': '已出库',
                         'checked_out': '已出库',
                         'courier_waiting': '骑手待取件',
                         'courier_picked_up': '骑手已取件',
@@ -6036,6 +7683,7 @@
                         'cleaning': 'bg-yellow-100 text-yellow-800',
                         'cleaned': 'bg-purple-100 text-purple-800',
                         'ready': 'bg-orange-100 text-orange-800',
+                        'out': 'bg-green-100 text-green-800',
                         'checked_out': 'bg-cyan-100 text-cyan-800',
                         'courier_waiting': 'bg-red-100 text-red-800',
                         'courier_picked_up': 'bg-pink-100 text-pink-800',
@@ -6150,14 +7798,20 @@
             return storeOrders[sIdx] || cOrders[cIdx] || { ...currentOrder, items: updatedItems, status: orderStatus };
         }
         
-        // 根据物品状态计算订单级状态（支持 out/completed 等出库状态）
+        // 根据物品状态计算订单级状态（【修复】包含跑腿配送+出库所有状态）
         function _calcOrderStatusFromItems(currentStatus, items) {
             if (!items || items.length === 0) return currentStatus;
-            const isTerminal = s => ['completed','out','customer_picked_up'].includes(s);
+            // 终端状态：已送达/已出库/已取件/已完成/骑手配送中
+            const isTerminal = s => ['completed','out','customer_picked_up','customer_received','courier_delivering'].includes(s);
+            // 就绪状态：已清洗/待取件/出库相关
+            const readyLike = ['ready','completed','out','customer_picked_up','customer_received','courier_waiting','courier_picked_up','courier_delivering'];
+            const cleanedLike = ['cleaned','ready','completed','out','customer_picked_up','customer_received','courier_waiting','courier_picked_up','courier_delivering'];
+            const cleaningLike = ['cleaning','cleaned','ready','completed','out','customer_picked_up','customer_received','courier_waiting','courier_picked_up','courier_delivering'];
+            
             const allTerminal = items.every(item => isTerminal(item.status));
-            const allReady = items.every(item => ['ready','completed','out','customer_picked_up'].includes(item.status));
-            const allCleaned = items.every(item => ['cleaned','ready','completed','out','customer_picked_up'].includes(item.status));
-            const allCleaning = items.every(item => ['cleaning','cleaned','ready','completed','out','customer_picked_up'].includes(item.status));
+            const allReady = items.every(item => readyLike.includes(item.status));
+            const allCleaned = items.every(item => cleanedLike.includes(item.status));
+            const allCleaning = items.every(item => cleaningLike.includes(item.status));
             
             if (allTerminal) return 'completed';
             if (allReady) return 'ready';
@@ -6752,6 +8406,10 @@ ${(order.items || order.services || []).map((item, idx) => `${idx + 1}. ${item.n
             let orders = JSON.parse(localStorage.getItem('store_orders') || '[]');
             let cOrders = JSON.parse(localStorage.getItem('orders') || '[]');
             
+            // 【修复】C端不识别store_outbound/delivering_back等中间状态，需映射为C端友好状态
+            const cUnfriendlyStatuses = ['store_outbound', 'delivering_back', 'awaiting_store_outbound', 'awaiting_pickup_scan', 'outbound'];
+            const cEndStatus = cUnfriendlyStatuses.includes(newStatus) ? 'ready' : newStatus;
+            
             const orderIndex = orders.findIndex(o => o.orderId === orderId);
             if (orderIndex > -1) {
                 orders[orderIndex].status = newStatus;
@@ -6764,11 +8422,11 @@ ${(order.items || order.services || []).map((item, idx) => `${idx + 1}. ${item.n
             
             const cOrderIndex = cOrders.findIndex(o => o.orderId === orderId);
             if (cOrderIndex > -1) {
-                cOrders[cOrderIndex].status = newStatus;
+                cOrders[cOrderIndex].status = cEndStatus;
                 cOrders[cOrderIndex].items = updatedItems;
                 cOrders[cOrderIndex].services = updatedItems;
                 cOrders[cOrderIndex].updatedAt = new Date().toISOString();
-                cOrders[cOrderIndex].completedAt = newStatus === 'completed' ? new Date().toISOString() : cOrders[cOrderIndex].completedAt;
+                cOrders[cOrderIndex].completedAt = cEndStatus === 'completed' ? new Date().toISOString() : cOrders[cOrderIndex].completedAt;
                 localStorage.setItem('orders', JSON.stringify(cOrders));
             }
             
@@ -7044,8 +8702,8 @@ ${(order.items || order.services || []).map((item, idx) => `${idx + 1}. ${item.n
                 if (order) {
                     const items = order.items || order.services || [];
                     items.forEach((_, idx) => _updateItemStatusCore(orderId, idx, 'out'));
-                    setTimeout(() => _syncItemStatusToAPI(orderId, 'completed', items), 50);
-                    _updateOrderStatusLocal(orderId, 'completed');
+                    setTimeout(() => _syncItemStatusToAPI(orderId, 'store_outbound', items), 50);
+                    _updateOrderStatusLocal(orderId, 'store_outbound');
                     clearOrderLamps(orderId);
                 }
             }
@@ -10654,6 +12312,26 @@ ${(order.items || order.services || []).map((item, idx) => `${idx + 1}. ${item.n
                 read: false
             });
             localStorage.setItem('customer_store_messages', JSON.stringify(customerMsgs));
+            
+            // 同时同步到后端消息中心（Admin端可见）
+            const storeUser = JSON.parse(localStorage.getItem('storeUser') || '{}');
+            fetch('http://localhost:3000/api/messages', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    threadId: `order_${currentChatOrderId}`,
+                    fromType: 'store',
+                    fromId: storeUser.storeId || 'ST001',
+                    fromName: storeUser.name || '门店',
+                    toType: 'customer',
+                    toId: '',
+                    type: 'customer_inquiry',
+                    subject: '门店回复',
+                    content: content,
+                    orderNo: currentChatOrderId,
+                    storeId: storeUser.storeId || 'ST001'
+                })
+            }).catch(e => console.warn('[客服] 同步到消息中心失败:', e.message));
         }
         
         // 快捷回复
@@ -10766,6 +12444,8 @@ ${(order.items || order.services || []).map((item, idx) => `${idx + 1}. ${item.n
         // 页面初始化时加载客服会话
         function initCustomerService() {
             loadCustomerConversations();
+            // 每30秒从后端拉取新消息
+            setInterval(loadCustomerConversations, 30000);
         }
         
         // ==================== WLED智能灯条系统 ====================
@@ -11237,6 +12917,564 @@ ${(order.items || order.services || []).map((item, idx) => `${idx + 1}. ${item.n
                 console.log('或者直接在控制台测试: toggleSidebar()');
             });
         
+            // ============================================
+            // 灯条快速测试面板初始化（M端）
+            // ============================================
+            function initLightTestPanelM() {
+                const storeSelect = document.getElementById('light-store-id-select-m');
+                const onBtn = document.getElementById('quick-test-on-btn-m');
+                const offBtn = document.getElementById('quick-test-off-btn-m');
+                const pulseBtn = document.getElementById('quick-test-pulse-btn-m');
+                const checkBtn = document.getElementById('quick-test-check-btn-m');
+                const logPanel = document.getElementById('light-test-log-m');
+                
+                if (!logPanel) return; // 不在仪表盘页面时不初始化
+                
+                // 日志函数
+                function addLog(message, type = 'info') {
+                    const colors = {
+                        info: 'text-blue-600',
+                        success: 'text-green-600',
+                        error: 'text-red-600',
+                        warning: 'text-yellow-600'
+                    };
+                    const time = new Date().toLocaleTimeString();
+                    const logHtml = '<div class="' + colors[type] + '">[' + time + '] ' + message + '</div>';
+                    const placeholder = logPanel.querySelector('.text-gray-500');
+                    if (placeholder) placeholder.remove();
+                    logPanel.innerHTML += logHtml;
+                    logPanel.scrollTop = logPanel.scrollHeight;
+                }
+                
+                // 点亮按钮
+                if (onBtn) {
+                    onBtn.addEventListener('click', async () => {
+                        const storeId = storeSelect.value;
+                        addLog('正在点亮灯条 (门店: ' + storeId + ')...', 'info');
+                        try {
+                            const response = await fetch(API_BASE_URL + '/api/store/lights/' + storeId + '/turn-on-all', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ color: 'green', priority: 'high' })
+                            });
+                            const result = await response.json();
+                            if (result.success) {
+                                addLog('✅ 点亮成功: ' + (result.data?.message || '命令已发送'), 'success');
+                                if (result.data?.mqttConnected) {
+                                    addLog('📡 MQTT已连接，命令已发布到Broker', 'success');
+                                } else {
+                                    addLog('⚠️ MQTT未连接，模拟模式', 'warning');
+                                }
+                            } else {
+                                addLog('❌ 点亮失败: ' + result.error, 'error');
+                            }
+                        } catch (error) {
+                            addLog('❌ 请求失败: ' + error.message, 'error');
+                            addLog('💡 提示: 请确保后端服务正在运行', 'warning');
+                        }
+                    });
+                }
+                
+                // 关闭按钮
+                if (offBtn) {
+                    offBtn.addEventListener('click', async () => {
+                        const storeId = storeSelect.value;
+                        addLog('正在关闭灯条 (门店: ' + storeId + ')...', 'info');
+                        try {
+                            const response = await fetch(API_BASE_URL + '/api/store/lights/' + storeId + '/turn-off-all', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({})
+                            });
+                            const result = await response.json();
+                            if (result.success) {
+                                addLog('✅ 关闭成功: ' + (result.data?.message || '命令已发送'), 'success');
+                            } else {
+                                addLog('❌ 关闭失败: ' + result.error, 'error');
+                            }
+                        } catch (error) {
+                            addLog('❌ 请求失败: ' + error.message, 'error');
+                        }
+                    });
+                }
+                
+                // 闪烁按钮
+                if (pulseBtn) {
+                    pulseBtn.addEventListener('click', async () => {
+                        const storeId = storeSelect.value;
+                        addLog('正在闪烁提醒 (门店: ' + storeId + ')...', 'info');
+                        try {
+                            await fetch(API_BASE_URL + '/api/store/lights/' + storeId + '/turn-on-all', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ color: 'red', priority: 'high' })
+                            });
+                            addLog('⏳ 2秒后关闭...', 'info');
+                            setTimeout(async () => {
+                                await fetch(API_BASE_URL + '/api/store/lights/' + storeId + '/turn-off-all', {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({})
+                                });
+                                addLog('✅ 闪烁完成', 'success');
+                            }, 2000);
+                        } catch (error) {
+                            addLog('❌ 闪烁失败: ' + error.message, 'error');
+                        }
+                    });
+                }
+                
+                // 检查终端按钮
+                if (checkBtn) {
+                    checkBtn.addEventListener('click', async () => {
+                        addLog('正在检查终端状态...', 'info');
+                        try {
+                            const response = await fetch(API_BASE_URL + '/api/status', {
+                                method: 'GET'
+                            });
+                            const result = await response.json();
+                            if (result.success && result.data) {
+                                if (result.data.mqttConnected) {
+                                    addLog('✅ MQTT Broker已连接', 'success');
+                                } else {
+                                    addLog('❌ MQTT Broker未连接', 'error');
+                                }
+                            } else {
+                                addLog('❌ 检查失败: ' + result.error, 'error');
+                            }
+                        } catch (error) {
+                            addLog('❌ 请求失败: ' + error.message, 'error');
+                        }
+                    });
+                }
+                
+                console.log('【M端】灯条快速测试面板已初始化');
+            }
+        
+        console.log('【大脚本块】执行完毕，耗时:', (Date.now() - __bigScriptStartTime), 'ms');
+        
+        // ============================================
+        // 门店设置管理 - 服务类别/价格/促销 (移动端)
+        // ============================================
+        function initStoreSettings() {
+            var root = document.getElementById('store-settings-root');
+            if (!root) return;
+            
+            var config = StoreConfig.getConfig();
+            var activeTab = 'services';
+            var editing = { type: null, idx: -1 };
+            
+            function save() {
+                StoreConfig.saveConfig(null, config);
+                var toast = document.createElement('div');
+                toast.style.cssText = 'position:fixed;top:20px;left:50%;transform:translateX(-50%);background:#10b981;color:white;padding:10px 24px;border-radius:20px;z-index:9999;font-size:14px;font-weight:500;box-shadow:0 4px 12px rgba(0,0,0,0.2);';
+                toast.textContent = '✅ 设置已保存';
+                document.body.appendChild(toast);
+                setTimeout(function() { toast.style.opacity = '0'; toast.style.transition = 'opacity 0.3s'; setTimeout(function() { toast.remove(); }, 300); }, 1500);
+            }
+            
+            function switchTab(tab) { activeTab = tab; render(); }
+            
+            function render() {
+                var storeId = StoreConfig.getCurrentStoreId();
+                var tabsHtml = '<div style="display:flex;gap:6px;margin-bottom:16px;overflow-x:auto;">';
+                var tabs = [
+                    { id: 'categories', label: '📂 类别' },
+                    { id: 'services', label: '📋 服务' },
+                    { id: 'promotions', label: '🎁 促销' }
+                ];
+                tabs.forEach(function(t) {
+                    var isActive = t.id === activeTab;
+                    tabsHtml += '<button onclick="window._mStoreTab(\'' + t.id + '\')" style="flex:1;min-width:90px;padding:10px 8px;border:none;border-radius:10px;font-size:13px;font-weight:600;white-space:nowrap;' +
+                        (isActive ? 'background:#3b82f6;color:white;' : 'background:#f3f4f6;color:#6b7280;') + '">' + t.label + '</button>';
+                });
+                tabsHtml += '</div>';
+                
+                var contentHtml = '';
+                if (activeTab === 'categories') contentHtml = renderCats();
+                else if (activeTab === 'services') contentHtml = renderSvcs();
+                else if (activeTab === 'promotions') contentHtml = renderPromos();
+                
+                root.innerHTML = tabsHtml +
+                    '<div style="background:white;border-radius:12px;padding:16px;box-shadow:0 1px 3px rgba(0,0,0,0.08);">' +
+                    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px;">' +
+                    '<span style="font-size:12px;color:#9ca3af;">门店: <strong>' + storeId + '</strong></span>' +
+                    '<div style="display:flex;gap:6px;">' +
+                    '<button onclick="window._mStoreSave()" style="padding:6px 14px;background:#10b981;color:white;border:none;border-radius:6px;font-size:12px;font-weight:500;">💾 保存</button>' +
+                    '<button onclick="window._mStoreReset()" style="padding:6px 14px;background:#ef4444;color:white;border:none;border-radius:6px;font-size:12px;font-weight:500;">🔄 默认</button>' +
+                    '</div></div>' + contentHtml + '</div>';
+            }
+            
+            function renderCats() {
+                var cats = config.categories || [];
+                var html = '<div style="display:flex;flex-direction:column;gap:8px;">';
+                cats.forEach(function(cat, idx) {
+                    if (editing.type === 'cat' && editing.idx === idx) {
+                        // 行内编辑模式
+                        html += '<div style="background:#eff6ff;border:2px solid #3b82f6;border-radius:8px;padding:10px 12px;">' +
+                            '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">' +
+                            '<input id="medit-cat-icon-' + idx + '" value="' + (cat.icon || '📦') + '" style="width:44px;height:36px;text-align:center;font-size:18px;border:1px solid #d1d5db;border-radius:6px;outline:none;" placeholder="📦">' +
+                            '<input id="medit-cat-name-' + idx + '" value="' + (cat.name || '') + '" style="flex:1;height:36px;padding:0 10px;border:1px solid #d1d5db;border-radius:6px;font-size:14px;outline:none;" placeholder="类别名称">' +
+                            '</div>' +
+                            '<div style="display:flex;gap:6px;">' +
+                            '<button onclick="window._mStoreSaveCatEdit(' + idx + ')" style="flex:1;padding:8px;background:#10b981;color:white;border:none;border-radius:6px;font-size:13px;font-weight:500;">✅ 保存</button>' +
+                            '<button onclick="window._mStoreCancelEdit()" style="flex:1;padding:8px;background:#e5e7eb;color:#374151;border:none;border-radius:6px;font-size:13px;">取消</button>' +
+                            '</div></div>';
+                    } else {
+                        html += '<div style="display:flex;align-items:center;justify-content:space-between;background:#f9fafb;border-radius:8px;padding:10px 12px;">' +
+                            '<div style="display:flex;align-items:center;gap:8px;">' +
+                            '<span style="font-size:18px;">' + (cat.icon || '📂') + '</span>' +
+                            '<span style="font-weight:500;font-size:14px;">' + cat.name + '</span>' +
+                            '</div>' +
+                            '<button onclick="window._mStoreEditCat(' + idx + ')" style="background:none;border:none;color:#3b82f6;font-size:13px;padding:4px 8px;font-weight:500;">编辑</button>' +
+                            '</div>';
+                    }
+                });
+                html += '<button onclick="window._mStoreAddCat()" style="margin-top:8px;width:100%;padding:10px;background:#3b82f6;color:white;border:none;border-radius:8px;font-size:14px;font-weight:500;">+ 添加类别</button></div>';
+                return html;
+            }
+            
+            function renderSvcs() {
+                var svcs = config.services || [];
+                var cats = config.categories || [];
+                var catNames = cats.map(function(c) { return c.name; });
+                var html = '<div style="display:flex;flex-direction:column;gap:8px;">';
+                svcs.forEach(function(svc, idx) {
+                    var enabled = svc.enabled !== false;
+                    if (editing.type === 'svc' && editing.idx === idx) {
+                        // 行内编辑模式
+                        html += '<div style="background:#eff6ff;border:2px solid #3b82f6;border-radius:10px;padding:12px;">' +
+                            '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">' +
+                            '<input id="medit-svc-icon-' + idx + '" value="' + (svc.icon || '📦') + '" style="width:44px;height:36px;text-align:center;font-size:18px;border:1px solid #d1d5db;border-radius:6px;outline:none;">' +
+                            '<div style="flex:1;">' +
+                            '<input id="medit-svc-name-' + idx + '" value="' + (svc.name || '') + '" style="width:100%;height:36px;padding:0 10px;border:1px solid #d1d5db;border-radius:6px;font-size:14px;font-weight:600;outline:none;margin-bottom:4px;box-sizing:border-box;" placeholder="服务名称">' +
+                            '<div style="display:flex;gap:6px;">' +
+                            '<select id="medit-svc-cat-' + idx + '" style="flex:1;height:32px;padding:0 6px;border:1px solid #d1d5db;border-radius:6px;font-size:12px;outline:none;">' +
+                            catNames.map(function(cn) { return '<option value="' + cn + '"' + (svc.category === cn ? ' selected' : '') + '>' + cn + '</option>'; }).join('') +
+                            (catNames.indexOf(svc.category) === -1 ? '<option value="' + (svc.category || '') + '" selected>' + (svc.category || '') + '</option>' : '') +
+                            '</select>' +
+                            '</div>' +
+                            '</div>' +
+                            '</div>' +
+                            '<div style="display:flex;gap:6px;margin-bottom:6px;">' +
+                            '<div style="flex:1;"><label style="font-size:11px;color:#9ca3af;display:block;margin-bottom:2px;">价格 (¥)</label>' +
+                            '<input id="medit-svc-price-' + idx + '" type="number" value="' + svc.price + '" min="0" step="0.01" oninput="window._mStoreSyncPrice(' + idx + ',this.value)" style="width:100%;height:32px;padding:0 8px;border:1px solid #d1d5db;border-radius:6px;font-size:14px;font-weight:600;color:#059669;outline:none;box-sizing:border-box;"></div>' +
+                            '<div style="flex:1;"><label style="font-size:11px;color:#9ca3af;display:block;margin-bottom:2px;">描述</label>' +
+                            '<input id="medit-svc-desc-' + idx + '" value="' + (svc.desc || '') + '" style="width:100%;height:32px;padding:0 8px;border:1px solid #d1d5db;border-radius:6px;font-size:13px;outline:none;box-sizing:border-box;" placeholder="选填"></div>' +
+                            '</div>' +
+                            '<div style="display:flex;gap:6px;">' +
+                            '<button onclick="window._mStoreSaveSvcEdit(' + idx + ')" style="flex:1;padding:8px;background:#10b981;color:white;border:none;border-radius:6px;font-size:13px;font-weight:500;">✅ 保存</button>' +
+                            '<button onclick="window._mStoreCancelEdit()" style="flex:1;padding:8px;background:#e5e7eb;color:#374151;border:none;border-radius:6px;font-size:13px;">取消</button>' +
+                            '</div></div>';
+                    } else {
+                        html += '<div style="background:#f9fafb;border-radius:10px;padding:12px;' + (enabled ? '' : 'opacity:0.6;') + '">' +
+                            '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">' +
+                            '<div style="display:flex;align-items:center;gap:8px;">' +
+                            '<span style="font-size:20px;">' + (svc.icon || '📦') + '</span>' +
+                            '<div><div style="font-weight:600;font-size:14px;">' + svc.name + '</div>' +
+                            '<div style="font-size:11px;color:#9ca3af;">' + (svc.category || '-') + ' · ' + (svc.desc || '') + '</div></div>' +
+                            '</div>' +
+                            '<span style="font-weight:700;color:#059669;font-size:15px;">¥' + svc.price + '</span>' +
+                            '</div>' +
+                            '<div style="display:flex;gap:6px;">' +
+                            '<button onclick="window._mStoreEditSvc(' + idx + ')" style="flex:1;padding:6px;background:#3b82f6;color:white;border:none;border-radius:6px;font-size:12px;">✏️ 编辑</button>' +
+                            '<button onclick="window._mStoreToggleSvc(' + idx + ')" style="flex:1;padding:6px;background:' + (enabled ? '#f59e0b' : '#10b981') + ';color:white;border:none;border-radius:6px;font-size:12px;">' + (enabled ? '禁用' : '启用') + '</button>' +
+                            '</div></div>';
+                    }
+                });
+                html += '<button onclick="window._mStoreAddSvc()" style="margin-top:8px;width:100%;padding:10px;background:#3b82f6;color:white;border:none;border-radius:8px;font-size:14px;font-weight:500;">+ 添加服务</button></div>';
+                return html;
+            }
+            
+            function renderPromos() {
+                var promos = config.promotions || [];
+                var html = '<div style="display:flex;flex-direction:column;gap:8px;">';
+                promos.forEach(function(promo, idx) {
+                    var typeColor = promo.type === 'discount' ? '#8b5cf6' : '#f59e0b';
+                    var typeLabel = promo.type === 'discount' ? '折扣' : '满减';
+                    var detail = promo.type === 'discount' ? ('打' + (100 - promo.discountPercent) + '折') : ('满¥' + promo.threshold + '减¥' + promo.reduce);
+                    var conditionLabel = promo.condition === 'pickup' ? ' [自取]' : (promo.condition === 'first_order' ? ' [首单]' : '');
+                    var enabled = promo.enabled !== false;
+                    
+                    if (editing.type === 'promo' && editing.idx === idx) {
+                        // 行内编辑模式
+                        html += '<div style="background:#eff6ff;border:2px solid #3b82f6;border-radius:10px;padding:12px;">' +
+                            '<div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;">' +
+                            '<span style="padding:3px 10px;border-radius:12px;font-size:11px;font-weight:600;color:white;background:' + typeColor + ';">' + typeLabel + '</span>' +
+                            '<input id="medit-promo-name-' + idx + '" value="' + (promo.name || '') + '" style="flex:1;height:32px;padding:0 8px;border:1px solid #d1d5db;border-radius:6px;font-size:13px;font-weight:600;outline:none;" placeholder="促销名称">' +
+                            '</div>';
+                        if (promo.type === 'discount') {
+                            html += '<div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;">' +
+                                '<label style="font-size:11px;color:#6b7280;">折扣%:</label>' +
+                                '<input id="medit-promo-pct-' + idx + '" type="number" value="' + promo.discountPercent + '" min="1" max="99" style="width:70px;height:32px;padding:0 8px;border:1px solid #d1d5db;border-radius:6px;font-size:13px;outline:none;">' +
+                                '<span style="font-size:10px;color:#9ca3af;">10=9折</span>' +
+                                '</div>';
+                        } else {
+                            html += '<div style="display:flex;align-items:center;gap:4px;margin-bottom:8px;">' +
+                                '<label style="font-size:11px;color:#6b7280;">满¥</label>' +
+                                '<input id="medit-promo-th-' + idx + '" type="number" value="' + promo.threshold + '" min="0" style="width:70px;height:32px;padding:0 8px;border:1px solid #d1d5db;border-radius:6px;font-size:13px;outline:none;">' +
+                                '<label style="font-size:11px;color:#6b7280;">减¥</label>' +
+                                '<input id="medit-promo-rd-' + idx + '" type="number" value="' + promo.reduce + '" min="0" style="width:70px;height:32px;padding:0 8px;border:1px solid #d1d5db;border-radius:6px;font-size:13px;outline:none;">' +
+                                '</div>';
+                        }
+                        html += '<div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;">' +
+                            '<label style="font-size:11px;color:#6b7280;">条件:</label>' +
+                            '<select id="medit-promo-cond-' + idx + '" style="flex:1;height:32px;padding:0 6px;border:1px solid #d1d5db;border-radius:6px;font-size:12px;outline:none;">' +
+                            '<option value=""' + (!promo.condition ? ' selected' : '') + '>无条件</option>' +
+                            '<option value="pickup"' + (promo.condition === 'pickup' ? ' selected' : '') + '>仅自取</option>' +
+                            '<option value="first_order"' + (promo.condition === 'first_order' ? ' selected' : '') + '>仅首单</option>' +
+                            '</select>' +
+                            '</div>' +
+                            '<div style="margin-bottom:8px;">' +
+                            '<input id="medit-promo-desc-' + idx + '" value="' + (promo.desc || '') + '" style="width:100%;height:32px;padding:0 8px;border:1px solid #d1d5db;border-radius:6px;font-size:12px;outline:none;box-sizing:border-box;" placeholder="描述（选填）">' +
+                            '</div>' +
+                            '<div style="display:flex;gap:6px;">' +
+                            '<button onclick="window._mStoreSavePromoEdit(' + idx + ')" style="flex:1;padding:8px;background:#10b981;color:white;border:none;border-radius:6px;font-size:13px;font-weight:500;">✅ 保存</button>' +
+                            '<button onclick="window._mStoreCancelEdit()" style="flex:1;padding:8px;background:#e5e7eb;color:#374151;border:none;border-radius:6px;font-size:13px;">取消</button>' +
+                            '</div></div>';
+                    } else {
+                        html += '<div style="background:#f9fafb;border-radius:10px;padding:12px;' + (enabled ? '' : 'opacity:0.6;') + '">' +
+                            '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">' +
+                            '<div style="display:flex;align-items:center;gap:8px;">' +
+                            '<span style="padding:3px 10px;border-radius:12px;font-size:11px;font-weight:600;color:white;background:' + typeColor + ';">' + typeLabel + '</span>' +
+                            '<span style="font-weight:600;font-size:14px;">' + promo.name + conditionLabel + '</span>' +
+                            '</div>' +
+                            '<span style="font-size:11px;color:#6b7280;">' + detail + '</span>' +
+                            '</div>' +
+                            '<div style="display:flex;gap:6px;">' +
+                            '<button onclick="window._mStoreEditPromo(' + idx + ')" style="flex:1;padding:6px;background:#3b82f6;color:white;border:none;border-radius:6px;font-size:12px;">✏️ 编辑</button>' +
+                            '<button onclick="window._mStoreTogglePromo(' + idx + ')" style="flex:1;padding:6px;background:' + (enabled ? '#f59e0b' : '#10b981') + ';color:white;border:none;border-radius:6px;font-size:12px;">' + (enabled ? '禁用' : '启用') + '</button>' +
+                            '</div></div>';
+                    }
+                });
+                html += '<button onclick="window._mStoreAddPromo()" style="margin-top:8px;width:100%;padding:10px;background:#3b82f6;color:white;border:none;border-radius:8px;font-size:14px;font-weight:500;">+ 添加促销</button></div>';
+                return html;
+            }
+            
+            // ---- 服务类别操作（行内编辑）----
+            window._mStoreAddCat = function() {
+                var name = prompt('新类别名称：');
+                if (!name || !name.trim()) return;
+                var icon = prompt('图标emoji：', '📦') || '📦';
+                (config.categories || []).push({ id: StoreConfig.genId('cat'), name: name.trim(), icon: icon });
+                render();
+            };
+            window._mStoreEditCat = function(idx) {
+                editing = { type: 'cat', idx: idx };
+                render();
+            };
+            window._mStoreSaveCatEdit = function(idx) {
+                var cat = (config.categories || [])[idx];
+                if (!cat) return;
+                var name = (document.getElementById('medit-cat-name-' + idx) || {}).value;
+                var icon = (document.getElementById('medit-cat-icon-' + idx) || {}).value;
+                if (!name || !name.trim()) { alert('类别名称不能为空'); return; }
+                cat.name = name.trim();
+                cat.icon = icon || '📦';
+                editing = { type: null, idx: -1 };
+                save();
+                render();
+            };
+            
+            // ---- 服务项目操作（行内编辑）----
+            window._mStoreAddSvc = function() {
+                var name = prompt('服务名称：');
+                if (!name || !name.trim()) return;
+                var cats = (config.categories || []).map(function(c) { return c.name; }).join('/') || '衣物清洗';
+                var category = prompt('所属类别（' + cats + '）：', config.categories && config.categories[0] ? config.categories[0].name : '衣物清洗') || '衣物清洗';
+                var price = parseFloat(prompt('价格（元）：', '50'));
+                if (isNaN(price) || price <= 0) { alert('请输入有效价格'); return; }
+                var icon = prompt('图标emoji：', '📦') || '📦';
+                var desc = prompt('描述：', '') || '';
+                (config.services || []).push({ id: StoreConfig.genId('svc'), name: name.trim(), category: category, price: price, icon: icon, desc: desc, enabled: true });
+                render();
+            };
+            window._mStoreEditSvc = function(idx) {
+                editing = { type: 'svc', idx: idx };
+                render();
+            };
+            // 实时同步价格输入框到config（避免跳过快照保存导致丢失修改）
+            window._mStoreSyncPrice = function(idx, val) {
+                var svc = (config.services || [])[idx];
+                var p = parseFloat(val);
+                if (svc && !isNaN(p) && p >= 0) { svc.price = p; }
+            };
+            window._mStoreSaveSvcEdit = function(idx) {
+                var svc = (config.services || [])[idx];
+                if (!svc) return;
+                var name = (document.getElementById('medit-svc-name-' + idx) || {}).value;
+                var category = (document.getElementById('medit-svc-cat-' + idx) || {}).value;
+                var price = parseFloat((document.getElementById('medit-svc-price-' + idx) || {}).value);
+                var icon = (document.getElementById('medit-svc-icon-' + idx) || {}).value;
+                var desc = (document.getElementById('medit-svc-desc-' + idx) || {}).value;
+                if (!name || !name.trim()) { alert('服务名称不能为空'); return; }
+                if (isNaN(price) || price <= 0) { alert('请输入有效价格'); return; }
+                svc.name = name.trim();
+                svc.category = category || svc.category;
+                svc.price = price;
+                svc.icon = icon || '📦';
+                svc.desc = desc || '';
+                editing = { type: null, idx: -1 };
+                save();
+                render();
+            };
+            window._mStoreToggleSvc = function(idx) {
+                var svc = (config.services || [])[idx];
+                if (svc) { svc.enabled = !svc.enabled; save(); render(); }
+            };
+            
+            // ---- 促销操作（行内编辑）----
+            window._mStoreAddPromo = function() {
+                var type = prompt('促销类型（1=折扣 2=满减）：', '1');
+                if (!type) return;
+                var name, promoData = { id: StoreConfig.genId('promo'), enabled: true };
+                if (type === '1') {
+                    promoData.type = 'discount';
+                    name = prompt('名称（如：自取9折）：');
+                    if (!name || !name.trim()) return;
+                    promoData.name = name.trim();
+                    var pct = parseFloat(prompt('折扣百分比（10=9折）：', '10'));
+                    if (isNaN(pct) || pct <= 0 || pct >= 100) { alert('请输入1-99'); return; }
+                    promoData.discountPercent = pct;
+                    var cond = prompt('适用条件（pickup=自取 first_order=首单，留空=无条件）：');
+                    if (cond === 'pickup') promoData.condition = 'pickup';
+                    else if (cond === 'first_order') promoData.condition = 'first_order';
+                    promoData.desc = prompt('描述：', '') || '';
+                } else if (type === '2') {
+                    promoData.type = 'full_reduce';
+                    name = prompt('名称（如：满100减15）：');
+                    if (!name || !name.trim()) return;
+                    promoData.name = name.trim();
+                    var th = parseFloat(prompt('满额门槛：', '100'));
+                    if (isNaN(th) || th <= 0) { alert('无效金额'); return; }
+                    promoData.threshold = th;
+                    var rd = parseFloat(prompt('减免金额：', '15'));
+                    if (isNaN(rd) || rd <= 0) { alert('无效金额'); return; }
+                    promoData.reduce = rd;
+                    promoData.desc = prompt('描述：', '') || '';
+                } else { return; }
+                (config.promotions || []).push(promoData);
+                render();
+            };
+            window._mStoreEditPromo = function(idx) {
+                editing = { type: 'promo', idx: idx };
+                render();
+            };
+            window._mStoreSavePromoEdit = function(idx) {
+                var promo = (config.promotions || [])[idx];
+                if (!promo) return;
+                var name = (document.getElementById('medit-promo-name-' + idx) || {}).value;
+                var desc = (document.getElementById('medit-promo-desc-' + idx) || {}).value;
+                var cond = (document.getElementById('medit-promo-cond-' + idx) || {}).value;
+                if (!name || !name.trim()) { alert('促销名称不能为空'); return; }
+                promo.name = name.trim();
+                promo.desc = desc || '';
+                promo.condition = cond || undefined;
+                if (promo.type === 'discount') {
+                    var pct = parseFloat((document.getElementById('medit-promo-pct-' + idx) || {}).value);
+                    if (isNaN(pct) || pct <= 0 || pct >= 100) { alert('折扣百分比需在1-99之间'); return; }
+                    promo.discountPercent = pct;
+                } else {
+                    var th = parseFloat((document.getElementById('medit-promo-th-' + idx) || {}).value);
+                    var rd = parseFloat((document.getElementById('medit-promo-rd-' + idx) || {}).value);
+                    if (isNaN(th) || th <= 0 || isNaN(rd) || rd <= 0) { alert('请输入有效金额'); return; }
+                    promo.threshold = th;
+                    promo.reduce = rd;
+                }
+                editing = { type: null, idx: -1 };
+                save();
+                render();
+            };
+            window._mStoreTogglePromo = function(idx) {
+                var promo = (config.promotions || [])[idx];
+                if (promo) { promo.enabled = !promo.enabled; save(); render(); }
+            };
+            
+            // 统一取消编辑
+            window._mStoreCancelEdit = function() {
+                editing = { type: null, idx: -1 };
+                render();
+            };
+            
+            // 保存/重置
+            window._mStoreSave = function() { save(); };
+            window._mStoreReset = function() {
+                if (!confirm('确定恢复默认配置？当前设置将丢失！')) return;
+                StoreConfig.resetConfig(null);
+                config = StoreConfig.getConfig();
+                render();
+            };
+            window._mStoreTab = function(tab) { switchTab(tab); };
+            
+            render();
+            
+            // 监听其他标签页/桌面端的配置变更，自动同步
+            window.addEventListener('storage', function(e) {
+                if (e.key && e.key.indexOf('store_') === 0 && e.key.indexOf('_config') > 0) {
+                    try {
+                        var fresh = StoreConfig.getConfig();
+                        if (fresh && fresh.updatedAt !== (config.updatedAt || 0)) {
+                            config.categories = fresh.categories;
+                            config.services = fresh.services;
+                            config.promotions = fresh.promotions;
+                            config.updatedAt = fresh.updatedAt;
+                            render();
+                            var syncToast = document.createElement('div');
+                            syncToast.style.cssText = 'position:fixed;top:20px;left:50%;transform:translateX(-50%);background:#3b82f6;color:white;padding:10px 24px;border-radius:20px;z-index:9999;font-size:14px;box-shadow:0 4px 12px rgba(0,0,0,0.2);';
+                            syncToast.textContent = '🔄 门店配置已同步';
+                            document.body.appendChild(syncToast);
+                            setTimeout(function() { syncToast.style.opacity = '0'; syncToast.style.transition = 'opacity 0.3s'; setTimeout(function() { syncToast.remove(); }, 300); }, 1800);
+                        }
+                    } catch(ignore) {}
+                }
+            });
+        }
     </script>
+    
+    <!-- ========== 相机扫码取景器模态框 ========== -->
+    <div id="camera-scanner-modal" class="hidden">
+        <!-- 顶部工具栏 -->
+        <div style="position:absolute;top:0;left:0;right:0;z-index:100;display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:rgba(0,0,0,0.6);backdrop-filter:blur(8px);color:#fff;">
+            <button onclick="stopCameraScan()" style="background:rgba(255,255,255,0.2);border:none;color:#fff;width:36px;height:36px;border-radius:50%;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;">
+                <i class="fa fa-arrow-left"></i>
+            </button>
+            <span style="font-size:15px;font-weight:600;">📷 扫描物品条码</span>
+            <select id="camera-barcode-select" onchange="restartCameraScan(this.value)">
+                <option value="code_128">Code 128</option>
+                <option value="code_39">Code 39</option>
+                <option value="ean_13">EAN-13</option>
+                <option value="ean_8">EAN-8</option>
+                <option value="upc_a">UPC-A</option>
+                <option value="upc_e">UPC-E</option>
+            </select>
+        </div>
+        
+        <!-- 取景器 -->
+        <div id="camera-scanner-view">
+            <div id="camera-reader" style="width:100%;"></div>
+            <div class="scan-line"></div>
+            <div class="scan-corners"></div>
+            <div class="scan-corners-bottom"></div>
+        </div>
+        
+        <!-- 底部提示 -->
+        <div style="position:absolute;bottom:0;left:0;right:0;z-index:100;padding:20px 16px;background:rgba(0,0,0,0.6);backdrop-filter:blur(8px);text-align:center;">
+            <p style="color:#9ca3af;font-size:13px;margin-bottom:12px;">将条码对准取景框内，自动识别</p>
+            <div style="display:flex;gap:10px;justify-content:center;">
+                <button onclick="switchCameraFacing()" style="background:rgba(255,255,255,0.2);border:none;color:#fff;padding:8px 20px;border-radius:20px;font-size:14px;cursor:pointer;">
+                    <i class="fa fa-sync-alt mr-1"></i>切换镜头
+                </button>
+                <button onclick="toggleFlashlight()" style="background:rgba(255,255,255,0.2);border:none;color:#fff;padding:8px 20px;border-radius:20px;font-size:14px;cursor:pointer;" id="camera-flash-btn">
+                    <i class="fa fa-bolt mr-1"></i>手电筒
+                </button>
+            </div>
+        </div>
+        
+        <!-- 扫描结果提示 -->
+        <div id="camera-scan-result" style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);z-index:90;background:rgba(74,222,128,0.95);color:#000;padding:12px 28px;border-radius:12px;font-size:16px;font-weight:700;display:none;text-align:center;box-shadow:0 4px 20px rgba(0,0,0,0.3);">
+            识别成功 ✓
+        </div>
+    </div>
+
 </body>
 </html>

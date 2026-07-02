@@ -512,6 +512,15 @@ const UserModel = {
   // 关联门店（门店员工/老板）
   storeId: { type: 'string' },
   
+  // 数据来源和层级关系
+  registrationSource: { 
+    type: 'enum', 
+    enum: ['web_customer', 'wechat_mini', 'store_app', 'admin_system', 'unknown'],
+    default: 'unknown'
+  },  // 注册来源：C端网页、微信小程序、门店APP、后台系统
+  sourcePlatform: { type: 'string' },  // 来源平台标识
+  chainId: { type: 'string', index: true },  // 所属连锁ID（通过门店关联）
+  
   // 元数据
   createdAt: { type: 'datetime', default: 'now' },
   updatedAt: { type: 'datetime', default: 'now' },
@@ -593,6 +602,9 @@ const StoreModel = {
     schema: {
       totalOrders: { type: 'number', default: 0 },
       monthlyOrders: { type: 'number', default: 0 },
+      totalUsers: { type: 'number', default: 0 },  // 累计用户数
+      monthlyUsers: { type: 'number', default: 0 },  // 月度新增用户
+      dailyUsers: { type: 'number', default: 0 },  // 日新增用户
       rating: { type: 'number', default: 5.0 },
       ratingCount: { type: 'number', default: 0 }
     }

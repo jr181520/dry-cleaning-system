@@ -12,6 +12,8 @@
     <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
     <!-- 统一数据同步模块 -->
     <script src="js/unified-sync.js"></script>
+    <!-- 多品类管理器 -->
+    <script src="js/category-manager.js"></script>
     
     <script>
         tailwind.config = {
@@ -235,6 +237,18 @@
         .animate-fadeIn {
             animation: fadeIn 0.5s ease-out forwards;
         }
+
+        /* 品类选择标签 */
+        .category-tabs { scrollbar-width: none; -ms-overflow-style: none; }
+        .category-tabs::-webkit-scrollbar { display: none; }
+
+        .category-tab {
+            min-width: 64px;
+            transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .category-tab:active {
+            transform: scale(0.95);
+        }
     </style>
 </head>
 <body class="bg-gray-100 min-h-screen pb-24">
@@ -327,12 +341,17 @@
         </div>
     </div>
 
+    <!-- 品类选择 -->
+    <div class="px-4 mb-6" id="category-tabs-container">
+        <!-- 品类标签将通过 CategoryManager 动态加载 -->
+    </div>
+
     <!-- 热门服务 -->
     <div class="px-4 mb-6">
         <div class="flex items-center justify-between mb-4">
             <div class="flex items-center gap-2">
-                <span class="text-2xl">✨</span>
-                <span class="text-lg font-bold text-gray-800">热门服务</span>
+                <span class="text-2xl" id="service-section-icon">✨</span>
+                <span class="text-lg font-bold text-gray-800" id="service-section-title">热门服务</span>
             </div>
             <div onclick="goToServices()" class="flex items-center gap-1 text-gray-500 cursor-pointer">
                 <span class="text-sm">查看全部</span>
@@ -340,7 +359,7 @@
             </div>
         </div>
         <div class="grid grid-cols-2 gap-4" id="services-grid">
-            <!-- 服务项将通过JavaScript动态加载 -->
+            <!-- 服务项将通过 CategoryManager 动态加载 -->
         </div>
     </div>
 
@@ -420,11 +439,11 @@
             }
             
             await loadModuleConfig();
-            loadServices();
+            initCategoryTabs();  // 初始化品类选择器 + 服务列表（内含loadServices）
             loadStores();
             
-            // 启动统一数据同步（从后端获取最新订单）
-            UnifiedSync.start();
+            // ⚠️ 轮询同步已禁用 — 页面直接通过 API 加载数据
+            // 如需启用轮询，取消下行注释：UnifiedSync.start();
             loadPendingOrders();
             renderDynamicNav();
             
@@ -492,11 +511,37 @@
             }
         }
 
-        // 加载服务列表
+        // 加载服务列表（使用品类管理器）
+        // SaaS模式：所有价格由门店商家设定，C端首页仅展示服务项目
         function loadServices() {
+            // 获取当前选中品类
+            const activeCategory = CategoryManager.getSelectedCategory();
+            const categoryId = activeCategory ? activeCategory.id : 'cleaning';
+            const cat = CategoryManager.getCategory(categoryId);
+            const services = CategoryManager.getServices(categoryId);
+
+            // 更新标题
+            const titleEl = document.getElementById('service-section-title');
+            const iconEl = document.getElementById('service-section-icon');
+            if (titleEl && cat) titleEl.textContent = cat.name + '服务';
+            if (iconEl && cat) iconEl.textContent = cat.icon;
+
             const container = document.getElementById('services-grid');
-            container.innerHTML = services.map(service => `
-                <div class="service-card cursor-pointer" onclick="selectService(${service.id})">
+            if (!container) return;
+
+            const isRental = cat && cat.category === 'rental';
+
+            container.innerHTML = services.map(service => {
+                var priceHtml = '';
+                if (service.isBoarding) {
+                    priceHtml = '<span class="text-xs text-green-600 font-medium">按天计费</span>';
+                } else if (isRental) {
+                    priceHtml = '<span class="text-xs text-gray-400">' + (service.unit || '') + '</span>';
+                } else {
+                    priceHtml = '<span class="text-xs text-blue-500 font-medium">门店定价</span>';
+                }
+                return `
+                <div class="service-card cursor-pointer" onclick="CategoryManager.selectService('${categoryId}', '${service.id}')">
                     <div class="service-icon-wrapper">
                         <span class="text-4xl">${service.icon}</span>
                     </div>
@@ -505,14 +550,27 @@
                         <span class="text-sm text-gray-500">${service.desc}</span>
                     </div>
                     <div class="flex items-center justify-between pt-4 border-t border-gray-100">
-                        <span class="price-tag">¥${service.price}</span>
+                        ${priceHtml}
+                        ${service.deposit ? '<span class="text-xs text-orange-500">押¥' + service.deposit + '</span>' : ''}
                         <div class="btn-primary">
                             <span class="text-white text-sm font-semibold">预约</span>
                         </div>
                     </div>
                 </div>
-            `).join('');
+            `}).join('');
         }
+
+        // 初始化品类选择器
+        function initCategoryTabs() {
+            CategoryManager.renderCategoryTabs('category-tabs-container');
+            loadServices();
+        }
+        // 品类切换回调
+        window.onCategoryChange = function(categoryId) {
+            CategoryManager.selectCategory(categoryId);
+            CategoryManager.renderCategoryTabs('category-tabs-container');
+            loadServices();
+        };
 
         // 加载门店列表
         function loadStores() {

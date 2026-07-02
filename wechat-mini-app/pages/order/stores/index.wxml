@@ -2,46 +2,32 @@
   <!-- 页面头部 -->
   <view class="page-header">
     <view class="header-content">
-      <text class="page-title">选择门店</text>
-      <text class="page-subtitle">根据您的需求选择最合适的门店</text>
+      <text class="page-title">智慧推荐</text>
+      <text class="page-subtitle">🧠 综合多维度为您匹配最佳门店</text>
     </view>
   </view>
 
-  <!-- 已选服务摘要 -->
-  <view class="selected-services-summary" wx:if="{{serviceDetails.length > 0}}">
-    <view class="summary-header">
-      <text class="summary-icon">📋</text>
-      <text class="summary-title">已选服务</text>
-      <text class="summary-count">{{serviceDetails.length}}项</text>
-    </view>
-    <view class="summary-services">
-      <view class="service-tag" wx:for="{{serviceDetails}}" wx:key="id">
-        <text class="tag-icon">{{item.icon}}</text>
-        <text class="tag-name">{{item.name}}</text>
-        <text class="tag-price">¥{{item.price}}</text>
-      </view>
-    </view>
-    <view class="summary-footer">
-      <text class="total-label">服务费用合计</text>
-      <text class="total-price">¥{{serviceTotalPrice}}</text>
+  <!-- 已选服务简要提示 -->
+  <view class="selected-services-hint" wx:if="{{serviceCount > 0}}">
+    <text class="hint-text">已选 <text class="hint-count">{{serviceCount}}</text> 项服务，价格由各门店决定</text>
+  </view>
+
+  <!-- 推荐选项卡 Tab Bar -->
+  <view class="recommend-tabs-bar">
+    <view 
+      class="recommend-tab {{item.active ? 'active' : ''}}" 
+      wx:for="{{recommendTabs}}" 
+      wx:key="id"
+      bindtap="onSwitchTab"
+      data-id="{{item.id}}"
+    >
+      <text class="tab-icon-text">{{item.icon}}</text>
+      <text class="tab-label-text">{{item.label}}</text>
     </view>
   </view>
 
-  <!-- 排序和筛选 -->
+  <!-- 筛选栏 -->
   <view class="filter-bar">
-    <view class="sort-options">
-      <view 
-        class="sort-item {{item.active ? 'active' : ''}}" 
-        wx:for="{{sortOptions}}" 
-        wx:key="id"
-        bindtap="onSortChange"
-        data-id="{{item.id}}"
-      >
-        <text class="sort-icon">{{item.icon}}</text>
-        <text class="sort-label">{{item.label}}</text>
-      </view>
-    </view>
-    
     <view class="filter-actions">
       <checkbox-group bindchange="onFilterChange" data-type="promotion">
         <label class="filter-checkbox">
@@ -56,18 +42,30 @@
         </label>
       </checkbox-group>
     </view>
+    <text class="filter-count">共 {{displayStores.length}} 家</text>
+  </view>
+
+  <!-- 加载中 -->
+  <view class="loading-state" wx:if="{{loading}}">
+    <view class="loading-spinner"></view>
+    <text class="loading-text">智慧大脑计算中...</text>
+  </view>
+
+  <!-- 错误提示 -->
+  <view class="error-hint" wx:if="{{loadError && !loading}}">
+    <text class="error-text">⚠️ 推荐引擎暂时不可用，显示默认门店列表</text>
   </view>
 
   <!-- 门店列表 -->
-  <view class="store-list">
+  <view class="store-list" wx:if="{{!loading}}">
     <view 
-      class="store-card" 
-      wx:for="{{stores}}" 
+      class="store-card {{!item.isOnline ? 'offline' : ''}}" 
+      wx:for="{{displayStores}}" 
       wx:key="id"
       bindtap="onSelectStore"
       data-id="{{item.id}}"
     >
-      <!-- 门店信息 -->
+      <!-- 门店基本信息 -->
       <view class="store-main">
         <view class="store-header">
           <view class="store-title-row">
@@ -85,9 +83,7 @@
               <text class="rating-value">{{item.rating}}</text>
             </view>
             <view class="store-meta">
-              <text class="meta-item">{{item.serviceCount}}项服务</text>
-              <text class="meta-divider">|</text>
-              <text class="meta-item">最低¥{{item.minPrice}}</text>
+              <text class="meta-item">{{item.distance}}</text>
             </view>
           </view>
         </view>
@@ -97,17 +93,13 @@
             <text class="location-icon">📍</text>
             <text class="location-text">{{item.address}}</text>
           </view>
-          <view class="distance-row">
-            <text class="distance-icon">🚗</text>
-            <text class="distance-value">{{item.distance}}</text>
-          </view>
         </view>
         
         <!-- 标签 -->
-        <view class="store-tags" wx:if="{{item.isPromotion || item.isRecommended}}">
-          <view class="tag promotion" wx:if="{{item.isPromotion}}">
+        <view class="store-tags" wx:if="{{item.hasPromotion || item.isRecommended}}">
+          <view class="tag promotion" wx:if="{{item.hasPromotion}}">
             <text class="tag-icon">🔥</text>
-            <text class="tag-text">{{item.promotionDesc || '促销中'}}</text>
+            <text class="tag-text">促销中</text>
           </view>
           <view class="tag recommended" wx:if="{{item.isRecommended}}">
             <text class="tag-icon">⭐</text>
@@ -115,16 +107,37 @@
           </view>
         </view>
         
-        <!-- 价格和配送信息 -->
-        <view class="store-pricing">
-          <view class="price-info">
-            <text class="price-label">基础配送费</text>
-            <text class="price-value">¥{{item.baseDeliveryFee}}</text>
+        <!-- 价格明细（来自推荐API） -->
+        <view class="store-pricing-breakdown" wx:if="{{item.matchedServices.length > 0}}">
+          <view class="pricing-header">
+            <text class="pricing-label">{{activeTab === 'comprehensive' ? '🧠' : activeTab === 'nearby' ? '📍' : '💰'}} 您选择的 {{item.matchedServices.length}} 项服务</text>
           </view>
-          <view class="service-info">
-            <text class="service-label">预计费用</text>
-            <text class="service-value">¥{{serviceTotalPrice + item.baseDeliveryFee}}</text>
+          <view class="pricing-items">
+            <view class="pricing-item" wx:for="{{item.matchedServices}}" wx:key="serviceId" wx:for-item="svcItem">
+              <view class="pricing-item-left">
+                <text class="pricing-item-name">{{svcItem.icon}} {{svcItem.name}}</text>
+                <text class="pricing-item-boarding" wx:if="{{svcItem.isBoarding}}">（{{svcItem.boardingDetail.petName}} {{svcItem.boardingDetail.days}}天）</text>
+              </view>
+              <text class="pricing-item-price">¥{{svcItem.price}}</text>
+            </view>
           </view>
+          <view class="pricing-promo-row" wx:if="{{item.discount > 0}}">
+            <text class="promo-label">促销优惠</text>
+            <text class="promo-value">-¥{{item.discount}}</text>
+          </view>
+          <view class="pricing-total-row">
+            <text class="total-label">服务费小计</text>
+            <text class="total-value">¥{{item.finalPrice}}</text>
+          </view>
+          <view class="pricing-delivery-row">
+            <text class="delivery-label">配送费</text>
+            <text class="delivery-value">选择配送方式后计算</text>
+          </view>
+        </view>
+        
+        <!-- 无报价时 -->
+        <view class="no-pricing" wx:if="{{item.matchedServices.length === 0}}">
+          <text class="no-pricing-text">价格由门店决定，选择后可见</text>
         </view>
       </view>
       
@@ -149,21 +162,28 @@
           </view>
         </view>
         
-        <view class="select-btn">
-          <text class="btn-text">选择</text>
+        <view class="select-btn {{!item.isOnline ? 'disabled' : ''}}">
+          <text class="btn-text">{{item.isOnline ? '选择' : '休息中'}}</text>
           <text class="btn-arrow">→</text>
         </view>
       </view>
     </view>
+    
+    <!-- 空状态 -->
+    <view class="empty-state" wx:if="{{displayStores.length === 0}}">
+      <text class="empty-icon">🔍</text>
+      <text class="empty-text">暂无符合条件的门店</text>
+      <text class="empty-sub">尝试调整筛选条件</text>
+    </view>
   </view>
 
   <!-- 门店数量提示 -->
-  <view class="list-footer">
-    <text class="footer-text">共找到 {{stores.length}} 家门店</text>
+  <view class="list-footer" wx:if="{{!loading && displayStores.length > 0}}">
+    <text class="footer-text">以上为{{activeTab === 'comprehensive' ? '综合推荐' : activeTab === 'nearby' ? '附近推荐' : '价优推荐'}}结果</text>
   </view>
   
   <!-- 暂不选择门店按钮 -->
-  <view class="skip-section">
+  <view class="skip-section" wx:if="{{!loading}}">
     <view class="skip-button" bindtap="onSkipStore">
       <text class="skip-icon">⏭️</text>
       <text class="skip-text">暂不选择门店</text>

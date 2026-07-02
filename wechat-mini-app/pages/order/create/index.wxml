@@ -3,8 +3,25 @@
   <view class="page-header">
     <view class="header-content">
       <text class="page-title">选择服务</text>
-      <text class="page-subtitle">请选择您需要的服务项目</text>
+      <text class="page-subtitle">{{currentCategory.icon}} {{currentCategory.name}} - 请选择您需要的服务项目</text>
     </view>
+  </view>
+
+  <!-- 品类选择标签 -->
+  <view class="category-tabs-section">
+    <scroll-view scroll-x="true" class="category-scroll">
+      <view 
+        class="category-tab {{activeCategory === item.id ? 'active' : ''}}"
+        wx:for="{{categories}}" 
+        wx:key="id" 
+        bindtap="onSwitchCategory" 
+        data-id="{{item.id}}"
+        style="{{activeCategory === item.id ? 'background:' + item.color + ';color:#fff;border-color:' + item.color + ';' : ''}}"
+      >
+        <text class="tab-icon">{{item.icon}}</text>
+        <text class="tab-name">{{item.name}}</text>
+      </view>
+    </scroll-view>
   </view>
 
   <!-- 服务列表 -->
@@ -21,10 +38,12 @@
         <view class="service-info">
           <text class="service-name">{{item.name}}</text>
           <text class="service-desc">{{item.desc}}</text>
+          <text class="service-unit" wx:if="{{item.unit}}">单位：{{item.unit}}</text>
         </view>
       </view>
       <view class="service-footer">
-        <text class="service-price">¥{{item.price}}</text>
+        <text class="service-price-hint">价格由门店决定</text>
+        <text class="service-deposit" wx:if="{{item.deposit}}">押¥{{item.deposit}}</text>
         <view class="service-checkbox {{item.selected ? 'checked' : ''}}">
           <text class="check-icon" wx:if="{{item.selected}}">✓</text>
         </view>
@@ -32,12 +51,18 @@
     </view>
   </view>
 
-  <!-- 底部摘要栏 -->
+  <!-- 空状态 -->
+  <view class="empty-state" wx:if="{{!loading && services.length === 0}}">
+    <text class="empty-icon">📦</text>
+    <text class="empty-text">该品类暂未上架服务</text>
+  </view>
+
+  <!-- 底部摘要栏 — 只显示数量不显示价格，价格由门店决定 -->
   <view class="bottom-bar">
     <view class="bar-content">
       <view class="selected-summary">
-        <text class="summary-text">已选 {{selectedServices.length}} 项服务</text>
-        <text class="summary-price">¥{{totalPrice}}</text>
+        <text class="summary-text">已选 <text class="summary-count">{{serviceCount}}</text> 项服务</text>
+        <text class="summary-hint">价格由门店决定</text>
       </view>
       <view 
         class="next-btn {{selectedServices.length > 0 ? 'active' : ''}}"
@@ -51,4 +76,85 @@
   
   <!-- 底部安全区 -->
   <view class="safe-area-bottom"></view>
+
+  <!-- ========== 寄养详情弹窗 ========== -->
+  <view class="boarding-modal-mask" wx:if="{{showBoardingModal}}" bindtap="onConfirmBoarding"></view>
+  <view class="boarding-modal" wx:if="{{showBoardingModal}}">
+    <view class="boarding-modal-header">
+      <text class="boarding-modal-title">🏠 宠物寄养详情</text>
+      <text class="boarding-modal-sub">请填写寄养信息，系统将为您匹配最合适的门店</text>
+    </view>
+    
+    <!-- 宠物类型选择 -->
+    <view class="boarding-field">
+      <text class="field-label">宠物类型</text>
+      <view class="pet-type-grid">
+        <view 
+          class="pet-type-item {{boardingDetail.petType === item.value ? 'active' : ''}}"
+          wx:for="{{petTypeOptions}}"
+          wx:key="value"
+          bindtap="onSelectPetType"
+          data-type="{{item.value}}"
+        >
+          <text class="pet-type-name">{{item.label}}</text>
+        </view>
+      </view>
+    </view>
+
+    <!-- 宠物名称 -->
+    <view class="boarding-field">
+      <text class="field-label">宠物名称</text>
+      <input 
+        class="field-input" 
+        placeholder="请输入您的宠物名字"
+        value="{{boardingDetail.petName}}"
+        bindinput="onPetNameInput"
+        maxlength="20"
+      />
+    </view>
+
+    <!-- 寄养天数 -->
+    <view class="boarding-field">
+      <text class="field-label">寄养天数</text>
+      <view class="days-counter">
+        <view class="days-btn" bindtap="onDaysMinus">
+          <text class="days-btn-text">−</text>
+        </view>
+        <text class="days-value">{{boardingDetail.days}} 天</text>
+        <view class="days-btn" bindtap="onDaysPlus">
+          <text class="days-btn-text">+</text>
+        </view>
+      </view>
+    </view>
+
+    <!-- 喂养方式 -->
+    <view class="boarding-field">
+      <text class="field-label">喂养方式</text>
+      <view class="food-options">
+        <view 
+          class="food-option {{boardingDetail.foodOption === 'store' ? 'active' : ''}}"
+          bindtap="onSelectFoodOption"
+          data-option="store"
+        >
+          <text class="food-option-label">🏪 门店提供</text>
+          <text class="food-option-desc">价格由门店决定</text>
+        </view>
+        <view 
+          class="food-option {{boardingDetail.foodOption === 'self' ? 'active' : ''}}"
+          bindtap="onSelectFoodOption"
+          data-option="self"
+        >
+          <text class="food-option-label">🎒 自带粮食</text>
+          <text class="food-option-desc">无需额外费用</text>
+        </view>
+      </view>
+    </view>
+
+    <!-- 确认按钮 -->
+    <view class="boarding-confirm">
+      <view class="boarding-confirm-btn" bindtap="onConfirmBoarding">
+        <text class="confirm-text">确认并选择门店</text>
+      </view>
+    </view>
+  </view>
 </view>

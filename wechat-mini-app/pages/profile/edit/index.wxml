@@ -1,0 +1,62 @@
+<view class="container">
+  <!-- 头像编辑区域 -->
+  <view class="edit-section">
+    <view class="section-title">头像</view>
+    <view class="avatar-wrapper" bindtap="onChangeAvatar">
+      <image wx:if="{{userInfo.avatar}}" class="avatar-image" src="{{userInfo.avatar}}" mode="aspectFill"></image>
+      <view wx:else class="avatar-image avatar-placeholder">
+        <text class="avatar-placeholder-text">{{userInfo.nickname ? userInfo.nickname[0] : '用'}}</text>
+      </view>
+      <view class="avatar-mask">
+        <text class="avatar-camera-icon">📷</text>
+        <text class="avatar-tip">点击更换头像</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 基本信息编辑 -->
+  <view class="edit-section">
+    <view class="section-title">基本信息</view>
+    
+    <view class="form-item">
+      <text class="form-label">昵称</text>
+      <input class="form-input" placeholder="请输入昵称" value="{{userInfo.nickname}}" bindinput="onNicknameInput" maxlength="20" />
+    </view>
+
+    <view class="form-item">
+      <text class="form-label">手机号</text>
+      <input class="form-input" type="number" placeholder="请输入手机号" value="{{userInfo.phone}}" bindinput="onPhoneInput" maxlength="11" />
+    </view>
+
+    <view class="form-item">
+      <text class="form-label">性别</text>
+      <view class="gender-group">
+        <view class="gender-option {{userInfo.gender === 1 ? 'active' : ''}}" bindtap="onGenderSelect" data-gender="1">
+          <text class="gender-text">男</text>
+        </view>
+        <view class="gender-option {{userInfo.gender === 2 ? 'active' : ''}}" bindtap="onGenderSelect" data-gender="2">
+          <text class="gender-text">女</text>
+        </view>
+        <view class="gender-option {{userInfo.gender === 0 ? 'active' : ''}}" bindtap="onGenderSelect" data-gender="0">
+          <text class="gender-text">保密</text>
+        </view>
+      </view>
+    </view>
+
+    <view class="form-item">
+      <text class="form-label">生日</text>
+      <picker mode="date" value="{{userInfo.birthday}}" start="1950-01-01" end="{{today}}" bindchange="onBirthdayChange">
+        <view class="form-picker {{userInfo.birthday ? '' : 'placeholder'}}">
+          {{userInfo.birthday || '请选择生日'}}
+        </view>
+      </picker>
+    </view>
+  </view>
+
+  <!-- 保存按钮 -->
+  <view class="save-area">
+    <button class="save-btn" bindtap="onSave" loading="{{saving}}" disabled="{{saving}}">
+      {{saving ? '保存中...' : '保存修改'}}
+    </button>
+  </view>
+</view>

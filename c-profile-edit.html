@@ -1,0 +1,490 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>编辑资料</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#1e40af',
+                        secondary: '#3b82f6',
+                        accent: '#60a5fa'
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        * { -webkit-tap-highlight-color: transparent; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+
+        .edit-card {
+            background: #ffffff;
+            border-radius: 16px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+        }
+
+        .edit-item {
+            display: flex;
+            align-items: center;
+            padding: 16px 20px;
+            border-bottom: 1px solid #f3f4f6;
+            min-height: 56px;
+        }
+        .edit-item:last-child { border-bottom: none; }
+
+        .edit-label {
+            width: 72px;
+            font-size: 15px;
+            color: #374151;
+            flex-shrink: 0;
+        }
+
+        .edit-value {
+            flex: 1;
+            text-align: right;
+            font-size: 15px;
+            color: #6b7280;
+        }
+
+        .edit-input {
+            flex: 1;
+            text-align: right;
+            font-size: 15px;
+            color: #1f2937;
+            border: none;
+            outline: none;
+            background: transparent;
+            width: 100%;
+        }
+
+        .avatar-section {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 32px 0 24px;
+            position: relative;
+        }
+
+        .avatar-circle {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            position: relative;
+            overflow: hidden;
+            box-shadow: 0 4px 16px rgba(30,64,175,0.3);
+        }
+        .avatar-circle img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        .avatar-emoji {
+            font-size: 36px;
+        }
+
+        .avatar-badge {
+            position: absolute;
+            bottom: -2px;
+            right: -2px;
+            width: 26px;
+            height: 26px;
+            background: #3b82f6;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 2px solid #fff;
+            color: #fff;
+            font-size: 12px;
+        }
+
+        .gender-btn {
+            flex: 1;
+            padding: 10px;
+            border: 2px solid #e5e7eb;
+            border-radius: 8px;
+            text-align: center;
+            font-size: 14px;
+            color: #6b7280;
+            cursor: pointer;
+            transition: all 0.2s;
+            background: #fff;
+        }
+        .gender-btn.selected {
+            border-color: #3b82f6;
+            background: #eff6ff;
+            color: #1e40af;
+            font-weight: 600;
+        }
+
+        .save-btn {
+            width: calc(100% - 32px);
+            margin: 24px 16px;
+            padding: 14px;
+            background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
+            color: #fff;
+            border: none;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: opacity 0.2s;
+            box-shadow: 0 4px 16px rgba(30,64,175,0.3);
+        }
+        .save-btn:active { opacity: 0.85; }
+        .save-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        /* 手机号弹窗 */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.5);
+            z-index: 200;
+            align-items: center;
+            justify-content: center;
+        }
+        .modal-overlay.show { display: flex; }
+        .modal-box {
+            background: #fff;
+            border-radius: 16px;
+            padding: 24px;
+            width: 85%;
+            max-width: 360px;
+        }
+        .modal-title { font-size: 17px; font-weight: 600; margin-bottom: 16px; }
+        .modal-input {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            font-size: 15px;
+            outline: none;
+            text-align: center;
+        }
+        .modal-input:focus { border-color: #3b82f6; }
+        .modal-actions { display: flex; gap: 12px; margin-top: 16px; }
+        .modal-btn {
+            flex: 1;
+            padding: 10px;
+            border-radius: 8px;
+            font-size: 15px;
+            cursor: pointer;
+            border: none;
+        }
+        .modal-btn.cancel { background: #f3f4f6; color: #374151; }
+        .modal-btn.confirm { background: #1e40af; color: #fff; }
+
+        /* Toast */
+        .toast {
+            position: fixed;
+            top: 24px;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 10px 24px;
+            border-radius: 8px;
+            color: #fff;
+            font-size: 14px;
+            font-weight: 500;
+            z-index: 300;
+            animation: fadeIn 0.3s ease;
+        }
+        @keyframes fadeIn { from { opacity: 0; transform: translateX(-50%) translateY(-10px); } }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+
+    <!-- 导航栏 -->
+    <div class="bg-white border-b border-gray-200 px-4 py-3 flex items-center sticky top-0 z-50 shadow-sm">
+        <button onclick="history.back()" class="text-gray-600 mr-4 p-1">
+            <i class="fa fa-chevron-left text-lg"></i>
+        </button>
+        <h1 class="text-lg font-bold text-gray-800">编辑资料</h1>
+    </div>
+
+    <!-- 头像区域 -->
+    <div class="avatar-section">
+        <div class="avatar-circle" id="avatar-container" onclick="document.getElementById('avatar-input').click()">
+            <img id="avatar-img" src="" style="display:none;" alt="头像">
+            <span class="avatar-emoji" id="avatar-placeholder">👤</span>
+            <div class="avatar-badge"><i class="fa fa-camera"></i></div>
+        </div>
+        <input type="file" id="avatar-input" accept="image/*" style="display:none;" onchange="handleAvatarChange(event)">
+    </div>
+
+    <!-- 编辑表单 -->
+    <div class="px-4">
+        <div class="edit-card">
+            <!-- 昵称 -->
+            <div class="edit-item">
+                <span class="edit-label">昵称</span>
+                <input class="edit-input" id="nickname-input" type="text" placeholder="请输入昵称" maxlength="20">
+            </div>
+
+            <!-- 手机号 -->
+            <div class="edit-item" onclick="openPhoneModal()">
+                <span class="edit-label">手机号</span>
+                <span class="edit-value" id="phone-value">未设置</span>
+                <i class="fa fa-chevron-right text-gray-400 ml-2 text-xs"></i>
+            </div>
+
+            <!-- 性别 -->
+            <div class="edit-item" style="flex-direction:column;align-items:stretch;gap:10px;">
+                <span class="edit-label">性别</span>
+                <div class="flex gap-3">
+                    <button class="gender-btn" data-gender="1" onclick="selectGender(1, this)">男</button>
+                    <button class="gender-btn" data-gender="2" onclick="selectGender(2, this)">女</button>
+                    <button class="gender-btn selected" data-gender="0" onclick="selectGender(0, this)">保密</button>
+                </div>
+            </div>
+
+            <!-- 生日 -->
+            <div class="edit-item">
+                <span class="edit-label">生日</span>
+                <input class="edit-input" id="birthday-input" type="date" min="1950-01-01">
+            </div>
+        </div>
+    </div>
+
+    <!-- 保存按钮 -->
+    <button class="save-btn" id="save-btn" onclick="handleSave()">保存</button>
+
+    <!-- 手机号弹窗 -->
+    <div class="modal-overlay" id="phone-modal">
+        <div class="modal-box">
+            <div class="modal-title">修改手机号</div>
+            <input class="modal-input" id="phone-input" type="tel" placeholder="请输入11位手机号" maxlength="11">
+            <p class="text-xs text-gray-400 mt-1 text-center" id="phone-error" style="display:none;color:#ef4444;"></p>
+            <div class="modal-actions">
+                <button class="modal-btn cancel" onclick="closePhoneModal()">取消</button>
+                <button class="modal-btn confirm" onclick="confirmPhone()">确定</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:3000/api/auth';
+        let currentUserInfo = {};
+        let avatarDataUrl = '';
+
+        document.addEventListener('DOMContentLoaded', function() {
+            loadUserInfo();
+        });
+
+        function loadUserInfo() {
+            // 从本地加载
+            const stored = localStorage.getItem('userInfo');
+            if (stored) {
+                try {
+                    currentUserInfo = JSON.parse(stored);
+                } catch (e) {
+                    currentUserInfo = {};
+                }
+            }
+            applyUserInfo(currentUserInfo);
+
+            // 从后端同步
+            const token = localStorage.getItem('userToken');
+            if (token) {
+                fetch(`${API_BASE}/profile`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                })
+                .then(r => r.json())
+                .then(result => {
+                    if (result.success && result.data) {
+                        const user = result.data;
+                        currentUserInfo = {
+                            ...currentUserInfo,
+                            name: user.name || currentUserInfo.name,
+                            phone: user.phone || currentUserInfo.phone,
+                            avatar: user.avatar || currentUserInfo.avatar,
+                            gender: user.gender !== undefined ? user.gender : currentUserInfo.gender,
+                            birthday: user.birthday || currentUserInfo.birthday
+                        };
+                        localStorage.setItem('userInfo', JSON.stringify(currentUserInfo));
+                        applyUserInfo(currentUserInfo);
+                    }
+                })
+                .catch(e => console.log('后端同步失败，使用本地数据', e));
+            }
+        }
+
+        function applyUserInfo(info) {
+            document.getElementById('nickname-input').value = info.name || info.nickname || '';
+            document.getElementById('phone-value').textContent = info.phone ? maskPhone(info.phone) : '未设置';
+            document.getElementById('birthday-input').value = info.birthday || '';
+
+            // 性别
+            const gender = parseInt(info.gender) || 0;
+            document.querySelectorAll('.gender-btn').forEach(btn => {
+                const v = parseInt(btn.dataset.gender);
+                btn.classList.toggle('selected', v === gender);
+            });
+
+            // 头像
+            if (info.avatar) {
+                avatarDataUrl = info.avatar;
+                showAvatarImage(info.avatar);
+            }
+        }
+
+        function showAvatarImage(src) {
+            const img = document.getElementById('avatar-img');
+            const placeholder = document.getElementById('avatar-placeholder');
+            img.src = src;
+            img.style.display = 'block';
+            placeholder.style.display = 'none';
+        }
+
+        // 头像更换
+        function handleAvatarChange(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            // 校验大小（最大5MB）
+            if (file.size > 5 * 1024 * 1024) {
+                showToast('图片过大，请选择小于5MB的图片', 'error');
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                // 压缩图片（用canvas缩放到200x200）
+                const img = new Image();
+                img.onload = function() {
+                    const canvas = document.createElement('canvas');
+                    const size = 200;
+                    canvas.width = size;
+                    canvas.height = size;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, size, size);
+                    avatarDataUrl = canvas.toDataURL('image/jpeg', 0.8);
+                    showAvatarImage(avatarDataUrl);
+                };
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+
+            // 重置input以便再次选择同一文件
+            event.target.value = '';
+        }
+
+        // 性别选择
+        function selectGender(gender, el) {
+            document.querySelectorAll('.gender-btn').forEach(btn => btn.classList.remove('selected'));
+            el.classList.add('selected');
+            currentUserInfo.gender = gender;
+        }
+
+        // 手机号弹窗
+        function openPhoneModal() {
+            const phone = currentUserInfo.phone || '';
+            document.getElementById('phone-input').value = phone;
+            document.getElementById('phone-error').style.display = 'none';
+            document.getElementById('phone-modal').classList.add('show');
+        }
+
+        function closePhoneModal() {
+            document.getElementById('phone-modal').classList.remove('show');
+        }
+
+        function confirmPhone() {
+            const phone = document.getElementById('phone-input').value.replace(/\s/g, '');
+            if (phone && !/^1[3-9]\d{9}$/.test(phone)) {
+                const errEl = document.getElementById('phone-error');
+                errEl.textContent = '请输入正确的手机号';
+                errEl.style.display = 'block';
+                return;
+            }
+            currentUserInfo.phone = phone;
+            document.getElementById('phone-value').textContent = phone ? maskPhone(phone) : '未设置';
+            closePhoneModal();
+        }
+
+        // 保存
+        async function handleSave() {
+            const nickname = document.getElementById('nickname-input').value.trim();
+            const phone = document.getElementById('phone-input').value.replace(/\s/g, '');
+            const birthday = document.getElementById('birthday-input').value;
+
+            if (!nickname) {
+                showToast('请输入昵称', 'warning');
+                return;
+            }
+
+            const btn = document.getElementById('save-btn');
+            btn.disabled = true;
+            btn.textContent = '保存中...';
+
+            // 构建更新数据
+            const updateData = {
+                name: nickname,
+                nickname: nickname,
+                phone: phone,
+                avatar: avatarDataUrl,
+                gender: currentUserInfo.gender !== undefined ? currentUserInfo.gender : 0,
+                birthday: birthday
+            };
+
+            // 更新本地存储
+            const merged = { ...currentUserInfo, ...updateData };
+            localStorage.setItem('userInfo', JSON.stringify(merged));
+            currentUserInfo = merged;
+
+            // 同步到后端
+            const token = localStorage.getItem('userToken');
+            if (token) {
+                try {
+                    const response = await fetch(`${API_BASE}/profile`, {
+                        method: 'PUT',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${token}`
+                        },
+                        body: JSON.stringify(updateData)
+                    });
+                    const result = await response.json();
+                    if (!result.success) {
+                        console.log('后端同步失败，仅本地保存:', result.error);
+                    }
+                } catch (err) {
+                    console.log('后端同步失败，仅本地保存:', err);
+                }
+            }
+
+            btn.disabled = false;
+            btn.textContent = '保存';
+            showToast('保存成功');
+            setTimeout(() => { window.location.href = 'c-profile.html'; }, 1000);
+        }
+
+        function maskPhone(phone) {
+            if (!phone) return '';
+            return phone.replace(/(\d{3})\d{4}(\d{4})/, '$1****$2');
+        }
+
+        function showToast(message, type = 'success') {
+            const existing = document.querySelector('.toast');
+            if (existing) existing.remove();
+
+            const toast = document.createElement('div');
+            toast.className = 'toast';
+            toast.style.background = type === 'error' ? '#ef4444' : type === 'warning' ? '#f59e0b' : '#10b981';
+            toast.textContent = message;
+            document.body.appendChild(toast);
+            setTimeout(() => toast.remove(), 2500);
+        }
+    </script>
+</body>
+</html>
