@@ -105,6 +105,16 @@
                 userDropdown.classList.add('hidden');
             }
             
+            // 预览模式守卫：merchant用户或未审批用户只能访问仪表盘和消息
+            var _restricted = ['orders','inventory','customers','settlement','light-system','statistics','settings'];
+            if (_restricted.indexOf(target) >= 0) {
+                if (typeof window.requireApprovedStore === 'function' && !window.requireApprovedStore('访问' + target)) {
+                    // 不允许访问，跳回仪表盘
+                    navigateTo('dashboard');
+                    return;
+                }
+            }
+            
             // 隐藏所有内容区块
             const contentSections = document.querySelectorAll('.content-section');
             contentSections.forEach(section => {
@@ -898,8 +908,22 @@
                 <p class="text-gray-600">欢迎回来，今天是 <span id="current-date"></span></p>
             </div>
 
+            <!-- 预览模式提示（merchant用户可见） -->
+            <div id="m-dashboard-preview-notice" style="display:none;">
+                <div style="background: linear-gradient(135deg, #FEF3C7, #FDE68A); border: 2px solid #F59E0B; border-radius: 12px; padding: 16px; margin-bottom: 16px;">
+                    <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
+                        <i class="fa fa-eye" style="color: #D97706; font-size: 20px;"></i>
+                        <span style="font-weight: 700; color: #92400E; font-size: 15px;">预览模式</span>
+                    </div>
+                    <p style="color: #78350F; font-size: 13px; margin-bottom: 12px;">您的商家账户尚未完成入驻审批，当前仅可预览系统功能。完成入驻申请并审核通过后，即可使用全部功能。</p>
+                    <button onclick="window.showStoreApplyModal()" style="background: #F59E0B; color: white; border: none; padding: 10px 20px; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; width: 100%;">
+                        <i class="fa fa-paper-plane" style="margin-right: 6px;"></i>填写入驻申请
+                    </button>
+                </div>
+            </div>
+
             <!-- 统计卡片 -->
-            <div class="grid grid-cols-2 gap-4 mb-6">
+            <div id="m-dashboard-stats" class="grid grid-cols-2 gap-4 mb-6">
                 <div class="bg-white rounded-xl shadow-card p-4 border border-gray-200 hover:shadow-card-hover transition-all duration-300 ease-in-out hover-scale">
                     <div class="flex items-center justify-between mb-2">
                         <h3 class="text-sm font-medium text-gray-600">今日订单</h3>
@@ -946,25 +970,25 @@
             <div class="bg-white rounded-xl shadow-card p-4 border border-gray-200 mb-6">
                 <h3 class="text-lg font-semibold text-gray-800 mb-4">快速操作</h3>
                 <div class="grid grid-cols-4 gap-3">
-                    <button onclick="showCreateOrderModal()" class="flex flex-col items-center p-3 rounded-lg hover:bg-gray-50 transition-all duration-300 ease-in-out">
+                    <button onclick="if(requireApprovedStore('代客下单'))showCreateOrderModal()" class="flex flex-col items-center p-3 rounded-lg hover:bg-gray-50 transition-all duration-300 ease-in-out">
                         <div class="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center text-primary mb-2">
                             <i class="fa fa-plus"></i>
                         </div>
                         <span class="text-xs text-gray-700">代客下单</span>
                     </button>
-                    <button class="flex flex-col items-center p-3 rounded-lg hover:bg-gray-50 transition-all duration-300 ease-in-out">
+                    <button onclick="if(requireApprovedStore('完成订单')){alert('功能开发中')}" class="flex flex-col items-center p-3 rounded-lg hover:bg-gray-50 transition-all duration-300 ease-in-out">
                         <div class="w-12 h-12 rounded-full bg-green-100 flex items-center justify-center text-success mb-2">
                             <i class="fa fa-check"></i>
                         </div>
                         <span class="text-xs text-gray-700">完成订单</span>
                     </button>
-                    <button onclick="scanAndManageOrder()" class="flex flex-col items-center p-3 rounded-lg hover:bg-gray-50 transition-all duration-300 ease-in-out">
+                    <button onclick="if(requireApprovedStore('扫一扫'))scanAndManageOrder()" class="flex flex-col items-center p-3 rounded-lg hover:bg-gray-50 transition-all duration-300 ease-in-out">
                         <div class="w-12 h-12 rounded-full bg-gradient-to-br from-yellow-100 to-orange-100 flex items-center justify-center text-warning mb-2">
                             <i class="fa fa-camera"></i>
                         </div>
                         <span class="text-xs text-gray-700">扫一扫</span>
                     </button>
-                    <button class="flex flex-col items-center p-3 rounded-lg hover:bg-gray-50 transition-all duration-300 ease-in-out">
+                    <button onclick="if(requireApprovedStore('新增客户')){alert('功能开发中')}" class="flex flex-col items-center p-3 rounded-lg hover:bg-gray-50 transition-all duration-300 ease-in-out">
                         <div class="w-12 h-12 rounded-full bg-purple-100 flex items-center justify-center text-purple mb-2">
                             <i class="fa fa-user-plus"></i>
                         </div>
@@ -1430,7 +1454,7 @@
                     <div class="border border-gray-200 rounded-lg p-4">
                         <h4 class="font-medium text-gray-800 mb-3">快捷操作</h4>
                         <div class="space-y-2">
-                            <button onclick="outboundAllReadyItems()" class="w-full bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600 transition-colors flex items-center justify-center text-sm">
+                            <button onclick="if(requireApprovedStore('出库操作'))outboundAllReadyItems()" class="w-full bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600 transition-colors flex items-center justify-center text-sm">
                                 <i class="fa fa-check-square mr-2"></i>
                                 一键出库所有就绪物品
                             </button>
@@ -2192,6 +2216,11 @@
             if (confirm('确定要退出登录吗？')) {
                 localStorage.removeItem('storeUser');
                 localStorage.removeItem('currentStore');
+                localStorage.removeItem('auth_token');
+                localStorage.removeItem('storeAccount');
+                localStorage.removeItem('storeToken');
+                localStorage.removeItem('previewMode');
+                localStorage.removeItem('guestModeHandled');
                 window.location.href = 'm-login.html';
             }
         };
@@ -2638,9 +2667,15 @@
             }
             
             if (confirm('确定要退出登录吗？')) {
-                // 清除登录信息
+                // 清除所有登录信息
                 localStorage.removeItem('storeUser');
                 localStorage.removeItem('currentStore');
+                localStorage.removeItem('auth_token');
+                localStorage.removeItem('storeAccount');
+                localStorage.removeItem('storeToken');
+                localStorage.removeItem('previewMode');
+                localStorage.removeItem('guestModeHandled');
+                localStorage.removeItem('pendingApplicationId');
                 
                 // 跳转到登录页
                 window.location.href = 'm-login.html';
@@ -5373,8 +5408,9 @@
             const storeUserObj = JSON.parse(storeUser || '{}');
             const currentStoreObj = JSON.parse(currentStore || '{}');
             
-            // 检查是否是有效的登录状态（有 storeUser 或 currentStore，且有 storeId）
-            const isLoggedIn = (storeUserObj && (storeUserObj.username || storeUserObj.id || storeUserObj.storeId)) ||
+            // 检查是否是有效的登录状态（有 storeUser 或 currentStore，且有 storeId 或者是商家用户）
+            const isMerchant = storeUserObj && storeUserObj.roles && storeUserObj.roles.includes('merchant');
+            const isLoggedIn = (storeUserObj && (storeUserObj.username || storeUserObj.id || storeUserObj.storeId || storeUserObj.userId || isMerchant)) ||
                               (currentStoreObj && currentStoreObj.storeId);
             
             // 检查是否是访客模式（已经取消过登录的用户）
@@ -6599,6 +6635,12 @@
         function loadRecentOrders(orders) {
             const container = document.getElementById('recent-orders-container');
             if (!container) return;
+            
+            // 预览模式不加载订单数据
+            if (window.__isPreviewMode || (JSON.parse(localStorage.getItem('storeUser') || '{}').roles || []).includes('merchant')) {
+                container.innerHTML = '<div style="text-align:center;padding:20px;color:#9CA3AF;"><i class="fa fa-lock" style="font-size:24px;margin-bottom:8px;display:block;"></i>入驻审批通过后可查看订单</div>';
+                return;
+            }
             
             if (!orders || orders.length === 0) {
                 container.innerHTML = '<p class="text-gray-500 text-center py-4">暂无订单</p>';
@@ -12949,6 +12991,7 @@ ${(order.items || order.services || []).map((item, idx) => `${idx + 1}. ${item.n
                 // 点亮按钮
                 if (onBtn) {
                     onBtn.addEventListener('click', async () => {
+                        if (typeof requireApprovedStore === 'function' && !requireApprovedStore('点亮灯条')) return;
                         const storeId = storeSelect.value;
                         addLog('正在点亮灯条 (门店: ' + storeId + ')...', 'info');
                         try {
@@ -12978,6 +13021,7 @@ ${(order.items || order.services || []).map((item, idx) => `${idx + 1}. ${item.n
                 // 关闭按钮
                 if (offBtn) {
                     offBtn.addEventListener('click', async () => {
+                        if (typeof requireApprovedStore === 'function' && !requireApprovedStore('关闭灯条')) return;
                         const storeId = storeSelect.value;
                         addLog('正在关闭灯条 (门店: ' + storeId + ')...', 'info');
                         try {
@@ -13001,6 +13045,7 @@ ${(order.items || order.services || []).map((item, idx) => `${idx + 1}. ${item.n
                 // 闪烁按钮
                 if (pulseBtn) {
                     pulseBtn.addEventListener('click', async () => {
+                        if (typeof requireApprovedStore === 'function' && !requireApprovedStore('闪烁提醒')) return;
                         const storeId = storeSelect.value;
                         addLog('正在闪烁提醒 (门店: ' + storeId + ')...', 'info');
                         try {
@@ -13475,6 +13520,344 @@ ${(order.items || order.services || []).map((item, idx) => `${idx + 1}. ${item.n
             识别成功 ✓
         </div>
     </div>
+
+<!-- 门店入驻申请弹窗（移动端适配） -->
+<div id="store-apply-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:99999;overflow-y:auto;-webkit-overflow-scrolling:touch;">
+    <div style="min-height:100vh;padding:12px;display:flex;align-items:flex-start;justify-content:center;">
+        <div style="background:white;border-radius:12px;width:100%;max-width:480px;box-shadow:0 25px 50px rgba(0,0,0,0.3);overflow:hidden;">
+            <!-- 头部 -->
+            <div style="background:linear-gradient(135deg,#1e40af,#3b82f6);padding:20px;color:white;position:relative;">
+                <button onclick="window.closeStoreApplyModal()" style="position:absolute;top:12px;right:12px;width:32px;height:32px;border-radius:50%;border:none;background:rgba(255,255,255,0.2);color:white;font-size:18px;cursor:pointer;">×</button>
+                <h2 style="font-size:18px;font-weight:bold;margin:0 0 4px 0;">🏪 门店入驻申请</h2>
+                <p style="opacity:0.85;font-size:12px;margin:0;">填写入驻信息，审批通过后即可使用全部功能</p>
+            </div>
+            <!-- 表单 -->
+            <div style="padding:16px;">
+                <form id="store-apply-form" style="display:flex;flex-direction:column;gap:16px;">
+                    <!-- 基本信息 -->
+                    <div style="border-bottom:1px solid #e5e7eb;padding-bottom:12px;">
+                        <h3 style="font-size:14px;font-weight:600;color:#1f2937;margin:0 0 10px 0;"><i class="fa fa-info-circle" style="color:#1e40af;margin-right:4px;"></i>基本信息</h3>
+                        <div style="display:flex;flex-direction:column;gap:8px;">
+                            <input type="text" name="applicantName" required placeholder="申请人姓名 *" style="width:100%;border:1px solid #d1d5db;border-radius:8px;padding:10px;font-size:14px;box-sizing:border-box;">
+                            <input type="tel" name="applicantPhone" required placeholder="联系电话 *" style="width:100%;border:1px solid #d1d5db;border-radius:8px;padding:10px;font-size:14px;box-sizing:border-box;">
+                            <input type="text" name="storeName" required placeholder="门店名称 *" style="width:100%;border:1px solid #d1d5db;border-radius:8px;padding:10px;font-size:14px;box-sizing:border-box;">
+                        </div>
+                    </div>
+                    <!-- 门店信息 -->
+                    <div style="border-bottom:1px solid #e5e7eb;padding-bottom:12px;">
+                        <h3 style="font-size:14px;font-weight:600;color:#1f2937;margin:0 0 10px 0;"><i class="fa fa-building" style="color:#1e40af;margin-right:4px;"></i>门店信息</h3>
+                        <div style="display:flex;flex-direction:column;gap:8px;">
+                            <input type="text" name="storeAddress" required placeholder="门店地址 *" style="width:100%;border:1px solid #d1d5db;border-radius:8px;padding:10px;font-size:14px;box-sizing:border-box;">
+                            <div style="display:flex;gap:8px;">
+                                <input type="text" name="city" required placeholder="城市 *" style="flex:1;border:1px solid #d1d5db;border-radius:8px;padding:10px;font-size:14px;">
+                                <input type="text" name="district" placeholder="区域" style="flex:1;border:1px solid #d1d5db;border-radius:8px;padding:10px;font-size:14px;">
+                            </div>
+                            <div style="display:flex;gap:8px;align-items:center;">
+                                <input type="time" name="businessHoursOpen" value="09:00" style="flex:1;border:1px solid #d1d5db;border-radius:8px;padding:10px;font-size:14px;">
+                                <span style="color:#6b7280;font-size:13px;">至</span>
+                                <input type="time" name="businessHoursClose" value="21:00" style="flex:1;border:1px solid #d1d5db;border-radius:8px;padding:10px;font-size:14px;">
+                            </div>
+                        </div>
+                    </div>
+                    <!-- 业务品类 -->
+                    <div style="border-bottom:1px solid #e5e7eb;padding-bottom:12px;">
+                        <h3 style="font-size:14px;font-weight:600;color:#1f2937;margin:0 0 4px 0;"><i class="fa fa-th-large" style="color:#1e40af;margin-right:4px;"></i>业务品类 *</h3>
+                        <p style="font-size:11px;color:#6b7280;margin:0 0 8px 0;">选择主营品类，审批后自动归类</p>
+                        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;" id="m-apply-biz-cat">
+                            <label class="m-biz-cat" data-cat="cleaning" style="cursor:pointer;">
+                                <div style="border:2px solid #1e40af;border-radius:8px;padding:8px;text-align:center;background:#eff6ff;" class="m-biz-cat-card">
+                                    <div style="font-size:20px;">👔</div>
+                                    <div style="font-size:11px;font-weight:500;">衣物干洗</div>
+                                </div>
+                                <input type="radio" name="businessCategory" value="cleaning" checked style="display:none;">
+                            </label>
+                            <label class="m-biz-cat" data-cat="shoe_care" style="cursor:pointer;">
+                                <div style="border:2px solid #e5e7eb;border-radius:8px;padding:8px;text-align:center;" class="m-biz-cat-card">
+                                    <div style="font-size:20px;">👟</div>
+                                    <div style="font-size:11px;font-weight:500;">鞋类洗护</div>
+                                </div>
+                                <input type="radio" name="businessCategory" value="shoe_care" style="display:none;">
+                            </label>
+                            <label class="m-biz-cat" data-cat="luxury_care" style="cursor:pointer;">
+                                <div style="border:2px solid #e5e7eb;border-radius:8px;padding:8px;text-align:center;" class="m-biz-cat-card">
+                                    <div style="font-size:20px;">👜</div>
+                                    <div style="font-size:11px;font-weight:500;">奢侈品护理</div>
+                                </div>
+                                <input type="radio" name="businessCategory" value="luxury_care" style="display:none;">
+                            </label>
+                            <label class="m-biz-cat" data-cat="pet_grooming" style="cursor:pointer;">
+                                <div style="border:2px solid #e5e7eb;border-radius:8px;padding:8px;text-align:center;" class="m-biz-cat-card">
+                                    <div style="font-size:20px;">🐕</div>
+                                    <div style="font-size:11px;font-weight:500;">宠物清洗</div>
+                                </div>
+                                <input type="radio" name="businessCategory" value="pet_grooming" style="display:none;">
+                            </label>
+                            <label class="m-biz-cat" data-cat="electronics_repair" style="cursor:pointer;">
+                                <div style="border:2px solid #e5e7eb;border-radius:8px;padding:8px;text-align:center;" class="m-biz-cat-card">
+                                    <div style="font-size:20px;">📱</div>
+                                    <div style="font-size:11px;font-weight:500;">电子产品维修</div>
+                                </div>
+                                <input type="radio" name="businessCategory" value="electronics_repair" style="display:none;">
+                            </label>
+                            <label class="m-biz-cat" data-cat="rental" style="cursor:pointer;">
+                                <div style="border:2px solid #e5e7eb;border-radius:8px;padding:8px;text-align:center;" class="m-biz-cat-card">
+                                    <div style="font-size:20px;">👘</div>
+                                    <div style="font-size:11px;font-weight:500;">服饰租赁</div>
+                                </div>
+                                <input type="radio" name="businessCategory" value="rental" style="display:none;">
+                            </label>
+                            <label class="m-biz-cat" data-cat="rental_leisure" style="cursor:pointer;">
+                                <div style="border:2px solid #e5e7eb;border-radius:8px;padding:8px;text-align:center;" class="m-biz-cat-card">
+                                    <div style="font-size:20px;">🎮</div>
+                                    <div style="font-size:11px;font-weight:500;">小件租赁</div>
+                                </div>
+                                <input type="radio" name="businessCategory" value="rental_leisure" style="display:none;">
+                            </label>
+                        </div>
+                    </div>
+                    <!-- 资质信息 -->
+                    <div style="border-bottom:1px solid #e5e7eb;padding-bottom:12px;">
+                        <h3 style="font-size:14px;font-weight:600;color:#1f2937;margin:0 0 10px 0;"><i class="fa fa-certificate" style="color:#1e40af;margin-right:4px;"></i>资质信息</h3>
+                        <div style="display:flex;flex-direction:column;gap:8px;">
+                            <div style="display:flex;gap:8px;">
+                                <input type="text" name="businessLicense" placeholder="营业执照号" style="flex:1;border:1px solid #d1d5db;border-radius:8px;padding:10px;font-size:14px;">
+                                <input type="text" name="legalPerson" placeholder="法人代表" style="flex:1;border:1px solid #d1d5db;border-radius:8px;padding:10px;font-size:14px;">
+                            </div>
+                            <textarea name="description" rows="2" placeholder="门店描述" style="width:100%;border:1px solid #d1d5db;border-radius:8px;padding:10px;font-size:14px;box-sizing:border-box;"></textarea>
+                        </div>
+                    </div>
+                    <!-- BD信息 -->
+                    <div>
+                        <h3 style="font-size:14px;font-weight:600;color:#1f2937;margin:0 0 10px 0;"><i class="fa fa-handshake-o" style="color:#1e40af;margin-right:4px;"></i>负责BD *</h3>
+                        <div style="display:flex;gap:8px;">
+                            <input type="text" name="bdName" required placeholder="BD姓名 *" style="flex:1;border:1px solid #d1d5db;border-radius:8px;padding:10px;font-size:14px;">
+                            <input type="tel" name="bdPhone" required placeholder="BD电话 *" style="flex:1;border:1px solid #d1d5db;border-radius:8px;padding:10px;font-size:14px;">
+                        </div>
+                    </div>
+                    <!-- 提交 -->
+                    <div style="display:flex;gap:10px;padding-top:8px;">
+                        <button type="button" onclick="window.closeStoreApplyModal()" style="flex:1;padding:12px;border:1px solid #d1d5db;border-radius:8px;background:white;color:#374151;font-size:14px;cursor:pointer;">稍后填写</button>
+                        <button type="submit" id="m-apply-submit-btn" style="flex:2;padding:12px;border:none;border-radius:8px;background:#1e40af;color:white;font-size:14px;font-weight:600;cursor:pointer;"><i class="fa fa-paper-plane" style="margin-right:4px;"></i>提交申请</button>
+                    </div>
+                </form>
+                <!-- 申请已提交 -->
+                <div id="m-apply-status" style="display:none;padding:24px;text-align:center;">
+                    <div style="font-size:48px;margin-bottom:12px;">✅</div>
+                    <h3 style="font-size:16px;font-weight:bold;color:#059669;margin:0 0 8px 0;">申请已提交</h3>
+                    <p style="color:#6b7280;font-size:13px;margin:0 0 4px 0;">编号：<b id="m-apply-result-id"></b></p>
+                    <p style="color:#6b7280;font-size:13px;margin:0 0 16px 0;">请等待审批，通过后可使用全部功能</p>
+                    <button onclick="window.closeStoreApplyModal()" style="padding:10px 24px;border:none;border-radius:8px;background:#1e40af;color:white;font-size:14px;cursor:pointer;">关闭，先预览</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<!-- 预览模式横幅（移动端） -->
+<div id="m-preview-banner" style="display:none;position:fixed;top:0;left:0;right:0;z-index:9999;background:#fef3c7;padding:8px 16px;text-align:center;font-size:12px;color:#92400e;border-bottom:1px solid #fbbf24;">
+    <i class="fa fa-eye" style="margin-right:4px;"></i>预览模式 - <button onclick="window.showStoreApplyModal()" style="color:#1e40af;font-weight:600;border:none;background:none;cursor:pointer;font-size:12px;">完成入驻申请</button>后可操作
+</div>
+
+<script>
+// ===== 门店入驻申请模块（M端） =====
+(function() {
+    // 品类选择器
+    document.querySelectorAll('.m-biz-cat').forEach(function(label) {
+        label.addEventListener('click', function() {
+            document.querySelectorAll('.m-biz-cat-card').forEach(function(card) {
+                card.style.borderColor = '#e5e7eb';
+                card.style.background = 'white';
+            });
+            var card = this.querySelector('.m-biz-cat-card');
+            card.style.borderColor = '#1e40af';
+            card.style.background = '#eff6ff';
+            var radio = this.querySelector('input[type="radio"]');
+            if (radio) radio.checked = true;
+        });
+    });
+    
+    window.closeStoreApplyModal = function() {
+        var modal = document.getElementById('store-apply-modal');
+        if (modal) modal.style.display = 'none';
+        var storeUser = JSON.parse(localStorage.getItem('storeUser') || '{}');
+        if (storeUser.roles && storeUser.roles.includes('merchant')) {
+            localStorage.setItem('previewMode', 'true');
+            window.__isPreviewMode = true;
+            var banner = document.getElementById('m-preview-banner');
+            if (banner) banner.style.display = 'block';
+        }
+    };
+    
+    window.showStoreApplyModal = function() {
+        var modal = document.getElementById('store-apply-modal');
+        if (modal) modal.style.display = 'block';
+        var storeUser = JSON.parse(localStorage.getItem('storeUser') || '{}');
+        if (storeUser.phone) {
+            var phoneInput = modal.querySelector('input[name="applicantPhone"]');
+            if (phoneInput && !phoneInput.value) phoneInput.value = storeUser.phone;
+        }
+        if (storeUser.name && storeUser.name !== '新商家') {
+            var nameInput = modal.querySelector('input[name="applicantName"]');
+            if (nameInput && !nameInput.value) nameInput.value = storeUser.name;
+        }
+    };
+    
+    // 全局预览模式检查
+    window.__isPreviewMode = localStorage.getItem('previewMode') === 'true';
+    window.requireApprovedStore = function(action) {
+        if (window.__isPreviewMode || (JSON.parse(localStorage.getItem('storeUser') || '{}').roles || []).includes('merchant')) {
+            var storeUser = JSON.parse(localStorage.getItem('storeUser') || '{}');
+            if (storeUser.storeId && storeUser.storeId !== 'null') {
+                window.__isPreviewMode = false;
+                localStorage.removeItem('previewMode');
+                // 移除仪表盘预览提示
+                var notice = document.getElementById('m-dashboard-preview-notice');
+                if (notice) notice.style.display = 'none';
+                var stats = document.getElementById('m-dashboard-stats');
+                if (stats) stats.style.filter = '';
+                return true;
+            }
+            alert('⚠️ 您需要先完成门店入驻申请并审批通过后，才能进行「' + (action || '此操作') + '」。');
+            window.showStoreApplyModal();
+            return false;
+        }
+        return true;
+    };
+    
+    // 激活仪表盘预览模式（遮盖统计数据）
+    window.activateDashboardPreview = function() {
+        var notice = document.getElementById('m-dashboard-preview-notice');
+        if (notice) notice.style.display = 'block';
+        var stats = document.getElementById('m-dashboard-stats');
+        if (stats) {
+            stats.style.filter = 'blur(8px) grayscale(0.8)';
+            stats.style.pointerEvents = 'none';
+            stats.style.userSelect = 'none';
+        }
+        // 遮盖最近订单
+        var recentOrders = document.getElementById('recent-orders-container');
+        if (recentOrders) {
+            recentOrders.innerHTML = '<div style="text-align:center;padding:20px;color:#9CA3AF;"><i class="fa fa-lock" style="font-size:24px;margin-bottom:8px;display:block;"></i>入驻审批通过后可查看订单</div>';
+        }
+    };
+    
+    // 登录后检查是否需要显示入驻申请
+    window.checkMerchantApplication = async function() {
+        var storeUser = JSON.parse(localStorage.getItem('storeUser') || '{}');
+        var roles = storeUser.roles || [];
+        
+        if (roles.includes('merchant')) {
+            var phone = storeUser.phone || '';
+            if (phone) {
+                try {
+                    var baseUrl = window.API_CONFIG ? API_CONFIG.baseUrl : 'http://localhost:' + (window.location.port || 3000) + '/api';
+                    var resp = await fetch(baseUrl + '/auth/application-status?phone=' + encodeURIComponent(phone));
+                    var result = await resp.json();
+                    if (result.success && result.data.status === 'approved') {
+                        console.log('[入驻检查] 已通过');
+                        return;
+                    }
+                    if (result.success && result.data.status === 'pending') {
+                        window.__isPreviewMode = true;
+                        localStorage.setItem('previewMode', 'true');
+                        var banner = document.getElementById('m-preview-banner');
+                        if (banner) banner.style.display = 'block';
+                        if (typeof window.activateDashboardPreview === 'function') window.activateDashboardPreview();
+                        return;
+                    }
+                } catch (e) {
+                    console.warn('[入驻检查] API不可用');
+                }
+            }
+            // 未提交申请，先激活预览模式，再弹出表单
+            window.__isPreviewMode = true;
+            localStorage.setItem('previewMode', 'true');
+            if (typeof window.activateDashboardPreview === 'function') window.activateDashboardPreview();
+            setTimeout(function() { window.showStoreApplyModal(); }, 800);
+        }
+        
+        if (window.__isPreviewMode) {
+            var banner = document.getElementById('m-preview-banner');
+            if (banner) banner.style.display = 'block';
+            if (typeof window.activateDashboardPreview === 'function') window.activateDashboardPreview();
+        }
+    };
+    
+    // 表单提交
+    var form = document.getElementById('store-apply-form');
+    if (form) {
+        form.addEventListener('submit', async function(e) {
+            e.preventDefault();
+            var formData = new FormData(form);
+            var submitBtn = document.getElementById('m-apply-submit-btn');
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<i class="fa fa-spinner fa-spin" style="margin-right:4px;"></i>提交中...';
+            
+            var applicationData = {
+                applicationId: 'APP' + Date.now(),
+                applicantName: formData.get('applicantName'),
+                applicantPhone: formData.get('applicantPhone'),
+                storeName: formData.get('storeName'),
+                storeAddress: formData.get('storeAddress'),
+                city: formData.get('city'),
+                district: formData.get('district'),
+                businessHours: { open: formData.get('businessHoursOpen'), close: formData.get('businessHoursClose') },
+                businessLicense: formData.get('businessLicense'),
+                legalPerson: formData.get('legalPerson'),
+                businessCategory: formData.get('businessCategory') || 'cleaning',
+                description: formData.get('description'),
+                bdName: formData.get('bdName'),
+                bdPhone: formData.get('bdPhone'),
+                status: 'pending',
+                createTime: new Date().toISOString(),
+                updateTime: new Date().toISOString(),
+                approvalHistory: []
+            };
+            
+            try {
+                var baseUrl = window.API_CONFIG ? API_CONFIG.baseUrl : 'http://localhost:' + (window.location.port || 3000) + '/api';
+                var response = await fetch(baseUrl + '/store-applications/submit', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(applicationData)
+                });
+                var result = await response.json();
+                if (result.success || response.ok) {
+                    form.style.display = 'none';
+                    document.getElementById('m-apply-status').style.display = 'block';
+                    document.getElementById('m-apply-result-id').textContent = applicationData.applicationId;
+                    localStorage.setItem('pendingApplicationId', applicationData.applicationId);
+                    window.__isPreviewMode = true;
+                    localStorage.setItem('previewMode', 'true');
+                    var banner = document.getElementById('m-preview-banner');
+                    if (banner) banner.style.display = 'block';
+                } else {
+                    throw new Error(result.message || '提交失败');
+                }
+            } catch (error) {
+                console.error('提交失败:', error);
+                var apps = JSON.parse(localStorage.getItem('storeApplications') || '[]');
+                apps.push(applicationData);
+                localStorage.setItem('storeApplications', JSON.stringify(apps));
+                form.style.display = 'none';
+                document.getElementById('m-apply-status').style.display = 'block';
+                document.getElementById('m-apply-result-id').textContent = applicationData.applicationId;
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = '<i class="fa fa-paper-plane" style="margin-right:4px;"></i>提交申请';
+            }
+        });
+    }
+    
+    // 页面加载后检查
+    if (document.readyState === 'complete' || document.readyState === 'interactive') {
+        setTimeout(function() { window.checkMerchantApplication(); }, 1500);
+    } else {
+        document.addEventListener('DOMContentLoaded', function() {
+            setTimeout(function() { window.checkMerchantApplication(); }, 1500);
+        });
+    }
+})();
+</script>
 
 </body>
 </html>

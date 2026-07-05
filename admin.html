@@ -108,6 +108,12 @@
                                     <span>全部会员</span>
                                 </a>
                             </li>
+                            <li>
+                                <a href="#customer-service" class="nav-link flex items-center space-x-3 p-2 rounded-lg text-gray-600 hover:bg-blue-50 hover:text-primary transition-all duration-300 ease-in-out hover:translate-x-1">
+                                    <i class="fa fa-headphones w-5 text-center"></i>
+                                    <span>客服中心</span>
+                                </a>
+                            </li>
                             <!-- 分隔线 -->
                             <li class="pt-2 mt-2 border-t border-gray-100"></li>
                             <!-- 品类入口动态渲染 -->
@@ -140,6 +146,12 @@
                                     <span>智能灯条系统</span>
                                 </a>
                             </li>
+                            <li>
+                                <a href="#store-categories" class="nav-link flex items-center space-x-3 p-2 rounded-lg text-gray-600 hover:bg-blue-50 hover:text-primary transition-all duration-300 ease-in-out hover:translate-x-1">
+                                    <i class="fa fa-th-large w-5 text-center"></i>
+                                    <span>门店归类</span>
+                                </a>
+                            </li>
                         </ul>
                     </li>
                     
@@ -161,6 +173,12 @@
                                 <a href="#store-approval" class="nav-link flex items-center space-x-3 p-2 rounded-lg text-gray-600 hover:bg-blue-50 hover:text-primary transition-all duration-300 ease-in-out hover:translate-x-1">
                                     <i class="fa fa-check-square w-5 text-center"></i>
                                     <span>审批管理</span>
+                                </a>
+                            </li>
+                            <li>
+                                <a href="#bd-management" class="nav-link flex items-center space-x-3 p-2 rounded-lg text-gray-600 hover:bg-blue-50 hover:text-primary transition-all duration-300 ease-in-out hover:translate-x-1">
+                                    <i class="fa fa-id-badge w-5 text-center"></i>
+                                    <span>BD管理</span>
                                 </a>
                             </li>
                         </ul>
@@ -635,6 +653,111 @@
                     </div>
                 </div>
                 
+                <!-- 客服中心 -->
+                <div id="customer-service-content" class="content-section hidden">
+                    <div class="mb-6 flex justify-between items-center">
+                        <div>
+                            <h2 class="text-2xl font-bold text-gray-800">客服中心</h2>
+                            <div class="flex items-center space-x-2 mt-1">
+                                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                    <span class="w-2 h-2 bg-green-500 rounded-full mr-1 animate-pulse"></span>AI一号员工在线
+                                </span>
+                                <span class="text-gray-600 text-sm">智能体自动响应订单问题</span>
+                            </div>
+                        </div>
+                        <div class="flex space-x-3">
+                            <button onclick="openCreateTicketModal()" class="bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary/90 flex items-center space-x-2">
+                                <i class="fa fa-plus"></i><span>创建工单</span>
+                            </button>
+                            <button onclick="loadTicketStats()" class="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 flex items-center space-x-2">
+                                <i class="fa fa-refresh"></i><span>刷新</span>
+                            </button>
+                        </div>
+                    </div>
+                    <!-- 统计卡片 -->
+                    <div class="grid grid-cols-2 md:grid-cols-6 gap-3 mb-6" id="ticket-stats-cards">
+                        <div class="bg-white rounded-lg shadow p-4 border-l-4 border-blue-500"><p class="text-xs text-gray-500">今日工单</p><p class="text-xl font-bold" id="ticket-stat-today">-</p></div>
+                        <div class="bg-white rounded-lg shadow p-4 border-l-4 border-orange-500"><p class="text-xs text-gray-500">待处理</p><p class="text-xl font-bold" id="ticket-stat-open">-</p></div>
+                        <div class="bg-white rounded-lg shadow p-4 border-l-4 border-blue-400"><p class="text-xs text-gray-500">AI处理中</p><p class="text-xl font-bold" id="ticket-stat-processing">-</p></div>
+                        <div class="bg-white rounded-lg shadow p-4 border-l-4 border-green-500"><p class="text-xs text-gray-500">已解决</p><p class="text-xl font-bold" id="ticket-stat-resolved">-</p></div>
+                        <div class="bg-white rounded-lg shadow p-4 border-l-4 border-red-500"><p class="text-xs text-gray-500">紧急</p><p class="text-xl font-bold" id="ticket-stat-urgent">-</p></div>
+                        <div class="bg-white rounded-lg shadow p-4 border-l-4 border-gray-400"><p class="text-xs text-gray-500">总计</p><p class="text-xl font-bold" id="ticket-stat-total">-</p></div>
+                    </div>
+                    <!-- 工单列表 + 对话区 -->
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <!-- 左侧：工单列表 -->
+                        <div class="md:col-span-1 bg-white rounded-lg shadow-card p-4">
+                            <div class="flex items-center space-x-2 mb-3">
+                                <select id="ticket-status-filter" class="border rounded px-2 py-1 text-sm flex-1" onchange="loadTicketList()">
+                                    <option value="">全部状态</option><option value="open">待处理</option><option value="processing">处理中</option><option value="resolved">已解决</option><option value="closed">已关闭</option>
+                                </select>
+                                <select id="ticket-priority-filter" class="border rounded px-2 py-1 text-sm" onchange="loadTicketList()">
+                                    <option value="">全部优先级</option><option value="urgent">紧急</option><option value="high">高</option><option value="medium">中</option><option value="low">低</option>
+                                </select>
+                            </div>
+                            <div id="ticket-list" class="space-y-2 max-h-[60vh] overflow-y-auto">
+                                <p class="text-gray-400 text-center py-8">加载中...</p>
+                            </div>
+                        </div>
+                        <!-- 右侧：对话区 -->
+                        <div class="md:col-span-2 bg-white rounded-lg shadow-card p-4 flex flex-col" style="height:70vh">
+                            <div id="ticket-detail-header" class="border-b pb-3 mb-3">
+                                <p class="text-gray-400 text-center">← 请选择一个工单查看对话</p>
+                            </div>
+                            <div id="ticket-conversations" class="flex-1 overflow-y-auto space-y-3 mb-3">
+                            </div>
+                            <div id="ticket-chat-input" class="border-t pt-3 hidden">
+                                <div class="flex space-x-2">
+                                    <input type="text" id="chat-message-input" class="flex-1 border rounded-lg px-4 py-2" placeholder="输入消息..." onkeyup="if(event.key==='Enter')sendChatMessage()">
+                                    <button onclick="sendChatMessage()" class="bg-primary text-white px-6 py-2 rounded-lg hover:bg-primary/90"><i class="fa fa-paper-plane mr-1"></i>发送</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 创建工单弹窗 -->
+                <div id="ticket-modal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden flex items-center justify-center">
+                    <div class="bg-white rounded-xl shadow-xl w-full max-w-lg mx-4 p-6">
+                        <div class="flex items-center justify-between mb-4">
+                            <h3 class="text-lg font-bold">创建工单</h3>
+                            <button onclick="closeCreateTicketModal()" class="text-gray-400 hover:text-gray-600"><i class="fa fa-times text-xl"></i></button>
+                        </div>
+                        <form id="ticket-form" onsubmit="submitTicketForm(event)">
+                            <div class="space-y-3 mb-4">
+                                <div class="grid grid-cols-2 gap-3">
+                                    <div><label class="block text-sm font-medium text-gray-700 mb-1">客户姓名</label>
+                                        <input type="text" id="ticket-customer-name" class="w-full border rounded-lg p-2" placeholder="客户姓名"></div>
+                                    <div><label class="block text-sm font-medium text-gray-700 mb-1">客户电话</label>
+                                        <input type="tel" id="ticket-customer-phone" class="w-full border rounded-lg p-2" placeholder="联系电话"></div>
+                                </div>
+                                <div class="grid grid-cols-2 gap-3">
+                                    <div><label class="block text-sm font-medium text-gray-700 mb-1">问题分类</label>
+                                        <select id="ticket-category" class="w-full border rounded-lg p-2">
+                                            <option value="order_status">订单状态</option><option value="quality">质量问题</option>
+                                            <option value="refund">退款问题</option><option value="delivery">配送问题</option>
+                                            <option value="payment">支付问题</option><option value="complaint">投诉</option>
+                                            <option value="other">其他</option>
+                                        </select></div>
+                                    <div><label class="block text-sm font-medium text-gray-700 mb-1">优先级</label>
+                                        <select id="ticket-priority-input" class="w-full border rounded-lg p-2">
+                                            <option value="medium">中</option><option value="low">低</option>
+                                            <option value="high">高</option><option value="urgent">紧急</option>
+                                        </select></div>
+                                </div>
+                                <div><label class="block text-sm font-medium text-gray-700 mb-1">订单号（可选）</label>
+                                    <input type="text" id="ticket-order-no" class="w-full border rounded-lg p-2" placeholder="关联订单号"></div>
+                                <div><label class="block text-sm font-medium text-gray-700 mb-1">问题描述 <span class="text-red-500">*</span></label>
+                                    <textarea id="ticket-description" required rows="3" class="w-full border rounded-lg p-2" placeholder="请描述客户问题"></textarea></div>
+                            </div>
+                            <div class="flex justify-end space-x-3 pt-4 border-t">
+                                <button type="button" onclick="closeCreateTicketModal()" class="px-4 py-2 border rounded-lg text-gray-700 hover:bg-gray-50">取消</button>
+                                <button type="submit" class="px-6 py-2 bg-primary text-white rounded-lg hover:bg-primary/90">创建并触发AI响应</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+                
                 <!-- ========== 品类业务管理（动态模板） ========== -->
                 <!-- 品类订单管理 -->
                 <div id="business-orders-content" class="content-section hidden">
@@ -737,6 +860,13 @@
                             <p class="text-gray-600">管理所有门店 - 实时数据来自MongoDB</p>
                         </div>
                         <div class="flex space-x-3">
+                            <select id="store-category-filter" class="border rounded-lg px-3 py-2" onchange="loadStoresData()">
+                                <option value="">全部品类</option>
+                                <option value="cleaning">👔 衣物干洗</option><option value="shoe_care">👟 鞋类洗护</option>
+                                <option value="luxury_care">👜 奢侈品护理</option><option value="pet_grooming">🐕 宠物清洗</option>
+                                <option value="electronics_repair">📱 电子产品维修</option><option value="rental">👘 服饰租赁</option>
+                                <option value="rental_leisure">🎮 小件商品租赁</option>
+                            </select>
                             <button onclick="openImportModal()" class="bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded-lg flex items-center space-x-2 transition-all">
                                 <i class="fa fa-upload"></i>
                                 <span>批量导入</span>
@@ -812,6 +942,7 @@
                                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">地址</th>
                                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">联系电话</th>
                                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">服务项目</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">业务品类</th>
                                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">评分</th>
                                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">营业时间</th>
                                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">操作</th>
@@ -1251,6 +1382,37 @@
                     </div>
                 </div>
                 
+                <!-- 门店归类 -->
+                <div id="store-categories-content" class="content-section hidden">
+                    <div class="mb-6 flex justify-between items-center">
+                        <div>
+                            <h2 class="text-2xl font-bold text-gray-800">门店归类</h2>
+                            <p class="text-gray-600">按业务品类分组查看门店</p>
+                        </div>
+                        <button onclick="loadStoreCategories()" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center space-x-2">
+                            <i class="fa fa-refresh"></i><span>刷新</span>
+                        </button>
+                    </div>
+                    <!-- 品类标签栏 -->
+                    <div class="flex flex-wrap gap-2 mb-6" id="store-cat-tabs">
+                        <button onclick="filterStoreByCat('')" class="store-cat-tab px-4 py-2 rounded-full text-sm font-medium bg-primary text-white">全部</button>
+                        <button onclick="filterStoreByCat('cleaning')" class="store-cat-tab px-4 py-2 rounded-full text-sm font-medium bg-gray-100 text-gray-700 hover:bg-gray-200">👔 衣物干洗</button>
+                        <button onclick="filterStoreByCat('shoe_care')" class="store-cat-tab px-4 py-2 rounded-full text-sm font-medium bg-gray-100 text-gray-700 hover:bg-gray-200">👟 鞋类洗护</button>
+                        <button onclick="filterStoreByCat('luxury_care')" class="store-cat-tab px-4 py-2 rounded-full text-sm font-medium bg-gray-100 text-gray-700 hover:bg-gray-200">👜 奢侈品护理</button>
+                        <button onclick="filterStoreByCat('pet_grooming')" class="store-cat-tab px-4 py-2 rounded-full text-sm font-medium bg-gray-100 text-gray-700 hover:bg-gray-200">🐕 宠物清洗</button>
+                        <button onclick="filterStoreByCat('electronics_repair')" class="store-cat-tab px-4 py-2 rounded-full text-sm font-medium bg-gray-100 text-gray-700 hover:bg-gray-200">📱 电子产品维修</button>
+                        <button onclick="filterStoreByCat('rental')" class="store-cat-tab px-4 py-2 rounded-full text-sm font-medium bg-gray-100 text-gray-700 hover:bg-gray-200">👘 服饰租赁</button>
+                        <button onclick="filterStoreByCat('rental_leisure')" class="store-cat-tab px-4 py-2 rounded-full text-sm font-medium bg-gray-100 text-gray-700 hover:bg-gray-200">🎮 小件商品租赁</button>
+                    </div>
+                    <!-- 门店卡片网格 -->
+                    <div id="store-cat-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        <div class="col-span-full text-center text-gray-500 py-12">
+                            <i class="fa fa-spinner fa-spin text-2xl mb-2"></i>
+                            <p>加载门店数据中...</p>
+                        </div>
+                    </div>
+                </div>
+                
                 <!-- 申请入驻 -->
                 <div id="store-apply-content" class="content-section hidden">
                     <div class="mb-6 flex justify-between items-center">
@@ -1341,6 +1503,68 @@
                                 </div>
                             </div>
                             
+                            <!-- 业务品类 -->
+                            <div class="border-b border-gray-200 pb-4">
+                                <h3 class="text-lg font-semibold text-gray-800 mb-4 flex items-center">
+                                    <i class="fa fa-th-large mr-2 text-primary"></i>业务品类 <span class="text-red-500">*</span>
+                                </h3>
+                                <p class="text-sm text-gray-500 mb-4">
+                                    <i class="fa fa-info-circle mr-1"></i>
+                                    选择门店主营品类，审批通过后将自动归类到业务管理对应门类
+                                </p>
+                                <div class="grid grid-cols-2 md:grid-cols-4 gap-3" id="business-category-selector">
+                                    <label class="biz-cat-option cursor-pointer" data-category="cleaning">
+                                        <div class="border-2 border-gray-200 rounded-lg p-3 text-center hover:border-primary transition-all biz-cat-card">
+                                            <div class="text-2xl mb-1">👔</div>
+                                            <div class="text-sm font-medium">衣物干洗</div>
+                                        </div>
+                                        <input type="radio" name="businessCategory" value="cleaning" class="hidden" checked>
+                                    </label>
+                                    <label class="biz-cat-option cursor-pointer" data-category="shoe_care">
+                                        <div class="border-2 border-gray-200 rounded-lg p-3 text-center hover:border-primary transition-all biz-cat-card">
+                                            <div class="text-2xl mb-1">👟</div>
+                                            <div class="text-sm font-medium">鞋类洗护</div>
+                                        </div>
+                                        <input type="radio" name="businessCategory" value="shoe_care" class="hidden">
+                                    </label>
+                                    <label class="biz-cat-option cursor-pointer" data-category="luxury_care">
+                                        <div class="border-2 border-gray-200 rounded-lg p-3 text-center hover:border-primary transition-all biz-cat-card">
+                                            <div class="text-2xl mb-1">👜</div>
+                                            <div class="text-sm font-medium">奢侈品护理</div>
+                                        </div>
+                                        <input type="radio" name="businessCategory" value="luxury_care" class="hidden">
+                                    </label>
+                                    <label class="biz-cat-option cursor-pointer" data-category="pet_grooming">
+                                        <div class="border-2 border-gray-200 rounded-lg p-3 text-center hover:border-primary transition-all biz-cat-card">
+                                            <div class="text-2xl mb-1">🐕</div>
+                                            <div class="text-sm font-medium">宠物清洗</div>
+                                        </div>
+                                        <input type="radio" name="businessCategory" value="pet_grooming" class="hidden">
+                                    </label>
+                                    <label class="biz-cat-option cursor-pointer" data-category="electronics_repair">
+                                        <div class="border-2 border-gray-200 rounded-lg p-3 text-center hover:border-primary transition-all biz-cat-card">
+                                            <div class="text-2xl mb-1">📱</div>
+                                            <div class="text-sm font-medium">电子产品维修</div>
+                                        </div>
+                                        <input type="radio" name="businessCategory" value="electronics_repair" class="hidden">
+                                    </label>
+                                    <label class="biz-cat-option cursor-pointer" data-category="rental">
+                                        <div class="border-2 border-gray-200 rounded-lg p-3 text-center hover:border-primary transition-all biz-cat-card">
+                                            <div class="text-2xl mb-1">👘</div>
+                                            <div class="text-sm font-medium">服饰租赁</div>
+                                        </div>
+                                        <input type="radio" name="businessCategory" value="rental" class="hidden">
+                                    </label>
+                                    <label class="biz-cat-option cursor-pointer" data-category="rental_leisure">
+                                        <div class="border-2 border-gray-200 rounded-lg p-3 text-center hover:border-primary transition-all biz-cat-card">
+                                            <div class="text-2xl mb-1">🎮</div>
+                                            <div class="text-sm font-medium">小件商品租赁</div>
+                                        </div>
+                                        <input type="radio" name="businessCategory" value="rental_leisure" class="hidden">
+                                    </label>
+                                </div>
+                            </div>
+                            
                             <!-- 资质信息 -->
                             <div class="border-b border-gray-200 pb-4">
                                 <h3 class="text-lg font-semibold text-gray-800 mb-4 flex items-center">
@@ -1381,24 +1605,25 @@
                                 </h3>
                                 <p class="text-sm text-gray-500 mb-4">
                                     <i class="fa fa-info-circle mr-1"></i>
-                                    请填写指导您完成申请的BD信息，方便总部联系沟通
+                                    请从下拉列表中选择指导您完成申请的BD，方便总部联系沟通
                                 </p>
                                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <div>
                                         <label class="block text-sm font-medium text-gray-700 mb-2">
-                                            负责BD姓名 <span class="text-red-500">*</span>
+                                            负责BD <span class="text-red-500">*</span>
                                         </label>
-                                        <input type="text" name="bdName" required
-                                               class="w-full border border-gray-300 rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-primary"
-                                               placeholder="请输入负责BD姓名">
+                                        <select name="bdName" id="bd-select" required onchange="onBDSelectChange()"
+                                               class="w-full border border-gray-300 rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-primary">
+                                            <option value="">请选择BD</option>
+                                        </select>
                                     </div>
                                     <div>
                                         <label class="block text-sm font-medium text-gray-700 mb-2">
                                             BD联系电话 <span class="text-red-500">*</span>
                                         </label>
-                                        <input type="tel" name="bdPhone" required
-                                               class="w-full border border-gray-300 rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-primary"
-                                               placeholder="请输入BD联系电话">
+                                        <input type="tel" name="bdPhone" id="bd-phone-auto" required readonly
+                                               class="w-full border border-gray-300 rounded-lg p-3 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-primary"
+                                               placeholder="选择BD后自动填充">
                                     </div>
                                 </div>
                             </div>
@@ -1532,6 +1757,7 @@
                                         <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">申请编号</th>
                                         <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">门店名称</th>
                                         <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">申请人</th>
+                                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">业务品类</th>
                                         <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">联系电话</th>
                                         <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">城市</th>
                                         <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">申请时间</th>
@@ -1541,7 +1767,7 @@
                                 </thead>
                                 <tbody id="approval-list" class="divide-y divide-gray-200">
                                     <tr>
-                                        <td colspan="8" class="px-4 py-12 text-center text-gray-500">
+                                        <td colspan="9" class="px-4 py-12 text-center text-gray-500">
                                             <i class="fa fa-inbox text-2xl mb-2"></i>
                                             <p>暂无申请数据</p>
                                         </td>
@@ -1588,6 +1814,88 @@
                                 </div>
                             </div>
                         </div>
+                    </div>
+                </div>
+                
+                <!-- BD管理 -->
+                <div id="bd-management-content" class="content-section hidden">
+                    <div class="mb-6 flex justify-between items-center">
+                        <div>
+                            <h2 class="text-2xl font-bold text-gray-800">BD管理</h2>
+                            <p class="text-gray-600">管理BD团队组织架构</p>
+                        </div>
+                        <div class="flex space-x-3">
+                            <button onclick="openAddBDModal()" class="bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary/90 flex items-center space-x-2">
+                                <i class="fa fa-plus"></i><span>新增BD</span>
+                            </button>
+                            <button onclick="loadBDTeam()" class="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 flex items-center space-x-2">
+                                <i class="fa fa-refresh"></i><span>刷新</span>
+                            </button>
+                        </div>
+                    </div>
+                    <!-- BD统计卡片 -->
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6" id="bd-stats-cards">
+                        <div class="bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl p-5 text-white"><h3 class="text-blue-100 text-sm">BD总数</h3><p class="text-2xl font-bold mt-1" id="bd-stat-total">-</p></div>
+                        <div class="bg-gradient-to-br from-green-500 to-green-600 rounded-xl p-5 text-white"><h3 class="text-green-100 text-sm">活跃BD</h3><p class="text-2xl font-bold mt-1" id="bd-stat-active">-</p></div>
+                        <div class="bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl p-5 text-white"><h3 class="text-purple-100 text-sm">总监/经理</h3><p class="text-2xl font-bold mt-1" id="bd-stat-manager">-</p></div>
+                        <div class="bg-gradient-to-br from-orange-500 to-orange-600 rounded-xl p-5 text-white"><h3 class="text-orange-100 text-sm">初级/高级</h3><p class="text-2xl font-bold mt-1" id="bd-stat-junior">-</p></div>
+                    </div>
+                    <!-- BD列表 -->
+                    <div class="bg-white rounded-xl shadow-card p-6">
+                        <div class="flex items-center space-x-4 mb-4">
+                            <input type="text" id="bd-search-input" placeholder="搜索BD姓名/电话..." class="border rounded-lg px-4 py-2 flex-1" oninput="loadBDTeam()">
+                            <select id="bd-level-filter" class="border rounded-lg px-3 py-2" onchange="loadBDTeam()">
+                                <option value="">全部层级</option>
+                                <option value="director">总监</option>
+                                <option value="manager">经理</option>
+                                <option value="senior">高级BD</option>
+                                <option value="junior">初级BD</option>
+                            </select>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-sm">
+                                <thead><tr class="border-b">
+                                    <th class="p-3 text-left">编号</th><th class="p-3 text-left">姓名</th><th class="p-3 text-left">电话</th>
+                                    <th class="p-3 text-left">区域</th><th class="p-3 text-left">层级</th><th class="p-3 text-left">上级BD</th>
+                                    <th class="p-3 text-left">状态</th><th class="p-3 text-left">门店数</th><th class="p-3 text-left">操作</th>
+                                </tr></thead>
+                                <tbody id="bd-table-body"><tr><td colspan="9" class="p-8 text-center text-gray-400">加载中...</td></tr></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- BD新增/编辑弹窗 -->
+                <div id="bd-modal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden flex items-center justify-center">
+                    <div class="bg-white rounded-xl shadow-xl w-full max-w-lg mx-4 p-6">
+                        <div class="flex items-center justify-between mb-4">
+                            <h3 class="text-lg font-bold" id="bd-modal-title">新增BD</h3>
+                            <button onclick="closeBDModal()" class="text-gray-400 hover:text-gray-600"><i class="fa fa-times text-xl"></i></button>
+                        </div>
+                        <form id="bd-form" onsubmit="submitBDForm(event)">
+                            <input type="hidden" id="bd-edit-id" value="">
+                            <div class="grid grid-cols-2 gap-4 mb-4">
+                                <div><label class="block text-sm font-medium text-gray-700 mb-1">姓名 <span class="text-red-500">*</span></label>
+                                    <input type="text" id="bd-form-name" required class="w-full border rounded-lg p-2" placeholder="BD姓名"></div>
+                                <div><label class="block text-sm font-medium text-gray-700 mb-1">电话 <span class="text-red-500">*</span></label>
+                                    <input type="tel" id="bd-form-phone" required class="w-full border rounded-lg p-2" placeholder="联系电话"></div>
+                                <div><label class="block text-sm font-medium text-gray-700 mb-1">负责区域</label>
+                                    <input type="text" id="bd-form-region" class="w-full border rounded-lg p-2" placeholder="如：华东区"></div>
+                                <div><label class="block text-sm font-medium text-gray-700 mb-1">层级</label>
+                                    <select id="bd-form-level" class="w-full border rounded-lg p-2">
+                                        <option value="junior">初级BD</option><option value="senior">高级BD</option>
+                                        <option value="manager">经理</option><option value="director">总监</option>
+                                    </select></div>
+                                <div><label class="block text-sm font-medium text-gray-700 mb-1">所属团队</label>
+                                    <input type="text" id="bd-form-team" class="w-full border rounded-lg p-2" placeholder="团队名称"></div>
+                                <div><label class="block text-sm font-medium text-gray-700 mb-1">上级BD</label>
+                                    <select id="bd-form-parent" class="w-full border rounded-lg p-2"><option value="">无（顶级）</option></select></div>
+                            </div>
+                            <div class="flex justify-end space-x-3 pt-4 border-t">
+                                <button type="button" onclick="closeBDModal()" class="px-4 py-2 border rounded-lg text-gray-700 hover:bg-gray-50">取消</button>
+                                <button type="submit" class="px-6 py-2 bg-primary text-white rounded-lg hover:bg-primary/90">保存</button>
+                            </div>
+                        </form>
                     </div>
                 </div>
                 
@@ -2493,7 +2801,7 @@
         // 权限配置
         const permissions = {
             '总管理员': {
-                navigation: ['dashboard', 'orders', 'customers', 'items', 'members', 'stores', 'provincial-summary', 'light-system', 'store-apply', 'store-approval', 'bd-communication', 'users', 'messages', 'statistics', 'fund-management', 'store-supervision', 'settings', 'backup', 'miniprogram', 'business-orders', 'business-customers', 'business-members', 'chain-list', 'chain-create', 'chain-stores'],
+                navigation: ['dashboard', 'orders', 'customers', 'items', 'members', 'stores', 'provincial-summary', 'light-system', 'store-categories', 'store-apply', 'store-approval', 'bd-management', 'bd-communication', 'customer-service', 'users', 'messages', 'statistics', 'fund-management', 'store-supervision', 'settings', 'backup', 'miniprogram', 'business-orders', 'business-customers', 'business-members', 'chain-list', 'chain-create', 'chain-stores'],
                 canViewAllData: true,
                 canManageUsers: true,
                 canManageStores: true,
@@ -2505,7 +2813,7 @@
                 canChangeSettings: true
             },
             '区域管理员': {
-                navigation: ['dashboard', 'provincial-summary', 'stores', 'members', 'statistics', 'store-supervision', 'messages', 'miniprogram', 'store-apply', 'store-approval', 'bd-communication'],
+                navigation: ['dashboard', 'provincial-summary', 'stores', 'store-categories', 'members', 'statistics', 'store-supervision', 'messages', 'miniprogram', 'store-apply', 'store-approval', 'bd-management', 'bd-communication', 'customer-service'],
                 canViewAllData: false,
                 canManageUsers: false,
                 canManageStores: true,
@@ -2517,7 +2825,7 @@
                 canChangeSettings: false
             },
             '门店管理员': {
-                navigation: ['dashboard', 'orders', 'customers', 'members', 'items', 'light-system', 'statistics', 'messages', 'settings', 'backup', 'miniprogram', 'store-apply'],
+                navigation: ['dashboard', 'orders', 'customers', 'members', 'items', 'light-system', 'statistics', 'messages', 'settings', 'backup', 'miniprogram', 'store-apply', 'customer-service'],
                 canViewAllData: false,
                 canManageUsers: false,
                 canManageStores: false,
@@ -2659,9 +2967,10 @@
             const apiStatus = document.getElementById('api-status');
             
             // 显示加载状态
+            const catFilter = document.getElementById('store-category-filter')?.value || '';
             tableBody.innerHTML = `
                 <tr>
-                    <td colspan="8" class="px-6 py-12 text-center text-gray-500">
+                    <td colspan="9" class="px-6 py-12 text-center text-gray-500">
                         <i class="fa fa-spinner fa-spin text-2xl mb-2"></i>
                         <p>正在从MongoDB加载门店数据...</p>
                     </td>
@@ -2671,7 +2980,8 @@
             apiStatus.className = 'ml-2 inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800';
             
             try {
-                const response = await fetch('http://localhost:3000/api/stores');
+                const storeUrl = catFilter ? `http://localhost:3000/api/stores?businessCategory=${catFilter}` : 'http://localhost:3000/api/stores';
+                const response = await fetch(storeUrl);
                 const result = await response.json();
                 
                 if (result.success && result.data) {
@@ -2709,7 +3019,7 @@
                     if (stores.length === 0) {
                         tableBody.innerHTML = `
                             <tr>
-                                <td colspan="8" class="px-6 py-12 text-center text-gray-500">
+                                <td colspan="9" class="px-6 py-12 text-center text-gray-500">
                                     <i class="fa fa-inbox text-4xl mb-2"></i>
                                     <p>暂无门店数据</p>
                                 </td>
@@ -2747,6 +3057,11 @@
                                     </div>
                                 </td>
                                 <td class="px-6 py-4 whitespace-nowrap">
+                                    <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+                                        ${(function(){ const cm={'cleaning':'👔 衣物干洗','shoe_care':'👟 鞋类洗护','luxury_care':'👜 奢侈品护理','pet_grooming':'🐕 宠物清洗','electronics_repair':'📱 电子产品维修','rental':'👘 服饰租赁','rental_leisure':'🎮 小件商品租赁'}; return cm[store.businessCategory]||'👔 衣物干洗'; })()}
+                                    </span>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap">
                                     <div class="flex items-center">
                                         <span class="text-yellow-500 mr-1">★</span>
                                         <span class="text-sm font-medium">${store.rating || '-'}</span>
@@ -2781,7 +3096,7 @@
                 
                 tableBody.innerHTML = `
                     <tr>
-                        <td colspan="8" class="px-6 py-12 text-center text-red-500">
+                        <td colspan="9" class="px-6 py-12 text-center text-red-500">
                             <i class="fa fa-exclamation-triangle text-4xl mb-2"></i>
                             <p>加载失败: ${error.message}</p>
                             <button onclick="loadStoresData()" class="mt-2 text-blue-500 hover:text-blue-700">
@@ -3791,8 +4106,16 @@
                             if (targetSection) {
                                 targetSection.classList.remove('hidden');
                                 if (target === 'stores') loadStoresData();
+                                if (target === 'store-categories') loadStoreCategories();
+                                if (target === 'bd-management') loadBDTeam();
+                                if (target === 'customer-service') loadTicketStats();
                                 if (target === 'orders') loadAdminOrders();
                                 if (target === 'dashboard') loadDashboard();
+                                if (target === 'chain-list') loadChainList();
+                                if (target === 'users') loadUsers();
+                                if (target === 'statistics') loadStatistics();
+                                if (target === 'members') loadMembers();
+                                if (target === 'chain-stores') loadChainStoresSelect();
                             } else {
                                 console.warn('内容区域未找到:', sectionId);
                             }
@@ -4102,11 +4425,47 @@
         // 门店申请数据存储
         let storeApplications = [];
         
+        // 业务品类选择器点击效果
+        document.querySelectorAll('.biz-cat-option').forEach(function(label) {
+            label.addEventListener('click', function() {
+                // 重置所有卡片样式
+                document.querySelectorAll('.biz-cat-card').forEach(function(card) {
+                    card.classList.remove('border-primary', 'bg-blue-50');
+                    card.classList.add('border-gray-200');
+                });
+                // 高亮选中卡片
+                var card = this.querySelector('.biz-cat-card');
+                card.classList.remove('border-gray-200');
+                card.classList.add('border-primary', 'bg-blue-50');
+                // 设置radio选中
+                var radio = this.querySelector('input[type="radio"]');
+                if (radio) radio.checked = true;
+            });
+        });
+        // 初始化默认选中第一个
+        (function() {
+            var firstCard = document.querySelector('.biz-cat-option .biz-cat-card');
+            if (firstCard) {
+                firstCard.classList.remove('border-gray-200');
+                firstCard.classList.add('border-primary', 'bg-blue-50');
+            }
+        })();
+        
         // 重置申请表单
         window.resetRegistrationForm = function() {
             document.getElementById('store-registration-form').reset();
             document.getElementById('application-status').classList.add('hidden');
-        }
+            // 重置品类选择器
+            document.querySelectorAll('.biz-cat-card').forEach(function(card) {
+                card.classList.remove('border-primary', 'bg-blue-50');
+                card.classList.add('border-gray-200');
+            });
+            var firstCard = document.querySelector('.biz-cat-option .biz-cat-card');
+            if (firstCard) {
+                firstCard.classList.remove('border-gray-200');
+                firstCard.classList.add('border-primary', 'bg-blue-50');
+            }
+        };
         
         // 提交门店注册申请
         document.getElementById('store-registration-form').addEventListener('submit', async function(e) {
@@ -4129,6 +4488,7 @@
                 },
                 businessLicense: formData.get('businessLicense'),
                 legalPerson: formData.get('legalPerson'),
+                businessCategory: formData.get('businessCategory') || 'cleaning',
                 description: formData.get('description'),
                 bdName: formData.get('bdName'),
                 bdPhone: formData.get('bdPhone'),
@@ -4140,10 +4500,12 @@
             
             try {
                 // 调用API提交申请
+                const token = await initAdminToken();
                 const response = await fetch('http://localhost:3000/api/admin/store-applications', {
                     method: 'POST',
                     headers: {
-                        'Content-Type': 'application/json'
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
                     },
                     body: JSON.stringify(applicationData)
                 });
@@ -4218,7 +4580,10 @@
             const listBody = document.getElementById('approval-list');
             
             try {
-                const response = await fetch('http://localhost:3000/api/admin/store-applications');
+                const token = await initAdminToken();
+                const response = await fetch('http://localhost:3000/api/admin/store-applications', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
                 const result = await response.json();
                 
                 if (result.success && result.data) {
@@ -4241,10 +4606,21 @@
         function renderApprovalList(applications) {
             const listBody = document.getElementById('approval-list');
             
+            // 品类映射
+            const categoryMap = {
+                'cleaning': { name: '衣物干洗', icon: '👔' },
+                'shoe_care': { name: '鞋类洗护', icon: '👟' },
+                'luxury_care': { name: '奢侈品护理', icon: '👜' },
+                'pet_grooming': { name: '宠物清洗', icon: '🐕' },
+                'electronics_repair': { name: '电子产品维修', icon: '📱' },
+                'rental': { name: '服饰租赁', icon: '👘' },
+                'rental_leisure': { name: '小件商品租赁', icon: '🎮' }
+            };
+            
             if (!applications || applications.length === 0) {
                 listBody.innerHTML = `
                     <tr>
-                        <td colspan="8" class="px-4 py-12 text-center text-gray-500">
+                        <td colspan="9" class="px-4 py-12 text-center text-gray-500">
                             <i class="fa fa-inbox text-2xl mb-2"></i>
                             <p>暂无申请数据</p>
                         </td>
@@ -4262,12 +4638,14 @@
                 };
                 
                 const status = statusMap[app.status] || statusMap['pending'];
+                const cat = categoryMap[app.businessCategory] || { name: '衣物干洗', icon: '👔' };
                 
                 return `
                     <tr class="hover:bg-gray-50">
                         <td class="px-4 py-3 text-sm font-medium text-gray-900">${app.applicationId}</td>
                         <td class="px-4 py-3 text-sm text-gray-600">${app.storeName}</td>
                         <td class="px-4 py-3 text-sm text-gray-600">${app.applicantName}</td>
+                        <td class="px-4 py-3 text-sm"><span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-indigo-50 text-indigo-700">${cat.icon} ${cat.name}</span></td>
                         <td class="px-4 py-3 text-sm text-gray-600">${app.applicantPhone}</td>
                         <td class="px-4 py-3 text-sm text-gray-600">${app.city || '-'}</td>
                         <td class="px-4 py-3 text-sm text-gray-600">${new Date(app.createTime).toLocaleDateString()}</td>
@@ -4458,9 +4836,13 @@
             });
             
             try {
+                const token = await initAdminToken();
                 await fetch(`http://localhost:3000/api/admin/store-applications/${applicationId}`, {
                     method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
                     body: JSON.stringify(app)
                 });
             } catch (error) {
@@ -4500,12 +4882,17 @@
                     city: app.city,
                     district: app.district,
                     businessHours: app.businessHours,
+                    businessCategory: app.businessCategory || 'cleaning',
                     description: app.description
                 };
                 
+                const token = await initAdminToken();
                 const response = await fetch('http://localhost:3000/api/admin/stores', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
                     body: JSON.stringify(storeData)
                 });
                 
@@ -4523,7 +4910,10 @@
                 // 更新申请状态
                 await fetch(`http://localhost:3000/api/admin/store-applications/${applicationId}`, {
                     method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
                     body: JSON.stringify(app)
                 });
                 
@@ -4557,9 +4947,13 @@
             });
             
             try {
+                const token = await initAdminToken();
                 await fetch(`http://localhost:3000/api/admin/store-applications/${applicationId}`, {
                     method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
                     body: JSON.stringify(app)
                 });
             } catch (error) {
@@ -5942,6 +6336,9 @@
                 if (targetSection) {
                     targetSection.classList.remove('hidden');
                     if (target === 'stores' && typeof loadStoresData === 'function') loadStoresData();
+                    if (target === 'store-categories' && typeof loadStoreCategories === 'function') loadStoreCategories();
+                    if (target === 'bd-management' && typeof loadBDTeam === 'function') loadBDTeam();
+                    if (target === 'customer-service' && typeof loadTicketStats === 'function') loadTicketStats();
                     if (target === 'orders' && typeof loadAdminOrders === 'function') loadAdminOrders();
                     if (target === 'dashboard' && typeof loadDashboard === 'function') loadDashboard();
                     if (target === 'statistics' && typeof loadStatistics === 'function') loadStatistics();
@@ -6368,6 +6765,414 @@
                 alert('操作失败: ' + e.message);
             }
         };
+
+        // ========== 门店归类功能 ==========
+        let allStoresForCat = [];
+        let currentCatFilter = '';
+
+        async function loadStoreCategories() {
+            try {
+                const resp = await fetch('http://localhost:3000/api/stores?pageSize=200');
+                const result = await resp.json();
+                allStoresForCat = result.success ? (result.data.list || []) : [];
+                filterStoreByCat(currentCatFilter);
+            } catch (e) {
+                document.getElementById('store-cat-grid').innerHTML = '<div class="col-span-full text-center text-red-500 py-8">加载失败: ' + e.message + '</div>';
+            }
+        }
+
+        function filterStoreByCat(cat) {
+            currentCatFilter = cat;
+            document.querySelectorAll('.store-cat-tab').forEach(btn => {
+                btn.className = btn.className.replace(/bg-primary text-white/g, 'bg-gray-100 text-gray-700');
+            });
+            const tabs = document.querySelectorAll('.store-cat-tab');
+            tabs.forEach(btn => {
+                const onclickStr = btn.getAttribute('onclick') || '';
+                if ((cat === '' && onclickStr.includes("''")) || onclickStr.includes("'" + cat + "'")) {
+                    btn.className = btn.className.replace(/bg-gray-100 text-gray-700/g, 'bg-primary text-white');
+                }
+            });
+            const catMap = {'cleaning':'👔 衣物干洗','shoe_care':'👟 鞋类洗护','luxury_care':'👜 奢侈品护理','pet_grooming':'🐕 宠物清洗','electronics_repair':'📱 电子产品维修','rental':'👘 服饰租赁','rental_leisure':'🎮 小件商品租赁'};
+            const filtered = cat ? allStoresForCat.filter(s => s.businessCategory === cat) : allStoresForCat;
+            const grid = document.getElementById('store-cat-grid');
+            if (filtered.length === 0) {
+                grid.innerHTML = '<div class="col-span-full text-center text-gray-500 py-12"><i class="fa fa-inbox text-4xl mb-2"></i><p>该品类下暂无门店</p></div>';
+                return;
+            }
+            grid.innerHTML = filtered.map(store => `
+                <div class="bg-white rounded-lg shadow-card p-5 border border-gray-100 hover:shadow-card-hover transition-all">
+                    <div class="flex items-start justify-between mb-3">
+                        <div class="flex items-center space-x-3">
+                            <div class="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center">
+                                <i class="fa fa-building text-blue-600"></i>
+                            </div>
+                            <div>
+                                <h4 class="font-semibold text-gray-800">${store.name || '-'}</h4>
+                                <p class="text-xs text-gray-500">${store.storeNo || store.storeId || '-'}</p>
+                            </div>
+                        </div>
+                        <span class="px-2 py-0.5 rounded-full text-xs font-medium ${store.status==='active'?'bg-green-100 text-green-700':'bg-gray-100 text-gray-500'}">${store.status==='active'?'营业中':'停用'}</span>
+                    </div>
+                    <div class="space-y-1 text-sm text-gray-600">
+                        <p><i class="fa fa-map-marker w-4 text-center text-gray-400"></i> ${store.address || '-'}</p>
+                        <p><i class="fa fa-phone w-4 text-center text-gray-400"></i> ${store.phone || '-'}</p>
+                        <p><i class="fa fa-tag w-4 text-center text-gray-400"></i> ${catMap[store.businessCategory] || '👔 衣物干洗'}</p>
+                    </div>
+                    <div class="mt-3 pt-2 border-t flex items-center justify-between text-xs text-gray-500">
+                        <span>订单: ${store.stats?.totalOrders || 0}</span>
+                        <span>评分: ★ ${store.stats?.rating || store.rating || '-'}</span>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // ========== BD管理功能 ==========
+        let bdListCache = [];
+
+        async function loadBDTeam() {
+            const tbody = document.getElementById('bd-table-body');
+            tbody.innerHTML = '<tr><td colspan="9" class="p-8 text-center text-gray-400">加载中...</td></tr>';
+            try {
+                const keyword = document.getElementById('bd-search-input')?.value || '';
+                const level = document.getElementById('bd-level-filter')?.value || '';
+                const params = new URLSearchParams();
+                if (keyword) params.set('keyword', keyword);
+                if (level) params.set('level', level);
+                const resp = await fetch(`http://localhost:3000/api/admin/bd-team?${params}`);
+                const result = await resp.json();
+                if (result.success) {
+                    bdListCache = result.data.list || [];
+                    renderBDTable(bdListCache);
+                    loadBDStats();
+                } else {
+                    tbody.innerHTML = `<tr><td colspan="9" class="p-8 text-center text-red-500">${result.error}</td></tr>`;
+                }
+            } catch (e) {
+                tbody.innerHTML = `<tr><td colspan="9" class="p-8 text-center text-red-500">加载失败: ${e.message}</td></tr>`;
+            }
+        }
+
+        function renderBDTable(list) {
+            const tbody = document.getElementById('bd-table-body');
+            const levelMap = {junior:'初级BD',senior:'高级BD',manager:'经理',director:'总监'};
+            const levelColors = {junior:'bg-gray-100 text-gray-700',senior:'bg-blue-100 text-blue-700',manager:'bg-purple-100 text-purple-700',director:'bg-red-100 text-red-700'};
+            if (list.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="9" class="p-8 text-center text-gray-500"><i class="fa fa-inbox text-2xl mb-2"></i><p>暂无BD数据，点击“新增BD”添加</p></td></tr>';
+                return;
+            }
+            tbody.innerHTML = list.map(bd => {
+                const parentBd = bdListCache.find(p => p._id === bd.parentBdId);
+                return `<tr class="hover:bg-gray-50">
+                    <td class="p-3 text-sm">${bd.bdNo || '-'}</td>
+                    <td class="p-3 text-sm font-medium">${bd.name}</td>
+                    <td class="p-3 text-sm">${bd.phone}</td>
+                    <td class="p-3 text-sm">${bd.region || '-'}</td>
+                    <td class="p-3"><span class="px-2 py-0.5 rounded-full text-xs font-medium ${levelColors[bd.level]||''}">${levelMap[bd.level]||bd.level}</span></td>
+                    <td class="p-3 text-sm">${parentBd ? parentBd.name : '-'}</td>
+                    <td class="p-3"><span class="px-2 py-0.5 rounded-full text-xs ${bd.status==='active'?'bg-green-100 text-green-700':'bg-gray-100 text-gray-500'}">${bd.status==='active'?'活跃':'停用'}</span></td>
+                    <td class="p-3 text-sm">${bd.storeCount || 0}</td>
+                    <td class="p-3 text-sm">
+                        <button onclick="editBD('${bd._id}')" class="text-green-600 hover:text-green-800 mr-2"><i class="fa fa-edit"></i></button>
+                        <button onclick="deleteBD('${bd._id}','${bd.name}')" class="text-red-500 hover:text-red-700"><i class="fa fa-trash"></i></button>
+                    </td>
+                </tr>`;
+            }).join('');
+        }
+
+        async function loadBDStats() {
+            try {
+                const resp = await fetch('http://localhost:3000/api/admin/bd-team/stats');
+                const result = await resp.json();
+                if (result.success) {
+                    const d = result.data;
+                    document.getElementById('bd-stat-total').textContent = d.total || 0;
+                    document.getElementById('bd-stat-active').textContent = d.active || 0;
+                    const ld = d.levelDistribution || {};
+                    document.getElementById('bd-stat-manager').textContent = (ld.director||0) + (ld.manager||0);
+                    document.getElementById('bd-stat-junior').textContent = (ld.junior||0) + (ld.senior||0);
+                }
+            } catch (e) { console.error('BD统计加载失败:', e); }
+        }
+
+        function openAddBDModal() {
+            document.getElementById('bd-modal-title').textContent = '新增BD';
+            document.getElementById('bd-edit-id').value = '';
+            document.getElementById('bd-form-name').value = '';
+            document.getElementById('bd-form-phone').value = '';
+            document.getElementById('bd-form-region').value = '';
+            document.getElementById('bd-form-level').value = 'junior';
+            document.getElementById('bd-form-team').value = '';
+            loadBDParentOptions();
+            document.getElementById('bd-modal').classList.remove('hidden');
+        }
+
+        function editBD(id) {
+            const bd = bdListCache.find(b => b._id === id);
+            if (!bd) return;
+            document.getElementById('bd-modal-title').textContent = '编辑BD';
+            document.getElementById('bd-edit-id').value = id;
+            document.getElementById('bd-form-name').value = bd.name || '';
+            document.getElementById('bd-form-phone').value = bd.phone || '';
+            document.getElementById('bd-form-region').value = bd.region || '';
+            document.getElementById('bd-form-level').value = bd.level || 'junior';
+            document.getElementById('bd-form-team').value = bd.teamName || '';
+            loadBDParentOptions(bd.parentBdId);
+            document.getElementById('bd-modal').classList.remove('hidden');
+        }
+
+        function closeBDModal() { document.getElementById('bd-modal').classList.add('hidden'); }
+
+        async function loadBDParentOptions(selectedId) {
+            const sel = document.getElementById('bd-form-parent');
+            sel.innerHTML = '<option value="">无（顶级）</option>';
+            try {
+                const resp = await fetch('http://localhost:3000/api/admin/bd-team/active');
+                const result = await resp.json();
+                if (result.success) {
+                    (result.data || []).forEach(bd => {
+                        sel.innerHTML += `<option value="${bd._id}" ${bd._id===selectedId?'selected':''}>${bd.name} (${bd.phone})</option>`;
+                    });
+                }
+            } catch (e) {}
+        }
+
+        async function submitBDForm(e) {
+            e.preventDefault();
+            const editId = document.getElementById('bd-edit-id').value;
+            const data = {
+                name: document.getElementById('bd-form-name').value,
+                phone: document.getElementById('bd-form-phone').value,
+                region: document.getElementById('bd-form-region').value,
+                level: document.getElementById('bd-form-level').value,
+                teamName: document.getElementById('bd-form-team').value,
+                parentBdId: document.getElementById('bd-form-parent').value || null
+            };
+            try {
+                const url = editId ? `http://localhost:3000/api/admin/bd-team/${editId}` : 'http://localhost:3000/api/admin/bd-team';
+                const method = editId ? 'PUT' : 'POST';
+                const resp = await fetch(url, { method, headers: {'Content-Type':'application/json'}, body: JSON.stringify(data) });
+                const result = await resp.json();
+                if (result.success) {
+                    alert(editId ? 'BD更新成功！' : 'BD创建成功！');
+                    closeBDModal();
+                    loadBDTeam();
+                } else {
+                    alert('操作失败: ' + (result.error || '未知错误'));
+                }
+            } catch (err) { alert('请求失败: ' + err.message); }
+        }
+
+        async function deleteBD(id, name) {
+            if (!confirm(`确定停用BD "${name}"？`)) return;
+            try {
+                const resp = await fetch(`http://localhost:3000/api/admin/bd-team/${id}`, { method: 'DELETE' });
+                const result = await resp.json();
+                if (result.success) { alert('BD已停用'); loadBDTeam(); }
+            } catch (e) { alert('操作失败: ' + e.message); }
+        }
+
+        async function loadBDOptions() {
+            const sel = document.getElementById('bd-select');
+            if (!sel) return;
+            try {
+                const resp = await fetch('http://localhost:3000/api/admin/bd-team/active');
+                const result = await resp.json();
+                if (result.success) {
+                    sel.innerHTML = '<option value="">请选择BD</option>';
+                    (result.data || []).forEach(bd => {
+                        sel.innerHTML += `<option value="${bd.name}" data-phone="${bd.phone}" data-id="${bd._id}">${bd.name} - ${bd.region || '未分配'} (${bd.level || 'BD'})</option>`;
+                    });
+                }
+            } catch (e) { console.error('BD选项加载失败:', e); }
+        }
+
+        function onBDSelectChange() {
+            const sel = document.getElementById('bd-select');
+            const phoneInput = document.getElementById('bd-phone-auto');
+            if (sel && phoneInput) {
+                const selected = sel.options[sel.selectedIndex];
+                phoneInput.value = selected.getAttribute('data-phone') || '';
+            }
+        }
+
+        // ========== 客服中心功能 ==========
+        let currentTicketId = null;
+
+        async function loadTicketStats() {
+            try {
+                const resp = await fetch('http://localhost:3000/api/admin/service-tickets/stats');
+                const result = await resp.json();
+                if (result.success) {
+                    const d = result.data;
+                    document.getElementById('ticket-stat-today').textContent = d.todayCount || 0;
+                    document.getElementById('ticket-stat-open').textContent = d.open || 0;
+                    document.getElementById('ticket-stat-processing').textContent = d.processing || 0;
+                    document.getElementById('ticket-stat-resolved').textContent = d.resolved || 0;
+                    document.getElementById('ticket-stat-urgent').textContent = d.urgentCount || 0;
+                    document.getElementById('ticket-stat-total').textContent = d.total || 0;
+                }
+                loadTicketList();
+            } catch (e) { console.error('工单统计加载失败:', e); }
+        }
+
+        async function loadTicketList() {
+            const container = document.getElementById('ticket-list');
+            const status = document.getElementById('ticket-status-filter')?.value || '';
+            const priority = document.getElementById('ticket-priority-filter')?.value || '';
+            const params = new URLSearchParams();
+            if (status) params.set('status', status);
+            if (priority) params.set('priority', priority);
+            try {
+                const resp = await fetch(`http://localhost:3000/api/admin/service-tickets?${params}&pageSize=50`);
+                const result = await resp.json();
+                if (result.success && result.data.list) {
+                    const catMap = {order_status:'订单状态',quality:'质量问题',refund:'退款',delivery:'配送',payment:'支付',complaint:'投诉',other:'其他'};
+                    const prioColors = {urgent:'border-l-4 border-red-500',high:'border-l-4 border-orange-500',medium:'border-l-4 border-blue-400',low:'border-l-4 border-gray-300'};
+                    const statusBadge = {open:'bg-orange-100 text-orange-700',processing:'bg-blue-100 text-blue-700',resolved:'bg-green-100 text-green-700',closed:'bg-gray-100 text-gray-500'};
+                    const statusText = {open:'待处理',processing:'处理中',resolved:'已解决',closed:'已关闭'};
+                    if (result.data.list.length === 0) {
+                        container.innerHTML = '<p class="text-gray-400 text-center py-8">暂无工单</p>';
+                        return;
+                    }
+                    container.innerHTML = result.data.list.map(t => `
+                        <div onclick="openTicketDetail('${t._id}')" class="p-3 rounded-lg cursor-pointer hover:bg-blue-50 transition ${prioColors[t.priority]||''} ${currentTicketId===t._id?'bg-blue-50 ring-1 ring-primary':''}">
+                            <div class="flex items-center justify-between mb-1">
+                                <span class="text-xs font-mono text-gray-500">${t.ticketNo}</span>
+                                <span class="px-1.5 py-0.5 rounded text-xs ${statusBadge[t.status]||''}">${statusText[t.status]||t.status}</span>
+                            </div>
+                            <p class="text-sm font-medium text-gray-800 truncate">${t.title || t.description || '无标题'}</p>
+                            <div class="flex items-center justify-between mt-1 text-xs text-gray-500">
+                                <span>${catMap[t.category]||'其他'}</span>
+                                <span>${t.customerName || '-'}</span>
+                            </div>
+                        </div>
+                    `).join('');
+                }
+            } catch (e) { container.innerHTML = '<p class="text-red-500 text-center py-4">加载失败</p>'; }
+        }
+
+        async function openTicketDetail(id) {
+            currentTicketId = id;
+            try {
+                const resp = await fetch(`http://localhost:3000/api/admin/service-tickets/${id}`);
+                const result = await resp.json();
+                if (result.success) {
+                    const t = result.data;
+                    const catMap = {order_status:'订单状态',quality:'质量问题',refund:'退款',delivery:'配送',payment:'支付',complaint:'投诉',other:'其他'};
+                    const statusText = {open:'待处理',processing:'处理中',resolved:'已解决',closed:'已关闭'};
+                    document.getElementById('ticket-detail-header').innerHTML = `
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <span class="text-sm font-mono text-gray-500">${t.ticketNo}</span>
+                                <span class="ml-2 px-2 py-0.5 rounded text-xs bg-blue-100 text-blue-700">${catMap[t.category]||'其他'}</span>
+                                <span class="ml-1 px-2 py-0.5 rounded text-xs ${t.priority==='urgent'?'bg-red-100 text-red-700':'bg-gray-100 text-gray-700'}">${t.priority}</span>
+                            </div>
+                            <div class="flex items-center space-x-2">
+                                <span class="text-sm text-gray-500">${statusText[t.status]||t.status}</span>
+                                <select onchange="updateTicketStatus('${t._id}', this.value)" class="border rounded px-2 py-1 text-xs">
+                                    <option value="open" ${t.status==='open'?'selected':''}>待处理</option>
+                                    <option value="processing" ${t.status==='processing'?'selected':''}>处理中</option>
+                                    <option value="resolved" ${t.status==='resolved'?'selected':''}>已解决</option>
+                                    <option value="closed" ${t.status==='closed'?'selected':''}>已关闭</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="mt-2 text-sm text-gray-600">
+                            <span>客户: ${t.customerName||'-'} ${t.customerPhone||''}</span>
+                            ${t.orderNo ? `<span class="ml-4">订单: ${t.orderNo}</span>` : ''}
+                            <span class="ml-4">处理: ${t.assignedTo==='ai_agent'?'🤖 AI智能体':'👤 人工'}</span>
+                        </div>`;
+                    const convContainer = document.getElementById('ticket-conversations');
+                    convContainer.innerHTML = (t.conversations || []).map(c => {
+                        const isAI = c.sender === 'ai_agent';
+                        const isCustomer = c.sender === 'customer';
+                        const align = isAI ? 'items-start' : 'items-end';
+                        const bubbleColor = isAI ? 'bg-blue-50 border-blue-200' : isCustomer ? 'bg-green-50 border-green-200' : 'bg-gray-50 border-gray-200';
+                        const icon = isAI ? '🤖' : isCustomer ? '👤' : '⚙️';
+                        const label = isAI ? 'AI智能体' : isCustomer ? '客户' : '系统';
+                        return `<div class="flex ${align}">
+                            <div class="max-w-[80%]">
+                                <div class="flex items-center space-x-1 mb-1">
+                                    <span>${icon}</span><span class="text-xs text-gray-500">${label}</span>
+                                    <span class="text-xs text-gray-400">${new Date(c.time).toLocaleString()}</span>
+                                </div>
+                                <div class="p-3 rounded-lg border ${bubbleColor} text-sm whitespace-pre-wrap">${c.content}</div>
+                            </div>
+                        </div>`;
+                    }).join('');
+                    convContainer.scrollTop = convContainer.scrollHeight;
+                    document.getElementById('ticket-chat-input').classList.remove('hidden');
+                    loadTicketList();
+                }
+            } catch (e) {
+                document.getElementById('ticket-detail-header').innerHTML = '<p class="text-red-500 text-center">加载失败</p>';
+            }
+        }
+
+        async function sendChatMessage() {
+            const input = document.getElementById('chat-message-input');
+            const msg = input.value.trim();
+            if (!msg || !currentTicketId) return;
+            input.value = '';
+            try {
+                const resp = await fetch(`http://localhost:3000/api/admin/service-tickets/${currentTicketId}/chat`, {
+                    method: 'POST', headers: {'Content-Type':'application/json'},
+                    body: JSON.stringify({ message: msg })
+                });
+                const result = await resp.json();
+                if (result.success) openTicketDetail(currentTicketId);
+                else alert('发送失败: ' + (result.error || '未知'));
+            } catch (e) { alert('请求失败: ' + e.message); }
+        }
+
+        async function updateTicketStatus(id, status) {
+            try {
+                await fetch(`http://localhost:3000/api/admin/service-tickets/${id}`, {
+                    method: 'PUT', headers: {'Content-Type':'application/json'},
+                    body: JSON.stringify({ status })
+                });
+                openTicketDetail(id);
+                loadTicketStats();
+            } catch (e) { console.error('更新状态失败:', e); }
+        }
+
+        function openCreateTicketModal() {
+            document.getElementById('ticket-form').reset();
+            document.getElementById('ticket-modal').classList.remove('hidden');
+        }
+        function closeCreateTicketModal() { document.getElementById('ticket-modal').classList.add('hidden'); }
+
+        async function submitTicketForm(e) {
+            e.preventDefault();
+            const data = {
+                customerName: document.getElementById('ticket-customer-name').value,
+                customerPhone: document.getElementById('ticket-customer-phone').value,
+                category: document.getElementById('ticket-category').value,
+                priority: document.getElementById('ticket-priority-input').value,
+                orderNo: document.getElementById('ticket-order-no').value,
+                title: document.getElementById('ticket-description').value.substring(0, 50),
+                description: document.getElementById('ticket-description').value,
+                source: 'admin'
+            };
+            try {
+                const resp = await fetch('http://localhost:3000/api/admin/service-tickets', {
+                    method: 'POST', headers: {'Content-Type':'application/json'},
+                    body: JSON.stringify(data)
+                });
+                const result = await resp.json();
+                if (result.success) {
+                    alert('工单创建成功，AI智能体已自动响应！');
+                    closeCreateTicketModal();
+                    loadTicketStats();
+                    if (result.data) openTicketDetail(result.data._id);
+                } else { alert('创建失败: ' + (result.error || '未知')); }
+            } catch (err) { alert('请求失败: ' + err.message); }
+        }
+
+        // 页面初始化
+        (function initNewFeatures() {
+            setTimeout(() => { loadBDOptions(); }, 1500);
+        })();
     </script>
-</body>
 </html>

@@ -141,30 +141,101 @@
         .empty-state { text-align: center; padding: 40px 20px; color: #9ca3af; }
         .empty-state i { font-size: 40px; margin-bottom: 12px; display: block; }
         .user-menu-btn { cursor: pointer; display: flex; align-items: center; gap: 8px; }
+
+        /* 门店状态切换开关 */
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 44px;
+            height: 24px;
+        }
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #e5e7eb;
+            transition: .3s;
+            border-radius: 24px;
+        }
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 18px;
+            width: 18px;
+            left: 3px;
+            bottom: 3px;
+            background-color: white;
+            transition: .3s;
+            border-radius: 50%;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.15);
+        }
+        .switch input:checked + .slider {
+            background-color: #16a34a;
+        }
+        .switch input:checked + .slider:before {
+            transform: translateX(20px);
+        }
+        .switch input:disabled + .slider {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
     </style>
 </head>
 <body>
 
-<!-- ========== 登录界面 ========== -->
+<!-- ========== 登录/注册界面 ========== -->
 <div id="login-overlay" class="login-overlay">
     <div class="login-box">
         <h2>🏪 连锁企业管理平台</h2>
         <p class="subtitle">多门店统一管理 · 数据聚合分析</p>
-        <form onsubmit="handleChainLogin(event)">
-            <input type="text" id="login-account" placeholder="手机号 / 工号" required>
-            <input type="password" id="login-password" placeholder="登录密码" required>
-            <p id="login-error" style="color:#ef4444;font-size:13px;display:none;margin-bottom:14px;"></p>
-            <button type="submit" id="login-btn" class="btn btn-primary" style="width:100%;justify-content:center;padding:12px;">
-                登 录
-            </button>
-        </form>
-        <div style="text-align:center;margin-top:18px;font-size:12px;color:#9ca3af;">
-            没有账号？请联系平台管理员开通
+
+        <!-- 登录表单 -->
+        <div id="login-form-wrapper">
+            <form onsubmit="handleChainLogin(event)">
+                <input type="text" id="login-account" placeholder="手机号" required>
+                <input type="password" id="login-password" placeholder="登录密码" required>
+                <p id="login-error" style="color:#ef4444;font-size:13px;display:none;margin-bottom:14px;"></p>
+                <button type="submit" id="login-btn" class="btn btn-primary" style="width:100%;justify-content:center;padding:12px;">
+                    登 录
+                </button>
+            </form>
+            <div style="text-align:center;margin-top:18px;font-size:13px;">
+                <span style="color:#9ca3af;">还没有账号？</span>
+                <a href="javascript:void(0)" onclick="toggleAuthForm('register')" style="color:#6366f1;font-weight:600;text-decoration:none;">立即注册</a>
+            </div>
+            <div style="margin-top:12px;text-align:center;">
+                <button onclick="devChainLogin()" class="btn btn-outline btn-sm" style="font-size:11px;">
+                    <i class="fa fa-flask"></i> 开发测试模式
+                </button>
+            </div>
         </div>
-        <div style="margin-top:16px;text-align:center;">
-            <button onclick="devChainLogin()" class="btn btn-outline btn-sm" style="font-size:11px;">
-                <i class="fa fa-flask"></i> 开发测试模式
-            </button>
+
+        <!-- 注册表单 -->
+        <div id="register-form-wrapper" style="display:none;">
+            <form onsubmit="handleChainRegister(event)">
+                <input type="text" id="reg-chain-name" placeholder="连锁企业名称（如：XX洗衣连锁）" required>
+                <input type="text" id="reg-admin-name" placeholder="您的姓名（选填）">
+                <input type="text" id="reg-phone" placeholder="手机号（将作为登录账号）" required maxlength="11">
+                <input type="password" id="reg-password" placeholder="设置密码（至少6位）" required minlength="6">
+                <input type="password" id="reg-password2" placeholder="确认密码" required minlength="6">
+                <p id="register-error" style="color:#ef4444;font-size:13px;display:none;margin-bottom:10px;"></p>
+                <p id="register-success" style="color:#16a34a;font-size:13px;display:none;margin-bottom:10px;"></p>
+                <button type="submit" id="register-btn" class="btn btn-primary" style="width:100%;justify-content:center;padding:12px;background:#16a34a;">
+                    注册并创建连锁企业
+                </button>
+            </form>
+            <div style="text-align:center;margin-top:18px;font-size:13px;">
+                <span style="color:#9ca3af;">已有账号？</span>
+                <a href="javascript:void(0)" onclick="toggleAuthForm('login')" style="color:#6366f1;font-weight:600;text-decoration:none;">返回登录</a>
+            </div>
         </div>
     </div>
 </div>
@@ -676,8 +747,77 @@ function devChainLogin() {
     setupAfterLogin({ token, user: USER_INFO });
 }
 
+// ========== 登录/注册表单切换 ==========
+function toggleAuthForm(mode) {
+    const loginForm = document.getElementById('login-form-wrapper');
+    const registerForm = document.getElementById('register-form-wrapper');
+    if (mode === 'register') {
+        loginForm.style.display = 'none';
+        registerForm.style.display = 'block';
+    } else {
+        loginForm.style.display = 'block';
+        registerForm.style.display = 'none';
+    }
+    // 清空错误信息
+    document.getElementById('login-error').style.display = 'none';
+    document.getElementById('register-error').style.display = 'none';
+    document.getElementById('register-success').style.display = 'none';
+}
+
+// ========== 连锁管理员注册 ==========
+async function handleChainRegister(e) {
+    e.preventDefault();
+    const chainName = document.getElementById('reg-chain-name').value.trim();
+    const adminName = document.getElementById('reg-admin-name').value.trim();
+    const phone = document.getElementById('reg-phone').value.trim();
+    const password = document.getElementById('reg-password').value;
+    const password2 = document.getElementById('reg-password2').value;
+    const errEl = document.getElementById('register-error');
+    const successEl = document.getElementById('register-success');
+    const btn = document.getElementById('register-btn');
+
+    // 清空提示
+    errEl.style.display = 'none';
+    successEl.style.display = 'none';
+
+    // 校验
+    if (!chainName) { errEl.textContent = '请填写连锁企业名称'; errEl.style.display = 'block'; return; }
+    if (!phone || phone.length < 11) { errEl.textContent = '请填写正确的手机号'; errEl.style.display = 'block'; return; }
+    if (!password || password.length < 6) { errEl.textContent = '密码至少6位'; errEl.style.display = 'block'; return; }
+    if (password !== password2) { errEl.textContent = '两次输入的密码不一致'; errEl.style.display = 'block'; return; }
+
+    btn.disabled = true; btn.textContent = '注册中...';
+
+    try {
+        const resp = await fetch(`${API_BASE}/auth/chain-register`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ phone, password, chainName, adminName })
+        });
+        const result = await resp.json();
+        if (!result.success) throw new Error(result.error || '注册失败');
+
+        // 注册成功，显示成功信息并自动登录
+        successEl.textContent = `注册成功！连锁企业「${chainName}」已创建，正在进入系统...`;
+        successEl.style.display = 'block';
+
+        // 自动登录
+        setTimeout(() => {
+            setupAfterLogin(result.data);
+        }, 800);
+    } catch (err) {
+        if (err.message.includes('Failed to fetch') || err.name === 'TypeError') {
+            errEl.textContent = '无法连接服务器，请确认后端已启动';
+        } else {
+            errEl.textContent = err.message;
+        }
+        errEl.style.display = 'block';
+        btn.disabled = false; btn.textContent = '注册并创建连锁企业';
+    }
+}
+
 async function setupAfterLogin(data) {
-    const { token, user, store } = data;
+    const { token, user, store, chain } = data;
     
     if (token) {
         localStorage.setItem('auth_token', token);
@@ -685,35 +825,44 @@ async function setupAfterLogin(data) {
     }
     
     USER_INFO = user || { name: '连锁管理员' };
-    
-    // 获取连锁信息
-    if (user && user.storeId) {
+
+    // 如果注册接口直接返回了 chain 数据，直接使用
+    if (chain) {
+        CHAIN_DATA = chain;
+        CHAIN_ID = chain._id || chain.chainNo;
+    }
+
+    // 获取连锁信息：连锁管理员使用专属接口，避免请求平台管理员接口导致 403
+    const authToken = token || localStorage.getItem('auth_token') || '';
+    if (user && user.roles && user.roles.includes('chain_admin')) {
         try {
-            const resp = await fetch(`${API_BASE}/admin/chains?adminId=${user.id || user._id}`, {
-                headers: { 'Authorization': 'Bearer ' + (token || localStorage.getItem('auth_token')) }
+            const resp = await fetch(`${API_BASE}/chain-admin/info`, {
+                headers: { 'Authorization': 'Bearer ' + authToken }
             });
             const result = await resp.json();
-            if (result.success && result.data && result.data.list && result.data.list.length > 0) {
-                CHAIN_DATA = result.data.list[0];
+            if (result.success && result.data) {
+                CHAIN_DATA = result.data;
                 CHAIN_ID = CHAIN_DATA._id || CHAIN_DATA.chainNo;
             }
         } catch (e) {
             console.warn('[连锁信息] 获取失败:', e);
         }
     }
-    
-    // 如果没有连锁信息，尝试获取
-    if (!CHAIN_DATA) {
+
+    // 门店管理员等 Fallback：通过 storeId 反查连锁（保留旧逻辑但改用 chain-admin 入口）
+    if (!CHAIN_DATA && user && user.storeId) {
         try {
-            const resp = await fetch(`${API_BASE}/admin/chains`, {
-                headers: { 'Authorization': 'Bearer ' + (token || localStorage.getItem('auth_token')) }
+            const resp = await fetch(`${API_BASE}/chain-admin/info`, {
+                headers: { 'Authorization': 'Bearer ' + authToken }
             });
             const result = await resp.json();
-            if (result.success && result.data && result.data.list && result.data.list.length > 0) {
-                CHAIN_DATA = result.data.list[0];
+            if (result.success && result.data) {
+                CHAIN_DATA = result.data;
                 CHAIN_ID = CHAIN_DATA._id || CHAIN_DATA.chainNo;
             }
-        } catch (e) {}
+        } catch (e) {
+            console.warn('[连锁信息] 通过门店获取失败:', e);
+        }
     }
     
     // 开发模式默认连锁
@@ -745,27 +894,30 @@ async function loadDashboard() {
         const resp = await fetch(`${API_BASE}/chain-admin/dashboard`, {
             headers: { 'Authorization': 'Bearer ' + (localStorage.getItem('auth_token') || '') }
         });
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}: ${resp.statusText}`);
         const result = await resp.json();
-        if (!result.success) throw new Error(result.error);
+        if (!result.success) throw new Error(result.error || '加载失败');
+        
+        if (!result.data) throw new Error('返回数据为空');
         
         const d = result.data;
-        const s = d.stats;
+        const s = d.summary || d.stats || {};
         
         document.getElementById('stat-stores').textContent = s.totalStores || 0;
-        document.getElementById('stat-active-stores').textContent = s.activeStores || 0;
+        document.getElementById('stat-active-stores').textContent = s.activeStores || s.totalStores || 0;
         document.getElementById('stat-orders').textContent = s.todayOrders || 0;
         document.getElementById('stat-revenue').textContent = '¥' + ((s.todayRevenue || 0)).toLocaleString();
         document.getElementById('stat-new-users').textContent = s.todayNewUsers || 0;
-        document.getElementById('stat-month-orders').textContent = s.monthOrders || 0;
-        document.getElementById('stat-month-revenue').textContent = '¥' + ((s.monthRevenue || 0)).toLocaleString();
+        document.getElementById('stat-month-orders').textContent = s.monthOrders || s.totalOrders || 0;
+        document.getElementById('stat-month-revenue').textContent = '¥' + ((s.monthRevenue || s.totalRevenue || 0)).toLocaleString();
         document.getElementById('stat-pending').textContent = s.pendingOrders || 0;
         document.getElementById('stat-completed').textContent = s.completedOrders || 0;
         
         // 趋势图
-        renderTrendChart(d.dailyStats || []);
+        renderTrendChart(d.revenueTrend || d.dailyStats || []);
         
         // 门店排行
-        renderStoreRanking(d.storeList || []);
+        renderStoreRanking(d.topStores || d.storeList || []);
         
     } catch (e) {
         console.error('[控制台] 加载失败:', e);
@@ -837,31 +989,55 @@ async function loadChainStores() {
         });
         const result = await resp.json();
         
-        if (result.success && result.data && result.data.storeList) {
-            const stores = result.data.storeList;
+        const rawStores = (result.data && (result.data.storeList || result.data.list)) || [];
+        if (result.success && rawStores.length) {
+            // 统一数据格式：接口可能返回 storeList（聚合数据）或 list（原始门店数据）
+            const stores = rawStores.map(s => ({
+                storeId: s.storeId || s._id || s.storeNo,
+                storeNo: s.storeNo || s.storeId,
+                storeName: s.storeName || s.name || '未知门店',
+                status: s.status || 'active',
+                orders: s.orders || 0,
+                revenue: s.revenue || 0,
+                todayOrders: s.todayOrders || (s.stats && s.stats.todayOrders) || 0
+            }));
             const tbody = document.getElementById('store-table-body');
             if (!stores.length) {
                 tbody.innerHTML = '<tr><td colspan="8" class="empty-state"><i class="fa fa-inbox"></i>暂无门店</td></tr>';
                 return;
             }
-            
+
             tbody.innerHTML = stores.map(s => {
-                const statusBadge = s.status === 'active' ? '<span class="badge badge-active">活跃</span>' :
-                                   s.status === 'pending' ? '<span class="badge badge-pending">待激活</span>' :
-                                   '<span class="badge badge-disabled">已停用</span>';
+                const isActive = s.status === 'active';
+                const statusText = isActive ? '已启用' : (s.status === 'pending' ? '待激活' : '已停用');
+                const statusClass = isActive ? 'badge-active' : (s.status === 'pending' ? 'badge-pending' : 'badge-disabled');
+                const safeStoreId = (s.storeId || '').toString().replace(/'/g, "\\'");
+                const safeStoreName = (s.storeName || '').replace(/'/g, "\\'");
                 return `<tr>
                     <td>${s.storeNo || s.storeId}</td>
                     <td><strong>${s.storeName}</strong></td>
                     <td style="font-size:12px;color:#6b7280;">--</td>
-                    <td>${statusBadge}</td>
+                    <td>
+                        <div style="display:flex;align-items:center;gap:8px;">
+                            <label class="switch" title="点击${isActive ? '停用' : '启用'}门店">
+                                <input type="checkbox" ${isActive ? 'checked' : ''}
+                                       onchange="toggleStoreStatus('${safeStoreId}', ${isActive}, '${safeStoreName}', this)">
+                                <span class="slider"></span>
+                            </label>
+                            <span class="badge ${statusClass}">${statusText}</span>
+                        </div>
+                    </td>
                     <td>${s.orders || 0}</td>
                     <td>¥${(s.revenue || 0).toLocaleString()}</td>
                     <td>${s.todayOrders || 0}</td>
                     <td>
-                        <button class="btn btn-outline btn-sm" onclick="openStoreDetail('${s.storeId}')"><i class="fa fa-eye"></i></button>
+                        <button class="btn btn-outline btn-sm" onclick="openStoreDetail('${safeStoreId}')"><i class="fa fa-eye"></i></button>
                     </td>
                 </tr>`;
             }).join('');
+        } else {
+            const tbody = document.getElementById('store-table-body');
+            tbody.innerHTML = '<tr><td colspan="8" class="empty-state"><i class="fa fa-inbox"></i>暂无门店</td></tr>';
         }
     } catch (e) {
         console.error('[门店管理] 加载失败:', e);
@@ -872,6 +1048,42 @@ async function loadChainStores() {
 
 function openStoreDetail(storeId) {
     window.open(`index.html?storeId=${storeId}`, '_blank');
+}
+
+async function toggleStoreStatus(storeId, currentActive, storeName, checkbox) {
+    const newStatus = currentActive ? 'disabled' : 'active';
+    const actionText = currentActive ? '停用' : '启用';
+
+    if (!confirm(`确定要${actionText}门店 "${storeName}" 吗？\n${currentActive ? '停用后该门店将暂停接单。' : '启用后该门店将恢复正常运营。'}`)) {
+        checkbox.checked = currentActive;
+        return;
+    }
+
+    checkbox.disabled = true;
+    try {
+        const resp = await fetch(`${API_BASE}/chain-admin/stores/${storeId}/status`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': 'Bearer ' + (localStorage.getItem('auth_token') || '')
+            },
+            body: JSON.stringify({ status: newStatus })
+        });
+
+        const result = await resp.json();
+        if (result.success) {
+            alert(`门店 "${storeName}" 已${actionText}`);
+            loadChainStores();
+        } else {
+            throw new Error(result.message || result.error || '操作失败');
+        }
+    } catch (e) {
+        console.error('[门店管理] 切换门店状态失败:', e);
+        alert('操作失败: ' + e.message);
+        checkbox.checked = currentActive;
+    } finally {
+        checkbox.disabled = false;
+    }
 }
 
 // ========== 订单管理 ==========

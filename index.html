@@ -2601,6 +2601,24 @@
             location.reload();
         };
 
+        // ===== 全局预览模式检查 =====
+        window.__isPreviewMode = localStorage.getItem('previewMode') === 'true';
+        window.requireApprovedStore = function(action) {
+            if (window.__isPreviewMode || (JSON.parse(localStorage.getItem('storeUser') || '{}').roles || []).includes('merchant')) {
+                // 检查是否已通过审批
+                var storeUser = JSON.parse(localStorage.getItem('storeUser') || '{}');
+                if (storeUser.storeId && storeUser.storeId !== 'null') {
+                    window.__isPreviewMode = false;
+                    localStorage.removeItem('previewMode');
+                    return true;
+                }
+                alert('⚠️ 您需要先完成门店入驻申请并等待审批通过后，才能进行「' + (action || '此操作') + '」。\n\n点击确定填写入驻申请。');
+                window.showStoreApplyModal();
+                return false;
+            }
+            return true;
+        };
+        
         // ===== 6. 账号登录 =====
         window.showLoginModal = function() {
             console.log('[用户菜单] showLoginModal');
@@ -2646,6 +2664,17 @@
                 '<button onclick="window.quickLogin(\'ST002\',\'staff002\',\'123456\')" style="padding:8px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:6px;font-size:11px;color:#16a34a;cursor:pointer;">海淀店</button>' +
                 '<button onclick="window.quickLogin(\'ST003\',\'admin\',\'123456\')" style="padding:8px;background:#faf5ff;border:1px solid #e9d5ff;border-radius:6px;font-size:11px;color:#9333ea;cursor:pointer;">总管理</button>' +
                 '</div>' +
+                '</div>' +
+                '<div style="border-top:1px solid #e5e7eb;padding-top:12px;margin-top:8px;">' +
+                '<div style="font-size:12px;color:#6b7280;margin-bottom:8px;text-align:center;">新商家？<button onclick="window.showMerchantRegisterForm()" style="color:#1e40af;font-weight:600;border:none;background:none;cursor:pointer;font-size:12px;">注册入驻账号</button></div>' +
+                '<div id="merchant-register-area" style="display:none;padding:12px;background:#f0f9ff;border:1px solid #bfdbfe;border-radius:8px;">' +
+                '<div style="font-size:13px;font-weight:600;color:#1e40af;margin-bottom:8px;"><i class="fa fa-user-plus" style="margin-right:4px;"></i>商家注册</div>' +
+                '<div style="display:flex;flex-direction:column;gap:8px;">' +
+                '<input type="tel" id="reg-phone" placeholder="手机号" style="border:1px solid #d1d5db;border-radius:6px;padding:8px;font-size:13px;">' +
+                '<input type="text" id="reg-name" placeholder="您的姓名" style="border:1px solid #d1d5db;border-radius:6px;padding:8px;font-size:13px;">' +
+                '<input type="password" id="reg-password" placeholder="设置密码" style="border:1px solid #d1d5db;border-radius:6px;padding:8px;font-size:13px;">' +
+                '<button id="reg-submit-btn" onclick="window.submitMerchantRegister()" style="padding:8px;border:none;border-radius:6px;background:#1e40af;color:white;font-size:13px;font-weight:600;cursor:pointer;">注册并申请入驻</button>' +
+                '</div></div>' +
                 '</div>' +
                 '</div>';
             
@@ -2699,6 +2728,71 @@
             if (userInput) userInput.value = username;
             if (pwdInput) pwdInput.value = password;
             window.performLogin(storeId, username, password);
+        };
+        
+        // 显示商家注册表单
+        window.showMerchantRegisterForm = function() {
+            var area = document.getElementById('merchant-register-area');
+            if (area) area.style.display = area.style.display === 'none' ? 'block' : 'none';
+        };
+        
+        // 提交商家注册
+        window.submitMerchantRegister = async function() {
+            var phone = document.getElementById('reg-phone').value.trim();
+            var name = document.getElementById('reg-name').value.trim();
+            var password = document.getElementById('reg-password').value;
+            if (!phone || !password) { alert('请填写手机号和密码'); return; }
+            if (!/^1\d{10}$/.test(phone)) { alert('手机号格式不正确'); return; }
+            
+            var btn = document.getElementById('reg-submit-btn');
+            btn.disabled = true;
+            btn.textContent = '注册中...';
+            
+            try {
+                var baseUrl = window.API_CONFIG ? API_CONFIG.baseUrl : 'http://localhost:' + (window.location.port || 3000) + '/api';
+                var resp = await fetch(baseUrl + '/auth/merchant-register', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ phone, password, name })
+                });
+                var result = await resp.json();
+                if (!result.success) throw new Error(result.error || '注册失败');
+                
+                var data = result.data;
+                // 保存登录状态
+                localStorage.setItem('auth_token', data.token);
+                var storeUser = {
+                    userId: data.user._id,
+                    userNo: data.user.userNo,
+                    phone: data.user.phone,
+                    name: data.user.name,
+                    roles: data.user.roles || ['merchant'],
+                    storeId: null,
+                    storeName: '待入驻',
+                    loginTime: new Date().toISOString()
+                };
+                localStorage.setItem('storeUser', JSON.stringify(storeUser));
+                localStorage.setItem('currentStore', JSON.stringify({ storeId: null, storeName: '待入驻', name: '待入驻' }));
+                
+                window.closeLoginModal();
+                alert('注册成功！请填写门店入驻申请表单。');
+                
+                // 更新UI
+                var headerName = document.getElementById('current-user-name');
+                if (headerName) headerName.textContent = name || '新商家';
+                var loginBtn = document.getElementById('login-btn');
+                var logoutBtn = document.getElementById('logout-btn');
+                if (loginBtn) loginBtn.classList.add('hidden');
+                if (logoutBtn) logoutBtn.classList.remove('hidden');
+                
+                // 弹出入驻申请表单
+                setTimeout(function() { window.showStoreApplyModal(); }, 500);
+            } catch (err) {
+                alert('注册失败: ' + err.message);
+            } finally {
+                btn.disabled = false;
+                btn.textContent = '注册并申请入驻';
+            }
         };
         
         window.performLogin = function(storeId, username, password) {
@@ -3660,6 +3754,24 @@
         function switchSection(section) {
             // 更新当前区域
             currentSection = section;
+            
+            // 预览模式下，某些操作区域显示提示
+            if (window.__isPreviewMode) {
+                var restrictedSections = ['orders', 'settlement', 'store-settings'];
+                if (restrictedSections.indexOf(section) >= 0) {
+                    // 显示区域仍然可见，但在顶部添加提示
+                    setTimeout(function() {
+                        var contentEl = document.getElementById(section + '-content');
+                        if (contentEl && !contentEl.querySelector('.preview-notice')) {
+                            var notice = document.createElement('div');
+                            notice.className = 'preview-notice';
+                            notice.style.cssText = 'background:#fef3c7;border:1px solid #fbbf24;border-radius:8px;padding:12px 16px;margin-bottom:16px;display:flex;align-items:center;gap:8px;font-size:13px;color:#92400e;';
+                            notice.innerHTML = '<i class="fa fa-lock"></i><span>预览模式 - 完成入驻申请并审批通过后可进行实际操作。</span><button onclick="window.showStoreApplyModal()" style="margin-left:auto;padding:4px 12px;border:1px solid #f59e0b;border-radius:6px;background:white;color:#92400e;font-size:12px;cursor:pointer;">填写申请</button>';
+                            contentEl.insertBefore(notice, contentEl.firstChild);
+                        }
+                    }, 100);
+                }
+            }
             
             // 更新导航链接样式
             navLinks.forEach(link => {
@@ -10108,6 +10220,360 @@
         };
 
         console.log('[系统] 核心业务逻辑已从M端同步完成');
+    </script>
+    <!-- 门店入驻申请弹窗 -->
+    <div id="store-apply-modal" class="fixed inset-0 bg-black bg-opacity-60 z-50 hidden" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:9999;overflow-y:auto;">
+        <div style="max-width:680px;margin:40px auto;padding:20px;">
+            <div style="background:white;border-radius:16px;box-shadow:0 25px 50px rgba(0,0,0,0.3);overflow:hidden;">
+                <!-- 弹窗头部 -->
+                <div style="background:linear-gradient(135deg,#1e40af,#3b82f6);padding:24px;color:white;position:relative;">
+                    <button onclick="window.closeStoreApplyModal()" style="position:absolute;top:16px;right:16px;width:36px;height:36px;border-radius:50%;border:none;background:rgba(255,255,255,0.2);color:white;font-size:20px;cursor:pointer;display:flex;align-items:center;justify-content:center;">×</button>
+                    <h2 style="font-size:22px;font-weight:bold;margin:0 0 4px 0;">🏪 门店入驻申请</h2>
+                    <p style="opacity:0.85;font-size:14px;margin:0;">填写门店入驻信息，审批通过后即可使用全部功能</p>
+                </div>
+                
+                <!-- 预览模式提示 -->
+                <div id="preview-mode-banner" style="background:#fef3c7;border-bottom:1px solid #fbbf24;padding:12px 24px;display:none;">
+                    <div style="display:flex;align-items:center;gap:8px;font-size:13px;color:#92400e;">
+                        <i class="fa fa-eye"></i>
+                        <span>您当前处于<b>预览模式</b>，可浏览系统功能。完成入驻申请并审批通过后可使用全部操作。</span>
+                    </div>
+                </div>
+                
+                <!-- 申请表单 -->
+                <div style="padding:24px;">
+                    <form id="store-apply-form" style="display:flex;flex-direction:column;gap:20px;">
+                        <!-- 基本信息 -->
+                        <div style="border-bottom:1px solid #e5e7eb;padding-bottom:16px;">
+                            <h3 style="font-size:16px;font-weight:600;color:#1f2937;margin:0 0 12px 0;"><i class="fa fa-info-circle" style="color:#1e40af;margin-right:6px;"></i>基本信息</h3>
+                            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+                                <div>
+                                    <label style="display:block;font-size:13px;font-weight:500;color:#374151;margin-bottom:4px;">申请人姓名 <span style="color:#ef4444;">*</span></label>
+                                    <input type="text" name="applicantName" required style="width:100%;border:1px solid #d1d5db;border-radius:8px;padding:10px;font-size:14px;box-sizing:border-box;" placeholder="请输入姓名">
+                                </div>
+                                <div>
+                                    <label style="display:block;font-size:13px;font-weight:500;color:#374151;margin-bottom:4px;">联系电话 <span style="color:#ef4444;">*</span></label>
+                                    <input type="tel" name="applicantPhone" required style="width:100%;border:1px solid #d1d5db;border-radius:8px;padding:10px;font-size:14px;box-sizing:border-box;" placeholder="请输入电话">
+                                </div>
+                                <div style="grid-column:span 2;">
+                                    <label style="display:block;font-size:13px;font-weight:500;color:#374151;margin-bottom:4px;">门店名称 <span style="color:#ef4444;">*</span></label>
+                                    <input type="text" name="storeName" required style="width:100%;border:1px solid #d1d5db;border-radius:8px;padding:10px;font-size:14px;box-sizing:border-box;" placeholder="请输入门店名称">
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- 门店信息 -->
+                        <div style="border-bottom:1px solid #e5e7eb;padding-bottom:16px;">
+                            <h3 style="font-size:16px;font-weight:600;color:#1f2937;margin:0 0 12px 0;"><i class="fa fa-building" style="color:#1e40af;margin-right:6px;"></i>门店信息</h3>
+                            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+                                <div>
+                                    <label style="display:block;font-size:13px;font-weight:500;color:#374151;margin-bottom:4px;">门店地址 <span style="color:#ef4444;">*</span></label>
+                                    <input type="text" name="storeAddress" required style="width:100%;border:1px solid #d1d5db;border-radius:8px;padding:10px;font-size:14px;box-sizing:border-box;" placeholder="详细地址">
+                                </div>
+                                <div>
+                                    <label style="display:block;font-size:13px;font-weight:500;color:#374151;margin-bottom:4px;">所在城市 <span style="color:#ef4444;">*</span></label>
+                                    <input type="text" name="city" required style="width:100%;border:1px solid #d1d5db;border-radius:8px;padding:10px;font-size:14px;box-sizing:border-box;" placeholder="如：北京市">
+                                </div>
+                                <div>
+                                    <label style="display:block;font-size:13px;font-weight:500;color:#374151;margin-bottom:4px;">所在区域</label>
+                                    <input type="text" name="district" style="width:100%;border:1px solid #d1d5db;border-radius:8px;padding:10px;font-size:14px;box-sizing:border-box;" placeholder="如：朝阳区">
+                                </div>
+                                <div>
+                                    <label style="display:block;font-size:13px;font-weight:500;color:#374151;margin-bottom:4px;">营业时间</label>
+                                    <div style="display:flex;align-items:center;gap:8px;">
+                                        <input type="time" name="businessHoursOpen" value="09:00" style="flex:1;border:1px solid #d1d5db;border-radius:8px;padding:10px;font-size:14px;">
+                                        <span style="color:#6b7280;">至</span>
+                                        <input type="time" name="businessHoursClose" value="21:00" style="flex:1;border:1px solid #d1d5db;border-radius:8px;padding:10px;font-size:14px;">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- 业务品类 -->
+                        <div style="border-bottom:1px solid #e5e7eb;padding-bottom:16px;">
+                            <h3 style="font-size:16px;font-weight:600;color:#1f2937;margin:0 0 4px 0;"><i class="fa fa-th-large" style="color:#1e40af;margin-right:6px;"></i>业务品类 <span style="color:#ef4444;">*</span></h3>
+                            <p style="font-size:12px;color:#6b7280;margin:0 0 12px 0;"><i class="fa fa-info-circle" style="margin-right:4px;"></i>选择主营品类，审批通过后自动归类到业务管理对应门类</p>
+                            <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;" id="apply-biz-cat-selector">
+                                <label class="apply-biz-cat" data-cat="cleaning" style="cursor:pointer;">
+                                    <div style="border:2px solid #1e40af;border-radius:8px;padding:10px;text-align:center;background:#eff6ff;transition:all 0.2s;" class="apply-biz-cat-card">
+                                        <div style="font-size:24px;">👔</div>
+                                        <div style="font-size:12px;font-weight:500;">衣物干洗</div>
+                                    </div>
+                                    <input type="radio" name="businessCategory" value="cleaning" checked style="display:none;">
+                                </label>
+                                <label class="apply-biz-cat" data-cat="shoe_care" style="cursor:pointer;">
+                                    <div style="border:2px solid #e5e7eb;border-radius:8px;padding:10px;text-align:center;transition:all 0.2s;" class="apply-biz-cat-card">
+                                        <div style="font-size:24px;">👟</div>
+                                        <div style="font-size:12px;font-weight:500;">鞋类洗护</div>
+                                    </div>
+                                    <input type="radio" name="businessCategory" value="shoe_care" style="display:none;">
+                                </label>
+                                <label class="apply-biz-cat" data-cat="luxury_care" style="cursor:pointer;">
+                                    <div style="border:2px solid #e5e7eb;border-radius:8px;padding:10px;text-align:center;transition:all 0.2s;" class="apply-biz-cat-card">
+                                        <div style="font-size:24px;">👜</div>
+                                        <div style="font-size:12px;font-weight:500;">奢侈品护理</div>
+                                    </div>
+                                    <input type="radio" name="businessCategory" value="luxury_care" style="display:none;">
+                                </label>
+                                <label class="apply-biz-cat" data-cat="pet_grooming" style="cursor:pointer;">
+                                    <div style="border:2px solid #e5e7eb;border-radius:8px;padding:10px;text-align:center;transition:all 0.2s;" class="apply-biz-cat-card">
+                                        <div style="font-size:24px;">🐕</div>
+                                        <div style="font-size:12px;font-weight:500;">宠物清洗</div>
+                                    </div>
+                                    <input type="radio" name="businessCategory" value="pet_grooming" style="display:none;">
+                                </label>
+                                <label class="apply-biz-cat" data-cat="electronics_repair" style="cursor:pointer;">
+                                    <div style="border:2px solid #e5e7eb;border-radius:8px;padding:10px;text-align:center;transition:all 0.2s;" class="apply-biz-cat-card">
+                                        <div style="font-size:24px;">📱</div>
+                                        <div style="font-size:12px;font-weight:500;">电子产品维修</div>
+                                    </div>
+                                    <input type="radio" name="businessCategory" value="electronics_repair" style="display:none;">
+                                </label>
+                                <label class="apply-biz-cat" data-cat="rental" style="cursor:pointer;">
+                                    <div style="border:2px solid #e5e7eb;border-radius:8px;padding:10px;text-align:center;transition:all 0.2s;" class="apply-biz-cat-card">
+                                        <div style="font-size:24px;">👘</div>
+                                        <div style="font-size:12px;font-weight:500;">服饰租赁</div>
+                                    </div>
+                                    <input type="radio" name="businessCategory" value="rental" style="display:none;">
+                                </label>
+                                <label class="apply-biz-cat" data-cat="rental_leisure" style="cursor:pointer;">
+                                    <div style="border:2px solid #e5e7eb;border-radius:8px;padding:10px;text-align:center;transition:all 0.2s;" class="apply-biz-cat-card">
+                                        <div style="font-size:24px;">🎮</div>
+                                        <div style="font-size:12px;font-weight:500;">小件商品租赁</div>
+                                    </div>
+                                    <input type="radio" name="businessCategory" value="rental_leisure" style="display:none;">
+                                </label>
+                            </div>
+                        </div>
+                        
+                        <!-- 资质信息 -->
+                        <div style="border-bottom:1px solid #e5e7eb;padding-bottom:16px;">
+                            <h3 style="font-size:16px;font-weight:600;color:#1f2937;margin:0 0 12px 0;"><i class="fa fa-certificate" style="color:#1e40af;margin-right:6px;"></i>资质信息</h3>
+                            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+                                <div>
+                                    <label style="display:block;font-size:13px;font-weight:500;color:#374151;margin-bottom:4px;">营业执照号</label>
+                                    <input type="text" name="businessLicense" style="width:100%;border:1px solid #d1d5db;border-radius:8px;padding:10px;font-size:14px;box-sizing:border-box;" placeholder="营业执照号">
+                                </div>
+                                <div>
+                                    <label style="display:block;font-size:13px;font-weight:500;color:#374151;margin-bottom:4px;">法人代表</label>
+                                    <input type="text" name="legalPerson" style="width:100%;border:1px solid #d1d5db;border-radius:8px;padding:10px;font-size:14px;box-sizing:border-box;" placeholder="法人代表">
+                                </div>
+                                <div style="grid-column:span 2;">
+                                    <label style="display:block;font-size:13px;font-weight:500;color:#374151;margin-bottom:4px;">门店描述</label>
+                                    <textarea name="description" rows="2" style="width:100%;border:1px solid #d1d5db;border-radius:8px;padding:10px;font-size:14px;box-sizing:border-box;" placeholder="门店描述、服务特色等"></textarea>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- BD信息 -->
+                        <div>
+                            <h3 style="font-size:16px;font-weight:600;color:#1f2937;margin:0 0 12px 0;"><i class="fa fa-handshake-o" style="color:#1e40af;margin-right:6px;"></i>负责BD（必填）</h3>
+                            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+                                <div>
+                                    <label style="display:block;font-size:13px;font-weight:500;color:#374151;margin-bottom:4px;">BD姓名 <span style="color:#ef4444;">*</span></label>
+                                    <input type="text" name="bdName" required style="width:100%;border:1px solid #d1d5db;border-radius:8px;padding:10px;font-size:14px;box-sizing:border-box;" placeholder="BD姓名">
+                                </div>
+                                <div>
+                                    <label style="display:block;font-size:13px;font-weight:500;color:#374151;margin-bottom:4px;">BD电话 <span style="color:#ef4444;">*</span></label>
+                                    <input type="tel" name="bdPhone" required style="width:100%;border:1px solid #d1d5db;border-radius:8px;padding:10px;font-size:14px;box-sizing:border-box;" placeholder="BD电话">
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- 提交按钮 -->
+                        <div style="display:flex;gap:12px;justify-content:flex-end;padding-top:12px;border-top:1px solid #e5e7eb;">
+                            <button type="button" onclick="window.closeStoreApplyModal()" style="padding:10px 20px;border:1px solid #d1d5db;border-radius:8px;background:white;color:#374151;font-size:14px;cursor:pointer;">稍后填写</button>
+                            <button type="submit" id="apply-submit-btn" style="padding:10px 24px;border:none;border-radius:8px;background:#1e40af;color:white;font-size:14px;font-weight:600;cursor:pointer;"><i class="fa fa-paper-plane" style="margin-right:6px;"></i>提交申请</button>
+                        </div>
+                    </form>
+                    
+                    <!-- 申请已提交状态 -->
+                    <div id="apply-status-area" style="display:none;padding:24px;text-align:center;">
+                        <div style="font-size:48px;margin-bottom:12px;">✅</div>
+                        <h3 style="font-size:18px;font-weight:bold;color:#059669;margin:0 0 8px 0;">申请已提交</h3>
+                        <p style="color:#6b7280;font-size:14px;margin:0 0 4px 0;">申请编号：<b id="apply-result-id"></b></p>
+                        <p style="color:#6b7280;font-size:14px;margin:0 0 16px 0;">请等待后台审批，审批通过后即可使用全部功能</p>
+                        <button onclick="window.closeStoreApplyModal()" style="padding:10px 24px;border:none;border-radius:8px;background:#1e40af;color:white;font-size:14px;cursor:pointer;">关闭，先预览系统</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+    // ===== 门店入驻申请模块 =====
+    (function() {
+        // 品类选择器点击效果
+        document.querySelectorAll('.apply-biz-cat').forEach(function(label) {
+            label.addEventListener('click', function() {
+                document.querySelectorAll('.apply-biz-cat-card').forEach(function(card) {
+                    card.style.borderColor = '#e5e7eb';
+                    card.style.background = 'white';
+                });
+                var card = this.querySelector('.apply-biz-cat-card');
+                card.style.borderColor = '#1e40af';
+                card.style.background = '#eff6ff';
+                var radio = this.querySelector('input[type="radio"]');
+                if (radio) radio.checked = true;
+            });
+        });
+        
+        // 关闭弹窗
+        window.closeStoreApplyModal = function() {
+            var modal = document.getElementById('store-apply-modal');
+            if (modal) {
+                modal.style.display = 'none';
+                modal.classList.add('hidden');
+            }
+            // 标记为预览模式
+            var storeUser = JSON.parse(localStorage.getItem('storeUser') || '{}');
+            if (storeUser.roles && storeUser.roles.includes('merchant')) {
+                localStorage.setItem('previewMode', 'true');
+                var banner = document.getElementById('preview-mode-banner');
+                if (banner) banner.style.display = 'block';
+                window.__isPreviewMode = true;
+            }
+        };
+        
+        // 显示弹窗
+        window.showStoreApplyModal = function() {
+            var modal = document.getElementById('store-apply-modal');
+            if (modal) {
+                modal.style.display = 'block';
+                modal.classList.remove('hidden');
+            }
+            // 预填用户手机号
+            var storeUser = JSON.parse(localStorage.getItem('storeUser') || '{}');
+            if (storeUser.phone) {
+                var phoneInput = modal.querySelector('input[name="applicantPhone"]');
+                if (phoneInput && !phoneInput.value) phoneInput.value = storeUser.phone;
+            }
+            if (storeUser.name && storeUser.name !== '新商家') {
+                var nameInput = modal.querySelector('input[name="applicantName"]');
+                if (nameInput && !nameInput.value) nameInput.value = storeUser.name;
+            }
+        };
+        
+        // 检查是否需要显示入驻申请
+        window.checkMerchantApplication = async function() {
+            var storeUser = JSON.parse(localStorage.getItem('storeUser') || '{}');
+            var roles = storeUser.roles || [];
+            
+            // 如果是merchant角色，需要检查申请状态
+            if (roles.includes('merchant')) {
+                // 检查是否已有approved申请
+                var phone = storeUser.phone || '';
+                if (phone) {
+                    try {
+                        var baseUrl = window.API_CONFIG ? API_CONFIG.baseUrl : 'http://localhost:' + (window.location.port || 3000) + '/api';
+                        var resp = await fetch(baseUrl + '/auth/application-status?phone=' + encodeURIComponent(phone));
+                        var result = await resp.json();
+                        if (result.success && !result.data.needsApplication && result.data.status === 'approved') {
+                            // 已审批通过，不需要再显示
+                            console.log('[入驻检查] 申请已通过，无需操作');
+                            return;
+                        }
+                        if (result.success && result.data.status === 'pending') {
+                            console.log('[入驻检查] 申请待审批，显示提示');
+                            showPreviewBanner('您的入驻申请正在审批中（' + result.data.applicationId + '），审批通过后即可使用全部功能。');
+                            return;
+                        }
+                    } catch (e) {
+                        console.warn('[入驻检查] API不可用，显示申请表单');
+                    }
+                }
+                // 显示申请表单弹窗
+                setTimeout(function() { window.showStoreApplyModal(); }, 800);
+            }
+            
+            // 如果有store，不需要申请
+            if (storeUser.storeId && storeUser.storeId !== 'null') {
+                return;
+            }
+        };
+        
+        // 显示预览模式横幅
+        function showPreviewBanner(msg) {
+            localStorage.setItem('previewMode', 'true');
+            window.__isPreviewMode = true;
+            var banner = document.getElementById('preview-mode-banner');
+            if (banner) {
+                if (msg) banner.querySelector('span').innerHTML = '<i class="fa fa-eye" style="margin-right:4px;"></i>' + msg;
+                banner.style.display = 'block';
+            }
+        }
+        
+        // 表单提交
+        var form = document.getElementById('store-apply-form');
+        if (form) {
+            form.addEventListener('submit', async function(e) {
+                e.preventDefault();
+                var formData = new FormData(form);
+                var submitBtn = document.getElementById('apply-submit-btn');
+                submitBtn.disabled = true;
+                submitBtn.innerHTML = '<i class="fa fa-spinner fa-spin" style="margin-right:6px;"></i>提交中...';
+                
+                var applicationData = {
+                    applicationId: 'APP' + Date.now(),
+                    applicantName: formData.get('applicantName'),
+                    applicantPhone: formData.get('applicantPhone'),
+                    storeName: formData.get('storeName'),
+                    storeAddress: formData.get('storeAddress'),
+                    city: formData.get('city'),
+                    district: formData.get('district'),
+                    businessHours: { open: formData.get('businessHoursOpen'), close: formData.get('businessHoursClose') },
+                    businessLicense: formData.get('businessLicense'),
+                    legalPerson: formData.get('legalPerson'),
+                    businessCategory: formData.get('businessCategory') || 'cleaning',
+                    description: formData.get('description'),
+                    bdName: formData.get('bdName'),
+                    bdPhone: formData.get('bdPhone'),
+                    status: 'pending',
+                    createTime: new Date().toISOString(),
+                    updateTime: new Date().toISOString(),
+                    approvalHistory: []
+                };
+                
+                try {
+                    var baseUrl = window.API_CONFIG ? API_CONFIG.baseUrl : 'http://localhost:' + (window.location.port || 3000) + '/api';
+                    var response = await fetch(baseUrl + '/store-applications/submit', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(applicationData)
+                    });
+                    var result = await response.json();
+                    if (result.success || response.ok) {
+                        // 显示成功状态
+                        form.style.display = 'none';
+                        document.getElementById('apply-status-area').style.display = 'block';
+                        document.getElementById('apply-result-id').textContent = applicationData.applicationId;
+                        localStorage.setItem('pendingApplicationId', applicationData.applicationId);
+                        showPreviewBanner('您的入驻申请已提交（' + applicationData.applicationId + '），正在等待审批。');
+                    } else {
+                        throw new Error(result.message || '提交失败');
+                    }
+                } catch (error) {
+                    console.error('提交申请失败:', error);
+                    // 离线保存
+                    var apps = JSON.parse(localStorage.getItem('storeApplications') || '[]');
+                    apps.push(applicationData);
+                    localStorage.setItem('storeApplications', JSON.stringify(apps));
+                    form.style.display = 'none';
+                    document.getElementById('apply-status-area').style.display = 'block';
+                    document.getElementById('apply-result-id').textContent = applicationData.applicationId;
+                    showPreviewBanner('申请已保存（离线模式），待网络恢复后自动提交。');
+                } finally {
+                    submitBtn.disabled = false;
+                    submitBtn.innerHTML = '<i class="fa fa-paper-plane" style="margin-right:6px;"></i>提交申请';
+                }
+            });
+        }
+        
+        // 页面加载后检查
+        document.addEventListener('DOMContentLoaded', function() {
+            setTimeout(function() { window.checkMerchantApplication(); }, 1000);
+        });
+    })();
     </script>
 </body>
 </html>

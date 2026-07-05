@@ -16,7 +16,7 @@ const userSchema = new mongoose.Schema({
   avatar: String,
   gender: { type: String, enum: ['male', 'female', 'unknown'], default: 'unknown' },
   birthday: Date,
-  roles: [{ type: String, enum: ['customer', 'store_staff', 'store_owner', 'admin'], default: 'customer' }],
+  roles: [{ type: String, enum: ['customer', 'store_staff', 'store_owner', 'recycler', 'appraiser', 'brand_admin', 'chain_admin', 'admin', 'merchant'], default: 'customer' }],
   storeId: String, // 如果是门店角色，关联的门店
   status: { type: String, enum: ['active', 'inactive', 'banned'], default: 'active' },
   creditScore: { type: Number, default: 100 },
@@ -37,7 +37,7 @@ const userSchema = new mongoose.Schema({
   // 数据来源和层级关系
   registrationSource: { 
     type: String, 
-    enum: ['web_customer', 'wechat_mini', 'store_app', 'admin_system', 'unknown'],
+    enum: ['web_customer', 'wechat_mini', 'store_app', 'admin_system', 'chain-admin', 'unknown'],
     default: 'unknown'
   },  // 注册来源：C端网页、微信小程序、门店APP、后台系统
   sourcePlatform: { type: String },  // 来源平台标识
@@ -344,25 +344,27 @@ class AuthService {
   }
 
   /**
-   * 通过账号（手机号/工号）查找门店员工
+   * 通过账号（手机号/工号）查找门店员工或连锁管理员
    */
   async findStaffByAccount(account) {
+    const staffRoles = ['store_staff', 'store_owner', 'chain_admin', 'merchant'];
+
     // 先通过手机号查找
-    let user = await User.findOne({ 
-      phone: account, 
-      roles: { $in: ['store_staff', 'store_owner'] },
+    let user = await User.findOne({
+      phone: account,
+      roles: { $in: staffRoles },
       status: 'active'
     });
-    
+
     // 再通过工号查找
     if (!user) {
-      user = await User.findOne({ 
-        userNo: account, 
-        roles: { $in: ['store_staff', 'store_owner'] },
+      user = await User.findOne({
+        userNo: account,
+        roles: { $in: staffRoles },
         status: 'active'
       });
     }
-    
+
     return user;
   }
 

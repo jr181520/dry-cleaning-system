@@ -96,12 +96,13 @@ router.put('/users/:id/status', async (req, res) => {
 // 获取门店列表
 router.get('/stores', async (req, res) => {
   try {
-    const { page, pageSize, keyword, status } = req.query;
+    const { page, pageSize, keyword, status, businessCategory } = req.query;
     const result = await adminService.getStores({
       page: parseInt(page) || 1,
       pageSize: parseInt(pageSize) || 20,
       keyword,
-      status
+      status,
+      businessCategory
     });
     res.json(result);
   } catch (error) {
@@ -1199,6 +1200,136 @@ router.post('/chains/:chainId/settlement/stores/batch-update', authMiddleware, r
   } catch (error) {
     console.error('[结算权限] 批量更新门店配置失败:', error);
     res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// ============================================
+// BD管理
+// ============================================
+
+router.get('/bd-team', async (req, res) => {
+  try {
+    const { page, pageSize, keyword, status, level } = req.query;
+    const result = await adminService.getBDTeamList({
+      page: parseInt(page) || 1, pageSize: parseInt(pageSize) || 50, keyword, status, level
+    });
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+router.get('/bd-team/active', async (req, res) => {
+  try {
+    const result = await adminService.getActiveBDList();
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+router.get('/bd-team/stats', async (req, res) => {
+  try {
+    const result = await adminService.getBDStats();
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+router.get('/bd-team/:id', async (req, res) => {
+  try {
+    const result = await adminService.getBDById(req.params.id);
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+router.post('/bd-team', async (req, res) => {
+  try {
+    const result = await adminService.createBD(req.body);
+    res.json(result);
+  } catch (error) {
+    res.status(400).json({ success: false, error: error.message });
+  }
+});
+
+router.put('/bd-team/:id', async (req, res) => {
+  try {
+    const result = await adminService.updateBD(req.params.id, req.body);
+    res.json(result);
+  } catch (error) {
+    res.status(400).json({ success: false, error: error.message });
+  }
+});
+
+router.delete('/bd-team/:id', async (req, res) => {
+  try {
+    const result = await adminService.deleteBD(req.params.id);
+    res.json(result);
+  } catch (error) {
+    res.status(400).json({ success: false, error: error.message });
+  }
+});
+
+// ============================================
+// 客服中心
+// ============================================
+
+router.get('/service-tickets', async (req, res) => {
+  try {
+    const { page, pageSize, status, priority, keyword, storeId } = req.query;
+    const result = await adminService.getTickets({ page, pageSize, status, priority, keyword, storeId });
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+router.get('/service-tickets/stats', async (req, res) => {
+  try {
+    const result = await adminService.getTicketStats();
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+router.get('/service-tickets/:id', async (req, res) => {
+  try {
+    const result = await adminService.getTicketById(req.params.id);
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+router.post('/service-tickets', async (req, res) => {
+  try {
+    const result = await adminService.createTicket(req.body);
+    res.json(result);
+  } catch (error) {
+    res.status(400).json({ success: false, error: error.message });
+  }
+});
+
+router.post('/service-tickets/:id/chat', async (req, res) => {
+  try {
+    const { message } = req.body;
+    const result = await adminService.aiAgentRespond(req.params.id, message);
+    res.json(result);
+  } catch (error) {
+    res.status(400).json({ success: false, error: error.message });
+  }
+});
+
+router.put('/service-tickets/:id', async (req, res) => {
+  try {
+    const result = await adminService.updateTicket(req.params.id, req.body);
+    res.json(result);
+  } catch (error) {
+    res.status(400).json({ success: false, error: error.message });
   }
 });
 

@@ -46,7 +46,7 @@ async function authMiddleware(req, res, next) {
         name: '连锁管理员',
         roles: ['chain_admin'],
         storeId: null,
-        chainId: null,
+        chainId: 'mock-chain',
         creditScore: 100
       };
       next();
@@ -80,7 +80,7 @@ async function authMiddleware(req, res, next) {
         name: '连锁管理员',
         roles: ['chain_admin'],
         storeId: null,
-        chainId: null,
+        chainId: 'mock-chain',
         creditScore: 100
       };
       next();
@@ -122,6 +122,7 @@ async function authMiddleware(req, res, next) {
       name: user.name,
       roles: user.roles,
       storeId: user.storeId,
+      chainId: user.chainId || null,
       creditScore: user.creditScore,
       openid: user.openid || null  // 用于跨平台用户识别
     };
@@ -172,6 +173,7 @@ async function optionalAuth(req, res, next) {
           name: user.name,
           roles: user.roles,
           storeId: user.storeId,
+          chainId: user.chainId || null,
           openid: user.openid || null  // 用于跨平台用户识别
         };
       }

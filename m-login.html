@@ -200,15 +200,30 @@
                 <div class="text-center pt-4 border-t border-gray-200">
                     <p class="text-gray-600 text-sm">
                         还没有账号？
-                        <a href="admin.html#store-apply" class="text-primary font-medium hover:underline">
+                        <button type="button" onclick="toggleRegisterForm()" class="text-primary font-medium hover:underline">
                             <i class="fa fa-user-plus mr-1"></i>
-                            注册门店账号
-                        </a>
+                            注册商家账号
+                        </button>
                     </p>
                     <p class="text-gray-500 text-xs mt-2">
                         <i class="fa fa-info-circle mr-1"></i>
-                        注册后将进入门店入驻申请流程
+                        注册后需填写入驻申请，审批通过后即可使用
                     </p>
+                </div>
+                
+                <!-- 商家注册表单 -->
+                <div id="register-form-area" class="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-200 hidden">
+                    <h3 class="text-sm font-semibold text-blue-800 mb-3">
+                        <i class="fa fa-user-plus mr-1"></i> 新商家注册
+                    </h3>
+                    <div class="space-y-3">
+                        <input type="tel" id="reg-phone" placeholder="手机号（用于登录）" class="w-full border border-gray-300 rounded-lg p-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary">
+                        <input type="text" id="reg-name" placeholder="您的姓名" class="w-full border border-gray-300 rounded-lg p-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary">
+                        <input type="password" id="reg-password" placeholder="设置密码" class="w-full border border-gray-300 rounded-lg p-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary">
+                        <button type="button" id="reg-submit-btn" onclick="submitMerchantRegister()" class="w-full bg-primary text-white py-2.5 rounded-lg text-sm font-medium hover:bg-primary/90 transition-all">
+                            <i class="fa fa-check mr-1"></i> 注册并进入入驻申请
+                        </button>
+                    </div>
                 </div>
                 
                 <!-- 测试账号快捷登录 -->
@@ -217,17 +232,17 @@
                         <i class="fa fa-flask mr-1"></i> 测试模式 - 快捷登录
                     </div>
                     <div class="grid grid-cols-3 gap-2">
-                        <button onclick="quickLogin('13900001001')" class="px-3 py-2 bg-white border border-green-200 rounded-lg text-sm text-green-700 hover:bg-green-50 transition-colors">
+                        <button type="button" onclick="quickLogin('13900001001')" class="px-3 py-2 bg-white border border-green-200 rounded-lg text-sm text-green-700 hover:bg-green-50 transition-colors">
                             <div class="font-medium">店员</div>
                             <div class="text-xs text-gray-500">13900001001</div>
                             <div class="text-xs text-green-600">ST002</div>
                         </button>
-                        <button onclick="quickLogin('13900001002')" class="px-3 py-2 bg-white border border-purple-200 rounded-lg text-sm text-purple-700 hover:bg-purple-50 transition-colors">
+                        <button type="button" onclick="quickLogin('13900001002')" class="px-3 py-2 bg-white border border-purple-200 rounded-lg text-sm text-purple-700 hover:bg-purple-50 transition-colors">
                             <div class="font-medium">店长</div>
                             <div class="text-xs text-gray-500">13900001002</div>
                             <div class="text-xs text-purple-600">ST002</div>
                         </button>
-                        <button onclick="quickLogin('13900001003')" class="px-3 py-2 bg-white border border-blue-200 rounded-lg text-sm text-blue-700 hover:bg-blue-50 transition-colors">
+                        <button type="button" onclick="quickLogin('13900001003')" class="px-3 py-2 bg-white border border-blue-200 rounded-lg text-sm text-blue-700 hover:bg-blue-50 transition-colors">
                             <div class="font-medium">管理员</div>
                             <div class="text-xs text-gray-500">13900001003</div>
                             <div class="text-xs text-blue-600">ST001</div>
@@ -520,6 +535,19 @@
         
         // 页面加载时检查
         window.addEventListener('DOMContentLoaded', function() {
+            // 清除可能残留的旧会话数据，确保注册流程干净
+            localStorage.removeItem('storeAccount');
+            localStorage.removeItem('storeToken');
+            localStorage.removeItem('isMockStoreUser');
+            // 注意：不清除 storeUser/currentStore，因为可能用于检测已登录状态
+            // 但如果 storeUser 是 merchant 角色，则保留（可能是注册后返回）
+            var su = JSON.parse(localStorage.getItem('storeUser') || '{}');
+            if (su.roles && !su.roles.includes('merchant')) {
+                // 非 merchant 的残留数据，清除
+                localStorage.removeItem('storeUser');
+                localStorage.removeItem('currentStore');
+                localStorage.removeItem('auth_token');
+            }
             checkLoggedInAccount();
         });
         
@@ -561,6 +589,64 @@
                 alert('测试账号不存在');
             }
         }
+    
+    // 切换注册表单显示
+    function toggleRegisterForm() {
+        var area = document.getElementById('register-form-area');
+        if (area) {
+            area.classList.toggle('hidden');
+        }
+    }
+    
+    // 提交商家注册
+    async function submitMerchantRegister() {
+        var phone = document.getElementById('reg-phone').value.trim();
+        var name = document.getElementById('reg-name').value.trim();
+        var password = document.getElementById('reg-password').value;
+        
+        if (!phone || !password) { alert('请填写手机号和密码'); return; }
+        if (!/^1\d{10}$/.test(phone)) { alert('手机号格式不正确'); return; }
+        
+        var btn = document.getElementById('reg-submit-btn');
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa fa-spinner fa-spin mr-1"></i> 注册中...';
+        
+        try {
+            var port = window.location.port || 3000;
+            var baseUrl = 'http://localhost:' + port + '/api';
+            var resp = await fetch(baseUrl + '/auth/merchant-register', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ phone, password, name })
+            });
+            var result = await resp.json();
+            if (!result.success) throw new Error(result.error || '注册失败');
+            
+            var data = result.data;
+            localStorage.setItem('auth_token', data.token);
+            var storeUser = {
+                userId: data.user._id,
+                userNo: data.user.userNo,
+                phone: data.user.phone,
+                name: data.user.name,
+                roles: data.user.roles || ['merchant'],
+                storeId: null,
+                storeName: '待入驻',
+                loginTime: new Date().toISOString()
+            };
+            localStorage.setItem('storeUser', JSON.stringify(storeUser));
+            localStorage.setItem('currentStore', JSON.stringify({ storeId: null, storeName: '待入驻', name: '待入驻' }));
+            localStorage.removeItem('guestModeHandled');
+            
+            alert('注册成功！请填写门店入驻申请表。');
+            window.location.href = 'm-index.html';
+        } catch (err) {
+            alert('注册失败: ' + err.message);
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fa fa-check mr-1"></i> 注册并进入入驻申请';
+        }
+    }
     </script>
 </body>
 </html>

@@ -990,4 +990,70 @@ router.post('/settlement/stores/batch-update', createDataHierarchyMiddleware({
   }
 });
 
+/**
+ * 更新门店状态（启用/停用）
+ * PUT /api/chain-admin/stores/:id/status
+ */
+router.put('/stores/:id/status', createDataHierarchyMiddleware({
+  dataType: 'store',
+  allowedRoles: ['chain_admin']
+}), async (req, res) => {
+  try {
+    const storeId = req.params.id;
+    const { status } = req.body;
+    const user = req.user;
+
+    if (!['active', 'disabled'].includes(status)) {
+      return res.status(400).json({
+        success: false,
+        error: 'invalid_status',
+        message: '状态值只能是 active 或 disabled'
+      });
+    }
+
+    const mongoose = require('mongoose');
+    const Store = mongoose.models.Store;
+
+    // 验证门店是否属于当前连锁
+    const store = await Store.findOne({
+      $or: [
+        { _id: mongoose.Types.ObjectId.isValid(storeId) ? storeId : null },
+        { storeNo: storeId }
+      ]
+    }).lean();
+
+    if (!store) {
+      return res.status(404).json({
+        success: false,
+        error: 'store_not_found',
+        message: '门店不存在'
+      });
+    }
+
+    if (store.chainId !== user.chainId) {
+      return res.status(403).json({
+        success: false,
+        error: 'permission_denied',
+        message: '无权访问该门店'
+      });
+    }
+
+    // 更新门店状态
+    await Store.findByIdAndUpdate(store._id, { status, updatedAt: new Date() });
+
+    res.json({
+      success: true,
+      message: '门店状态更新成功',
+      data: { storeId, status }
+    });
+  } catch (error) {
+    console.error('[连锁后台] 更新门店状态失败:', error);
+    res.status(500).json({
+      success: false,
+      error: 'server_error',
+      message: '更新门店状态失败'
+    });
+  }
+});
+
 module.exports = router;

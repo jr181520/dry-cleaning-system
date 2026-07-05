@@ -36,6 +36,7 @@ const storeSchema = new mongoose.Schema({
   staffIds: [String],
   // 连锁门店相关字段
   chainId: { type: String, index: true }, // 所属连锁ID
+  businessCategory: { type: String, default: 'cleaning' }, // 业务品类
   storeType: { type: String, enum: ['self', 'franchise', 'joint'], default: 'self' }, // 门店类型: self-自营, franchise-加盟, joint-联营
   terminalSettlementEnabled: { type: Boolean, default: true }, // 终端结算功能开关
   settlementRatio: { type: Number, default: 0.7 }, // 结算比例（0-1）

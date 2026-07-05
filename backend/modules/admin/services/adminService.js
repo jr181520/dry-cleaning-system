@@ -12,27 +12,36 @@ class AdminService {
     this.Order = this.getOrderModel();
     this.Store = this.getStoreModel();
     this.Chain = this.getChainModel();
+    this.BDTeam = this.getBDTeamModel();
+    this.ServiceTicket = this.getServiceTicketModel();
   }
 
   // 获取用户模型
   getUserModel() {
     const userSchema = new mongoose.Schema({
+      userNo: { type: String, index: true },
       phone: { type: String, required: true, unique: true },
       password: { type: String, required: true },
       name: String,
       avatar: String,
-      roles: [{ type: String, enum: ['customer', 'store_staff', 'store_owner', 'recycler', 'appraiser', 'brand_admin', 'chain_admin', 'admin'], default: 'customer' }],
-      status: { type: String, enum: ['active', 'disabled'], default: 'active' },
+      openid: { type: String, sparse: true, index: true },
+      roles: [{ type: String, enum: ['customer', 'store_staff', 'store_owner', 'recycler', 'appraiser', 'brand_admin', 'chain_admin', 'admin', 'merchant'], default: 'customer' }],
+      status: { type: String, enum: ['active', 'disabled', 'inactive', 'banned'], default: 'active' },
       memberLevel: { type: String, enum: ['normal', 'silver', 'gold', 'platinum'], default: 'normal' },
       balance: { type: Number, default: 0 },
       points: { type: Number, default: 0 },
+      storeId: String,
+      chainId: { type: String, index: true },
+      creditScore: { type: Number, default: 100 },
+      registrationSource: { type: String, default: 'unknown' },
+      createdFrom: { type: String, default: 'app' },
+      lastLoginAt: Date,
       addresses: [{
         name: String,
         phone: String,
         address: String,
         isDefault: Boolean
       }],
-      lastLoginAt: Date,
       createdAt: { type: Date, default: Date.now },
       updatedAt: { type: Date, default: Date.now }
     });
@@ -99,6 +108,7 @@ class AdminService {
       name: { type: String, required: true },
       ownerId: { type: String, required: true },
       chainId: { type: String, index: true },
+      businessCategory: { type: String, default: 'cleaning' }, // 业务品类
       phone: String,
       address: { type: String, required: true },
       city: String,
@@ -432,7 +442,7 @@ class AdminService {
    */
   async getStores(params) {
     try {
-      const { page = 1, pageSize = 20, keyword, status } = params;
+      const { page = 1, pageSize = 20, keyword, status, businessCategory } = params;
       
       const filter = {};
       if (keyword) {
@@ -442,6 +452,7 @@ class AdminService {
         ];
       }
       if (status) filter.status = status;
+      if (businessCategory) filter.businessCategory = businessCategory;
 
       const [stores, total] = await Promise.all([
         this.Store.find(filter)
@@ -498,7 +509,11 @@ class AdminService {
     try {
       const storeNo = 'ST' + String(Date.now()).slice(-8);
       
-      const store = await this.Store.create({
+      // 使用 mongoose.connection.db 直接操作，确保字段正确写入
+      const db = mongoose.connection.db;
+      const collection = db.collection('stores');
+      
+      const storeDoc = {
         storeNo,
         name: storeData.name,
         address: storeData.address,
@@ -523,15 +538,19 @@ class AdminService {
         ],
         images: storeData.images || [],
         description: storeData.description || '',
+        businessCategory: storeData.businessCategory || 'cleaning',
         rating: 5.0,
         orderCount: 0,
         status: 'active',
         createdAt: new Date(),
         updatedAt: new Date()
-      });
+      };
+      
+      const result = await collection.insertOne(storeDoc);
+      storeDoc._id = result.insertedId;
 
-      console.log('[管理员] 门店创建成功:', store.storeNo, store.name);
-      return store;
+      console.log('[管理员] 门店创建成功:', storeDoc.storeNo, storeDoc.name, 'category:', storeDoc.businessCategory);
+      return storeDoc;
     } catch (error) {
       console.error('[管理员] 创建门店失败:', error);
       throw error;
@@ -647,6 +666,7 @@ class AdminService {
       },
       businessLicense: String,
       legalPerson: String,
+      businessCategory: { type: String, default: 'cleaning' }, // 业务品类：cleaning/shoe_care/luxury_care/pet_grooming/electronics_repair/rental/rental_leisure
       description: String,
       bdName: String,
       bdPhone: String,
@@ -815,6 +835,50 @@ class AdminService {
       return { success: true, data: application.messages || [] };
     } catch (error) {
       console.error('[管理员] 获取消息失败:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  // 查询申请状态（商家自助查询）
+  async getApplicationStatus({ phone, applicationId }) {
+    try {
+      const Application = this.getApplicationModel();
+      const filter = {};
+      if (applicationId) {
+        filter.applicationId = applicationId;
+      } else if (phone) {
+        filter.applicantPhone = phone;
+      }
+      
+      const application = await Application.findOne(filter)
+        .sort({ createTime: -1 })
+        .lean();
+      
+      if (!application) {
+        return {
+          success: true,
+          data: {
+            hasApplication: false,
+            status: null,
+            needsApplication: true
+          }
+        };
+      }
+      
+      return {
+        success: true,
+        data: {
+          hasApplication: true,
+          applicationId: application.applicationId,
+          storeName: application.storeName,
+          status: application.status,
+          createTime: application.createTime,
+          updateTime: application.updateTime,
+          needsApplication: application.status !== 'approved'
+        }
+      };
+    } catch (error) {
+      console.error('[入驻申请] 查询状态失败:', error);
       return { success: false, error: error.message };
     }
   }
@@ -1829,8 +1893,8 @@ class AdminService {
         stats: { totalStores: 0, activeStores: 0, totalOrders: 0, totalRevenue: 0, monthlyOrders: 0, monthlyRevenue: 0 }
       });
 
-      // 更新管理员用户角色
-      if (adminId) {
+      // 更新管理员用户角色（adminId 必须是有效 ObjectId 才执行）
+      if (adminId && mongoose.Types.ObjectId.isValid(adminId)) {
         await this.User.findByIdAndUpdate(adminId, { $addToSet: { roles: 'chain_admin' } });
       }
 
@@ -1894,9 +1958,9 @@ class AdminService {
       // 获取下属门店
       const stores = await this.Store.find({ chainId: chain._id.toString() }).sort({ createdAt: -1 }).lean();
 
-      // 获取管理员信息
+      // 获取管理员信息（仅当 adminId 为有效 ObjectId 时查询）
       let admin = null;
-      if (chain.adminId) {
+      if (chain.adminId && mongoose.Types.ObjectId.isValid(chain.adminId)) {
         admin = await this.User.findById(chain.adminId).select('-password').lean();
       }
 
@@ -1969,8 +2033,8 @@ class AdminService {
       // 移除所有门店的chainId关联
       await this.Store.updateMany({ chainId: chain._id.toString() }, { $set: { chainId: null } });
 
-      // 移除管理员chain_admin角色
-      if (chain.adminId) {
+      // 移除管理员chain_admin角色（adminId 必须是有效 ObjectId 才执行）
+      if (chain.adminId && mongoose.Types.ObjectId.isValid(chain.adminId)) {
         await this.User.findByIdAndUpdate(chain.adminId, { $pull: { roles: 'chain_admin' } });
       }
 
@@ -1991,21 +2055,38 @@ class AdminService {
       });
       if (!chain) throw new Error('连锁企业不存在');
 
-      const store = await this.Store.findOneAndUpdate(
-        { $or: [{ _id: mongoose.Types.ObjectId.isValid(storeId) ? storeId : null }, { storeNo: storeId }] },
-        { $set: { chainId: chain._id.toString() }, $set: { updatedAt: new Date() } },
-        { new: true }
-      );
+      // 查找门店
+      let store = null;
+      if (mongoose.Types.ObjectId.isValid(storeId)) {
+        store = await this.Store.findById(storeId);
+      }
+      if (!store) {
+        store = await this.Store.findOne({ storeNo: storeId });
+      }
       if (!store) throw new Error('门店不存在');
 
+      // 使用 mongoose.connection.db 直接操作原生集合
+      const storeDocId = store._id;
+      const chainIdStr = chain._id.toString();
+      const db = mongoose.connection.db;
+      const collection = db.collection('stores');
+      
+      const updateResult = await collection.updateOne(
+        { _id: storeDocId },
+        { $set: { chainId: chainIdStr } }
+      );
+
+      // 直接用原生查询确认
+      const verifyDoc = await collection.findOne({ _id: storeDocId });
+
       // 更新连锁统计
-      const storeCount = await this.Store.countDocuments({ chainId: chain._id.toString() });
-      const activeCount = await this.Store.countDocuments({ chainId: chain._id.toString(), status: 'active' });
+      const storeCount = await collection.countDocuments({ chainId: chainIdStr });
+      const activeCount = await collection.countDocuments({ chainId: chainIdStr, status: 'active' });
       await this.Chain.findByIdAndUpdate(chain._id, {
         $set: { 'stats.totalStores': storeCount, 'stats.activeStores': activeCount, updatedAt: new Date() }
       });
 
-      return { success: true, data: store, message: `门店 ${store.name} 已加入连锁 ${chain.name}` };
+      return { success: true, data: verifyDoc, message: `门店 ${verifyDoc.name} 已加入连锁 ${chain.name}` };
     } catch (error) {
       console.error('[连锁管理] 门店加入失败:', error);
       return { success: false, error: error.message };
@@ -2017,18 +2098,29 @@ class AdminService {
    */
   async removeStoreFromChain(storeId) {
     try {
-      const store = await this.Store.findOneAndUpdate(
-        { $or: [{ _id: mongoose.Types.ObjectId.isValid(storeId) ? storeId : null }, { storeNo: storeId }] },
-        { $set: { chainId: null }, $set: { updatedAt: new Date() } },
-        { new: true }
-      );
+      let store = null;
+      if (mongoose.Types.ObjectId.isValid(storeId)) {
+        store = await this.Store.findById(storeId);
+      }
+      if (!store) {
+        store = await this.Store.findOne({ storeNo: storeId });
+      }
       if (!store) throw new Error('门店不存在');
 
+      const oldChainId = store.chainId;
+      // 使用 mongoose.connection.db 直接操作
+      const db = mongoose.connection.db;
+      const collection = db.collection('stores');
+      await collection.updateOne(
+        { _id: store._id },
+        { $set: { chainId: '', updatedAt: new Date() } }
+      );
+
       // 如果之前有chainId，更新连锁统计
-      if (store.chainId) {
-        const storeCount = await this.Store.countDocuments({ chainId: store.chainId });
-        const activeCount = await this.Store.countDocuments({ chainId: store.chainId, status: 'active' });
-        await this.Chain.findByIdAndUpdate(store.chainId, {
+      if (oldChainId) {
+        const storeCount = await collection.countDocuments({ chainId: oldChainId });
+        const activeCount = await collection.countDocuments({ chainId: oldChainId, status: 'active' });
+        await this.Chain.findByIdAndUpdate(oldChainId, {
           $set: { 'stats.totalStores': storeCount, 'stats.activeStores': activeCount, updatedAt: new Date() }
         });
       }
@@ -2993,6 +3085,365 @@ class AdminService {
       };
     } catch (error) {
       console.error('[结算权限] 批量更新门店配置失败:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  // ========== BD管理模型与方法 ==========
+
+  getBDTeamModel() {
+    const bdSchema = new mongoose.Schema({
+      bdNo: { type: String, unique: true, index: true },
+      name: { type: String, required: true },
+      phone: { type: String, required: true, unique: true },
+      region: String,
+      level: { type: String, enum: ['junior', 'senior', 'manager', 'director'], default: 'junior' },
+      teamName: String,
+      parentBdId: String,
+      children: [{ type: String }],
+      status: { type: String, enum: ['active', 'inactive'], default: 'active' },
+      storeCount: { type: Number, default: 0 },
+      totalOrders: { type: Number, default: 0 },
+      stats: {
+        monthlyNewStores: { type: Number, default: 0 },
+        monthlyOrders: { type: Number, default: 0 }
+      },
+      createdAt: { type: Date, default: Date.now },
+      updatedAt: { type: Date, default: Date.now }
+    });
+    bdSchema.index({ parentBdId: 1 });
+    bdSchema.index({ status: 1 });
+    return mongoose.models.BDTeam || mongoose.model('BDTeam', bdSchema);
+  }
+
+  async getBDTeamList(params) {
+    try {
+      const { page = 1, pageSize = 50, keyword, status, level } = params;
+      const filter = {};
+      if (keyword) {
+        filter.$or = [
+          { name: { $regex: keyword, $options: 'i' } },
+          { phone: { $regex: keyword, $options: 'i' } },
+          { bdNo: { $regex: keyword, $options: 'i' } }
+        ];
+      }
+      if (status) filter.status = status;
+      if (level) filter.level = level;
+
+      const [list, total] = await Promise.all([
+        this.BDTeam.find(filter).sort({ level: 1, createdAt: -1 }).skip((page - 1) * pageSize).limit(pageSize),
+        this.BDTeam.countDocuments(filter)
+      ]);
+      return { success: true, data: { list, total, page, pageSize } };
+    } catch (error) {
+      console.error('[BD管理] 获取BD列表失败:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  async getActiveBDList() {
+    try {
+      const list = await this.BDTeam.find({ status: 'active' }).sort({ level: -1, name: 1 });
+      return { success: true, data: list };
+    } catch (error) {
+      console.error('[BD管理] 获取活跃BD失败:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  async getBDById(id) {
+    try {
+      const bd = await this.BDTeam.findById(id);
+      if (!bd) return { success: false, error: 'BD不存在' };
+      // 获取下级BD
+      const children = await this.BDTeam.find({ parentBdId: id });
+      return { success: true, data: { ...bd.toObject(), childrenList: children } };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  }
+
+  async createBD(data) {
+    try {
+      const bdNo = 'BD' + String(Date.now()).slice(-8);
+      const bd = new this.BDTeam({ ...data, bdNo });
+      await bd.save();
+      // 维护上级children列表
+      if (data.parentBdId) {
+        await this.BDTeam.findByIdAndUpdate(data.parentBdId, { $addToSet: { children: bd._id.toString() } });
+      }
+      return { success: true, data: bd };
+    } catch (error) {
+      console.error('[BD管理] 创建BD失败:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  async updateBD(id, data) {
+    try {
+      const bd = await this.BDTeam.findByIdAndUpdate(id, { ...data, updatedAt: new Date() }, { new: true });
+      if (!bd) return { success: false, error: 'BD不存在' };
+      return { success: true, data: bd };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  }
+
+  async deleteBD(id) {
+    try {
+      const bd = await this.BDTeam.findByIdAndUpdate(id, { status: 'inactive', updatedAt: new Date() }, { new: true });
+      if (!bd) return { success: false, error: 'BD不存在' };
+      return { success: true, data: bd };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  }
+
+  async getBDStats() {
+    try {
+      const [total, active, levels] = await Promise.all([
+        this.BDTeam.countDocuments(),
+        this.BDTeam.countDocuments({ status: 'active' }),
+        this.BDTeam.aggregate([{ $group: { _id: '$level', count: { $sum: 1 } } }])
+      ]);
+      const levelMap = {};
+      levels.forEach(l => levelMap[l._id] = l.count);
+      return { success: true, data: { total, active, levelDistribution: levelMap } };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  }
+
+  // ========== 客服中心模型与方法 ==========
+
+  getServiceTicketModel() {
+    const ticketSchema = new mongoose.Schema({
+      ticketNo: { type: String, unique: true, index: true },
+      orderId: String,
+      orderNo: String,
+      storeId: String,
+      storeName: String,
+      customerId: String,
+      customerName: String,
+      customerPhone: String,
+      category: { type: String, enum: ['order_status', 'quality', 'refund', 'delivery', 'payment', 'complaint', 'other'], default: 'other' },
+      priority: { type: String, enum: ['low', 'medium', 'high', 'urgent'], default: 'medium' },
+      title: String,
+      description: String,
+      status: { type: String, enum: ['open', 'processing', 'resolved', 'closed'], default: 'open' },
+      assignedTo: { type: String, default: 'ai_agent' },
+      resolution: String,
+      conversations: [{
+        sender: { type: String, enum: ['customer', 'ai_agent', 'human_agent', 'system'] },
+        content: String,
+        time: { type: Date, default: Date.now }
+      }],
+      source: { type: String, enum: ['admin', 'c_end', 'auto'], default: 'admin' },
+      createdAt: { type: Date, default: Date.now },
+      updatedAt: { type: Date, default: Date.now }
+    });
+    ticketSchema.index({ status: 1, priority: -1, createdAt: -1 });
+    ticketSchema.index({ customerId: 1 });
+    ticketSchema.index({ orderId: 1 });
+    return mongoose.models.ServiceTicket || mongoose.model('ServiceTicket', ticketSchema);
+  }
+
+  async getTickets(params) {
+    try {
+      const { page = 1, pageSize = 20, status, priority, keyword, storeId } = params;
+      const filter = {};
+      if (status) filter.status = status;
+      if (priority) filter.priority = priority;
+      if (storeId) filter.storeId = storeId;
+      if (keyword) {
+        filter.$or = [
+          { ticketNo: { $regex: keyword, $options: 'i' } },
+          { title: { $regex: keyword, $options: 'i' } },
+          { customerName: { $regex: keyword, $options: 'i' } },
+          { customerPhone: { $regex: keyword, $options: 'i' } }
+        ];
+      }
+      const [list, total] = await Promise.all([
+        this.ServiceTicket.find(filter).sort({ priority: -1, createdAt: -1 }).skip((page - 1) * pageSize).limit(pageSize),
+        this.ServiceTicket.countDocuments(filter)
+      ]);
+      return { success: true, data: { list, total, page, pageSize } };
+    } catch (error) {
+      console.error('[客服中心] 获取工单失败:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  async getTicketById(id) {
+    try {
+      const ticket = await this.ServiceTicket.findById(id);
+      if (!ticket) return { success: false, error: '工单不存在' };
+      return { success: true, data: ticket };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  }
+
+  async createTicket(data) {
+    try {
+      const ticketNo = 'TK' + String(Date.now()).slice(-10);
+      const ticket = new this.ServiceTicket({
+        ...data,
+        ticketNo,
+        assignedTo: 'ai_agent',
+        status: 'open'
+      });
+      // 智能体自动首次响应
+      const aiReply = this._aiAgentGenerateReply(data.description || data.title || '', null);
+      ticket.conversations.push({
+        sender: 'ai_agent',
+        content: aiReply,
+        time: new Date()
+      });
+      ticket.status = 'processing';
+      await ticket.save();
+      return { success: true, data: ticket };
+    } catch (error) {
+      console.error('[客服中心] 创建工单失败:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  async submitTicketFromC(data) {
+    try {
+      const ticketNo = 'TK' + String(Date.now()).slice(-10);
+      // 尝试关联订单信息
+      let orderInfo = {};
+      if (data.orderId) {
+        const order = await this.Order.findById(data.orderId);
+        if (order) {
+          orderInfo = {
+            orderId: order._id.toString(),
+            orderNo: order.orderNo,
+            storeId: order.storeId
+          };
+        }
+      }
+      const ticket = new this.ServiceTicket({
+        ...data,
+        ...orderInfo,
+        ticketNo,
+        source: 'c_end',
+        assignedTo: 'ai_agent',
+        status: 'open'
+      });
+      const aiReply = this._aiAgentGenerateReply(data.description || data.title || '', orderInfo.orderNo ? { orderNo: orderInfo.orderNo } : null);
+      ticket.conversations.push({ sender: 'ai_agent', content: aiReply, time: new Date() });
+      ticket.status = 'processing';
+      await ticket.save();
+      return { success: true, data: ticket };
+    } catch (error) {
+      console.error('[客服中心] C端提交工单失败:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  async getMyTickets(customerId) {
+    try {
+      const list = await this.ServiceTicket.find({ customerId }).sort({ createdAt: -1 }).limit(50);
+      return { success: true, data: list };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  }
+
+  async aiAgentRespond(ticketId, userMessage) {
+    try {
+      const ticket = await this.ServiceTicket.findById(ticketId);
+      if (!ticket) return { success: false, error: '工单不存在' };
+      // 添加用户消息
+      ticket.conversations.push({ sender: 'customer', content: userMessage, time: new Date() });
+      // 查询订单上下文
+      let orderContext = null;
+      if (ticket.orderId || ticket.orderNo) {
+        const q = ticket.orderId ? { _id: ticket.orderId } : { orderNo: ticket.orderNo };
+        orderContext = await this.Order.findOne(q).lean();
+      }
+      // 智能体生成回复
+      const aiReply = this._aiAgentGenerateReply(userMessage, orderContext);
+      ticket.conversations.push({ sender: 'ai_agent', content: aiReply, time: new Date() });
+      // 投诉类自动升级
+      if (this._isComplaint(userMessage)) {
+        ticket.priority = 'urgent';
+        ticket.assignedTo = 'human_agent';
+      }
+      ticket.updatedAt = new Date();
+      await ticket.save();
+      return { success: true, data: ticket };
+    } catch (error) {
+      console.error('[智能体] 响应失败:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  _isComplaint(text) {
+    const keywords = ['投诉', '不满', '差评', '举报', '工商', '消协', '律师'];
+    return keywords.some(k => text.includes(k));
+  }
+
+  _aiAgentGenerateReply(message, orderContext) {
+    const msg = (message || '').toLowerCase();
+    // 订单状态查询
+    if (/订单|状态|进度|到哪了|什么时候|多久/.test(msg)) {
+      if (orderContext) {
+        const statusMap = { pending: '待支付', paid: '已支付待处理', processing: '处理中', completed: '已完成', cancelled: '已取消' };
+        return `您好！我是客服智能体小洁✨。\n\n您的订单 ${orderContext.orderNo || ''} 当前状态为：【${statusMap[orderContext.status] || orderContext.status}】。\n\n如有疑问请继续咨询，我将竭诚为您服务！`;
+      }
+      return '您好！我是客服智能体小洁✨。\n\n请提供您的订单号，我将为您查询最新订单状态。您可以在“我的订单”页面查看订单编号。';
+    }
+    // 退款问题
+    if (/退款|退钱|退还|退费|退还/.test(msg)) {
+      return '您好！我是客服智能体小洁✨。\n\n关于退款流程：\n1. 退款申请提交后，我们将在1-3个工作日内审核\n2. 审核通过后，退款将在3-5个工作日内原路返回\n3. 如超时未收到，请联系人工客服进一步处理\n\n如需提交退款申请，请提供订单号，我将为您记录并加速处理。';
+    }
+    // 配送问题
+    if (/配送|快递|取件|送货|物流|骑手/.test(msg)) {
+      return '您好！我是客服智能体小洁✨。\n\n关于取件/配送：\n- 门店自提：请在门店营业时间内前往取件，到店后扫描取件码即可\n- 上门取件：已为您安排快递员，预计30分钟内到达\n- 如需修改取件方式，请提供订单号，我将为您更新。';
+    }
+    // 支付问题
+    if (/支付|付款|扣款|充值|余额/.test(msg)) {
+      return '您好！我是客服智能体小洁✨。\n\n关于支付问题：\n- 微信支付/支付宝：实时到账，如有延迟请稍后刷新\n- 余额支付：请确认账户余额充足\n- 如需查询支付状态，请提供订单号\n\n充值问题请在“我的钱包”中查看充值记录。';
+    }
+    // 投诉
+    if (this._isComplaint(msg)) {
+      return '非常抱歉给您带来不好的体验！我已将您的问题标记为紧急事项，将立即转接人工客服为您处理。\n\n请您稍等，人工客服将在5分钟内与您联系。再次为给您造成的不便表示诚挚的歉意！🙏';
+    }
+    // 质量问题
+    if (/质量|破损|损坏|污渍|洗坏|褪色/.test(msg)) {
+      return '您好！我是客服智能体小洁✨。\n\n非常抱歉听到您的物品出现问题。请您：\n1. 拍照保存问题物品的照片\n2. 提供订单号，我将为您创建质量问题工单\n3. 我们将安排专人跟进处理\n\n我们承诺对质量问题负责到底，请您放心！';
+    }
+    // 兜底回复
+    return '您好！我是客服智能体小洁✨。\n\n已收到您的问题，我已为您记录。如需更精准的帮助，请告诉我：\n- 订单号（查询订单状态）\n- 具体问题类型（退款/配送/支付/质量等）\n\n如问题较为复杂，我将为您转接人工客服。感谢您的耐心等待！';
+  }
+
+  async updateTicket(id, data) {
+    try {
+      const ticket = await this.ServiceTicket.findByIdAndUpdate(id, { ...data, updatedAt: new Date() }, { new: true });
+      if (!ticket) return { success: false, error: '工单不存在' };
+      return { success: true, data: ticket };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  }
+
+  async getTicketStats() {
+    try {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const [total, open, processing, resolved, todayCount, urgentCount] = await Promise.all([
+        this.ServiceTicket.countDocuments(),
+        this.ServiceTicket.countDocuments({ status: 'open' }),
+        this.ServiceTicket.countDocuments({ status: 'processing' }),
+        this.ServiceTicket.countDocuments({ status: { $in: ['resolved', 'closed'] } }),
+        this.ServiceTicket.countDocuments({ createdAt: { $gte: today } }),
+        this.ServiceTicket.countDocuments({ priority: 'urgent', status: { $ne: 'closed' } })
+      ]);
+      return { success: true, data: { total, open, processing, resolved, todayCount, urgentCount } };
+    } catch (error) {
       return { success: false, error: error.message };
     }
   }

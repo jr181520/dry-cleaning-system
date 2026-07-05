@@ -151,6 +151,71 @@ const syncRouter = require('./modules/common/routes/syncRoutes');
 app.use('/api/sync', syncRouter);
 
 // ============================================
+// C端客服工单API
+// ============================================
+const adminService = require('./modules/admin/services/adminService');
+
+app.post('/api/service-tickets/submit', async (req, res) => {
+  try {
+    const result = await adminService.submitTicketFromC(req.body);
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+app.get('/api/service-tickets/my', async (req, res) => {
+  try {
+    const { customerId } = req.query;
+    if (!customerId) return res.status(400).json({ success: false, error: '缺少customerId' });
+    const result = await adminService.getMyTickets(customerId);
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+app.get('/api/service-tickets/detail/:id', async (req, res) => {
+  try {
+    const result = await adminService.getTicketById(req.params.id);
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// ============================================
+// 门店入驻申请公共API（商家提交申请，无需认证）
+// ============================================
+
+// 商家提交入驻申请（公开接口，无需admin认证）
+app.post('/api/store-applications/submit', async (req, res) => {
+  try {
+    const result = await adminService.createStoreApplication(req.body);
+    console.log('[入驻申请] 新申请提交:', req.body.storeName, req.body.applicationId);
+    res.json(result);
+  } catch (error) {
+    console.error('[入驻申请] 提交失败:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// 查询申请状态（公开接口，商家自助查询）
+app.get('/api/store-applications/status', async (req, res) => {
+  try {
+    const { phone, applicationId } = req.query;
+    if (!phone && !applicationId) {
+      return res.status(400).json({ success: false, error: '请提供手机号或申请编号' });
+    }
+    const result = await adminService.getApplicationStatus({ phone, applicationId });
+    res.json(result);
+  } catch (error) {
+    console.error('[入驻申请] 查询状态失败:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// ============================================
 // 通知中心API（Admin端轮询获取实时通知）
 // ============================================
 const notificationHubService = require('./services/notificationHubService');
