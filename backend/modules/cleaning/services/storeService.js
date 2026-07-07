@@ -54,17 +54,36 @@ class StoreService {
    * 获取门店列表
    */
   async getStores(params) {
-    const { page, pageSize, city, district, keyword, latitude, longitude, radius } = params;
+    const { page, pageSize, city, district, keyword, latitude, longitude, radius, businessCategory } = params;
     
     const filter = { status: 'active' };
     
     if (city) filter.city = city;
     if (district) filter.district = district;
+    if (businessCategory) {
+      // cleaning 为默认品类，也匹配未设置 businessCategory 的门店
+      if (businessCategory === 'cleaning') {
+        filter.$and = filter.$and || [];
+        filter.$and.push({
+          $or: [
+            { businessCategory: 'cleaning' },
+            { businessCategory: { $exists: false } },
+            { businessCategory: null },
+            { businessCategory: '' }
+          ]
+        });
+      } else {
+        filter.businessCategory = businessCategory;
+      }
+    }
     if (keyword) {
-      filter.$or = [
-        { name: { $regex: keyword, $options: 'i' } },
-        { address: { $regex: keyword, $options: 'i' } }
-      ];
+      filter.$and = filter.$and || [];
+      filter.$and.push({
+        $or: [
+          { name: { $regex: keyword, $options: 'i' } },
+          { address: { $regex: keyword, $options: 'i' } }
+        ]
+      });
     }
     
     // 地理位置搜索

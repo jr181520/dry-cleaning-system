@@ -2773,6 +2773,7 @@
                 };
                 localStorage.setItem('storeUser', JSON.stringify(storeUser));
                 localStorage.setItem('currentStore', JSON.stringify({ storeId: null, storeName: '待入驻', name: '待入驻' }));
+                localStorage.removeItem('guestModeHandled');
                 
                 window.closeLoginModal();
                 alert('注册成功！请填写门店入驻申请表单。');
@@ -10454,42 +10455,92 @@
             }
         };
         
+        // 激活预览模式（与m-index一致）
+        window.activateDashboardPreview = function() {
+            window.__isPreviewMode = true;
+            localStorage.setItem('previewMode', 'true');
+            var banner = document.getElementById('preview-mode-banner');
+            if (banner) banner.style.display = 'block';
+        };
+        
         // 检查是否需要显示入驻申请
         window.checkMerchantApplication = async function() {
             var storeUser = JSON.parse(localStorage.getItem('storeUser') || '{}');
             var roles = storeUser.roles || [];
             
-            // 如果是merchant角色，需要检查申请状态
             if (roles.includes('merchant')) {
-                // 检查是否已有approved申请
                 var phone = storeUser.phone || '';
                 if (phone) {
                     try {
                         var baseUrl = window.API_CONFIG ? API_CONFIG.baseUrl : 'http://localhost:' + (window.location.port || 3000) + '/api';
-                        var resp = await fetch(baseUrl + '/auth/application-status?phone=' + encodeURIComponent(phone));
+                        var resp = await fetch(baseUrl + '/store-applications/status?phone=' + encodeURIComponent(phone));
                         var result = await resp.json();
-                        if (result.success && !result.data.needsApplication && result.data.status === 'approved') {
-                            // 已审批通过，不需要再显示
-                            console.log('[入驻检查] 申请已通过，无需操作');
+                        if (result.success && result.data.status === 'approved') {
+                            console.log('[入驻检查] 已通过，门店ID:', result.data.storeId);
+                            // 审批通过：更新 storeUser、退出预览模式、刷新页面
+                            if (result.data.storeId) {
+                                storeUser.storeId = result.data.storeId;
+                                storeUser.roles = ['store_admin'];
+                                if (result.data.storeName) storeUser.storeName = result.data.storeName;
+                                localStorage.setItem('storeUser', JSON.stringify(storeUser));
+                                // 同步更新 currentStore
+                                var currentStore = JSON.parse(localStorage.getItem('currentStore') || '{}');
+                                currentStore.storeId = result.data.storeId;
+                                currentStore.storeName = result.data.storeName || storeUser.storeName || '';
+                                localStorage.setItem('currentStore', JSON.stringify(currentStore));
+                            }
+                            // 清除预览模式
+                            window.__isPreviewMode = false;
+                            localStorage.removeItem('previewMode');
+                            var banner = document.getElementById('preview-mode-banner');
+                            if (banner) banner.style.display = 'none';
+                            // 停止轮询
+                            if (window._merchantPollTimer) {
+                                clearInterval(window._merchantPollTimer);
+                                window._merchantPollTimer = null;
+                            }
+                            // 更新UI头部
+                            var headerName = document.getElementById('current-user-name');
+                            if (headerName) headerName.textContent = storeUser.storeName || storeUser.name || '商家';
+                            // 刷新页面以加载完整功能
+                            window.location.reload();
                             return;
                         }
                         if (result.success && result.data.status === 'pending') {
-                            console.log('[入驻检查] 申请待审批，显示提示');
+                            window.__isPreviewMode = true;
+                            localStorage.setItem('previewMode', 'true');
                             showPreviewBanner('您的入驻申请正在审批中（' + result.data.applicationId + '），审批通过后即可使用全部功能。');
+                            if (typeof window.startMerchantPolling === 'function') window.startMerchantPolling();
                             return;
                         }
                     } catch (e) {
-                        console.warn('[入驻检查] API不可用，显示申请表单');
+                        console.warn('[入驻检查] API不可用:', e.message);
                     }
                 }
-                // 显示申请表单弹窗
+                // 未提交申请，先激活预览模式，再弹出表单
+                window.__isPreviewMode = true;
+                localStorage.setItem('previewMode', 'true');
+                if (typeof window.activateDashboardPreview === 'function') window.activateDashboardPreview();
+                if (typeof window.startMerchantPolling === 'function') window.startMerchantPolling();
                 setTimeout(function() { window.showStoreApplyModal(); }, 800);
             }
             
-            // 如果有store，不需要申请
-            if (storeUser.storeId && storeUser.storeId !== 'null') {
-                return;
+            if (window.__isPreviewMode) {
+                var banner = document.getElementById('preview-mode-banner');
+                if (banner) banner.style.display = 'block';
             }
+        };
+        
+        // 审批状态轮询：预览模式下每15秒检查一次
+        window.startMerchantPolling = function() {
+            if (window._merchantPollTimer) return;
+            window._merchantPollTimer = setInterval(function() {
+                if (window.__isPreviewMode) {
+                    console.log('[入驻轮询] 检查审批状态...');
+                    window.checkMerchantApplication();
+                }
+            }, 15000);
+            console.log('[入驻轮询] 已启动，每15秒检查审批状态');
         };
         
         // 显示预览模式横幅

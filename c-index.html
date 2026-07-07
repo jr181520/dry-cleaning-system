@@ -413,11 +413,12 @@
             { id: 6, icon: '🛏️', name: '床单被罩', desc: '高温杀菌洗涤', price: 60, category: '家纺清洗' }
         ];
 
-        // 门店数据（与小程序同步）
-        const stores = [
-            { id: 1, name: '干洗店旗舰店', address: '朝阳区建国路88号', distance: '1.2km', isOnline: true, isPromotion: true, isRecommended: true, serviceCount: 12, minPrice: 30, rating: 4.8 },
-            { id: 2, name: '干洗店中心店', address: '海淀区中关村大街1号', distance: '2.5km', isOnline: true, isPromotion: false, isRecommended: true, serviceCount: 10, minPrice: 35, rating: 4.6 },
-            { id: 3, name: '干洗店东门店', address: '东城区王府井大街5号', distance: '3.8km', isOnline: false, isPromotion: false, isRecommended: false, serviceCount: 8, minPrice: 40, rating: 4.5 }
+        // 门店数据（从API动态加载）
+        let stores = [];
+        // 兆底门店数据（API不可用时使用）
+        const defaultStores = [
+            { id: 'ST001', storeId: 'ST001', name: '干洗店旗舰店', address: '朝阳区建国路88号', distance: '1.2km', isOnline: true, hasPromotion: true, isRecommended: true, serviceCount: 12, minPrice: 30, rating: 4.8, businessCategory: 'cleaning' },
+            { id: 'ST002', storeId: 'ST002', name: '干洗店中心店', address: '海淀区中关村大街1号', distance: '2.5km', isOnline: true, hasPromotion: false, isRecommended: true, serviceCount: 10, minPrice: 35, rating: 4.6, businessCategory: 'cleaning' }
         ];
 
         // 待取件订单数据
@@ -440,7 +441,7 @@
             
             await loadModuleConfig();
             initCategoryTabs();  // 初始化品类选择器 + 服务列表（内含loadServices）
-            loadStores();
+            await loadStores();
             
             // ⚠️ 轮询同步已禁用 — 页面直接通过 API 加载数据
             // 如需启用轮询，取消下行注释：UnifiedSync.start();
@@ -565,46 +566,102 @@
             CategoryManager.renderCategoryTabs('category-tabs-container');
             loadServices();
         }
-        // 品类切换回调
+        // 品类切换回调（由 CategoryManager._handleTabClick 触发）
         window.onCategoryChange = function(categoryId) {
-            CategoryManager.selectCategory(categoryId);
-            CategoryManager.renderCategoryTabs('category-tabs-container');
+            // _handleTabClick 已调用 selectCategory + renderCategoryTabs，此处只做额外刷新
             loadServices();
+            loadStores(categoryId);  // 按品类重新加载门店
         };
 
-        // 加载门店列表
-        function loadStores() {
+        // 加载门店列表（从API动态加载，支持品类过滤）
+        async function loadStores(categoryId) {
             const container = document.getElementById('stores-list');
-            container.innerHTML = stores.map(store => `
-                <div class="store-card flex gap-4 cursor-pointer" onclick="selectStore(${store.id})">
-                    <div class="flex-1">
-                        <div class="flex items-center gap-2 mb-2">
-                            <span class="font-bold text-gray-800">${store.name}</span>
-                            <span class="store-status ${store.isOnline ? 'online' : 'offline'}">
-                                <span class="w-2 h-2 rounded-full ${store.isOnline ? 'bg-green-500' : 'bg-gray-400'}"></span>
-                                ${store.isOnline ? '营业中' : '休息中'}
-                            </span>
-                        </div>
-                        <div class="flex items-center gap-1 text-sm text-gray-500 mb-1">
-                            <span>📍</span>
-                            <span>${store.distance}</span>
-                        </div>
-                        <div class="text-sm text-gray-500 mb-2">${store.address}</div>
-                        <div class="flex items-center gap-2">
-                            ${store.isPromotion ? '<span class="tag promotion"><span>🔥</span><span>促销中</span></span>' : ''}
-                            ${store.isRecommended ? '<span class="tag recommended"><span>⭐</span><span>推荐</span></span>' : ''}
-                            <span class="text-sm text-gray-500">${store.serviceCount}项服务</span>
-                            <span class="text-gray-300">|</span>
-                            <span class="text-sm font-semibold text-red-500">¥${store.minPrice}起</span>
-                        </div>
-                    </div>
-                    <div class="flex flex-col items-center gap-3">
-                        <div class="w-14 h-14 bg-blue-50 rounded-full flex items-center justify-center">
-                            <span class="text-2xl">📞</span>
-                        </div>
-                    </div>
-                </div>
-            `).join('');
+            if (!container) return;
+            
+            // 显示加载状态
+            container.innerHTML = '<div style="text-align:center;padding:20px;color:#9CA3AF;"><i class="fa fa-spinner fa-spin" style="margin-right:6px;"></i>加载门店中...</div>';
+            
+            try {
+                // 获取当前品类
+                if (!categoryId) {
+                    const activeCategory = CategoryManager.getSelectedCategory();
+                    categoryId = activeCategory ? activeCategory.id : 'cleaning';
+                }
+                
+                var apiBase = 'http://localhost:' + (window.location.port || 3000) + '/api';
+                var url = apiBase + '/cleaning/stores?categoryId=' + encodeURIComponent(categoryId);
+                var resp = await fetch(url);
+                var result = await resp.json();
+                
+                if (result.success && result.data && result.data.length > 0) {
+                    stores = result.data.map(function(store) {
+                        return {
+                            id: store.storeId || store.id,
+                            storeId: store.storeId || store.id,
+                            name: store.name || store.storeName,
+                            address: store.address || '',
+                            distance: store.distance ? store.distance + 'km' : '附近',
+                            isOnline: store.isOnline,
+                            hasPromotion: store.hasPromotion,
+                            isPromotion: store.hasPromotion,
+                            isRecommended: store.isRecommended,
+                            serviceCount: store.serviceCount || 0,
+                            minPrice: store.minPrice || 20,
+                            rating: store.rating || 4.5,
+                            businessCategory: store.businessCategory || 'cleaning',
+                            phone: store.phone || ''
+                        };
+                    });
+                    console.log('[C端门店] API加载成功，门店数:', stores.length);
+                } else {
+                    // API无数据，使用兆底
+                    stores = defaultStores;
+                    console.log('[C端门店] API无数据，使用兆底门店');
+                }
+            } catch (e) {
+                console.warn('[C端门店] API加载失败，使用兆底:', e.message);
+                stores = defaultStores;
+            }
+            
+            // 同步存储到 localStorage（供其他页面使用）
+            localStorage.setItem('stores', JSON.stringify(stores));
+            
+            // 渲染门店列表
+            if (stores.length === 0) {
+                container.innerHTML = '<div style="text-align:center;padding:30px;color:#9CA3AF;"><div style="font-size:36px;margin-bottom:8px;">🏪</div><div>暂无该品类的门店</div><div style="font-size:12px;margin-top:4px;color:#D1D5DB;">新入驻门店正在审核中</div></div>';
+                return;
+            }
+            
+            container.innerHTML = stores.map(function(store) {
+                var storeId = store.id || store.storeId;
+                return '<div class="store-card flex gap-4 cursor-pointer" onclick="selectStore(\'' + storeId + '\')">' +
+                    '<div class="flex-1">' +
+                        '<div class="flex items-center gap-2 mb-2">' +
+                            '<span class="font-bold text-gray-800">' + store.name + '</span>' +
+                            '<span class="store-status ' + (store.isOnline ? 'online' : 'offline') + '">' +
+                                '<span class="w-2 h-2 rounded-full ' + (store.isOnline ? 'bg-green-500' : 'bg-gray-400') + '"></span>' +
+                                (store.isOnline ? '营业中' : '休息中') +
+                            '</span>' +
+                        '</div>' +
+                        '<div class="flex items-center gap-1 text-sm text-gray-500 mb-1">' +
+                            '<span>📍</span><span>' + store.distance + '</span>' +
+                        '</div>' +
+                        '<div class="text-sm text-gray-500 mb-2">' + store.address + '</div>' +
+                        '<div class="flex items-center gap-2">' +
+                            (store.hasPromotion ? '<span class="tag promotion"><span>🔥</span><span>促销中</span></span>' : '') +
+                            (store.isRecommended ? '<span class="tag recommended"><span>⭐</span><span>推荐</span></span>' : '') +
+                            '<span class="text-sm text-gray-500">' + store.serviceCount + '项服务</span>' +
+                            '<span class="text-gray-300">|</span>' +
+                            '<span class="text-sm font-semibold text-red-500">¥' + store.minPrice + '起</span>' +
+                        '</div>' +
+                    '</div>' +
+                    '<div class="flex flex-col items-center gap-3">' +
+                        '<div class="w-14 h-14 bg-blue-50 rounded-full flex items-center justify-center">' +
+                            '<span class="text-2xl">📞</span>' +
+                        '</div>' +
+                    '</div>' +
+                '</div>';
+            }).join('');
         }
 
         // 加载待取件订单
@@ -700,22 +757,28 @@
             const service = services.find(s => s.id === serviceId);
             if (service) {
                 localStorage.setItem('selectedService', JSON.stringify(service));
-                window.location.href = 'c-order.html';
+                var activeCategory = CategoryManager ? CategoryManager.getSelectedCategory() : null;
+                var catId = (activeCategory && activeCategory.id) || 'cleaning';
+                window.location.href = 'c-order.html?category=' + encodeURIComponent(catId);
             }
         }
 
         // 选择门店
         function selectStore(storeId) {
-            const store = stores.find(s => s.id === storeId);
+            var store = stores.find(function(s) { return (s.id || s.storeId) === storeId; });
             if (store) {
                 localStorage.setItem('selectedStore', JSON.stringify(store));
-                window.location.href = 'c-order.html';
+                var activeCategory = CategoryManager ? CategoryManager.getSelectedCategory() : null;
+                var catId = (activeCategory && activeCategory.id) || store.businessCategory || 'cleaning';
+                window.location.href = 'c-order.html?category=' + encodeURIComponent(catId);
             }
         }
 
         // 页面跳转函数
         function goToOrder() {
-            window.location.href = 'c-order.html';
+            var activeCategory = CategoryManager ? CategoryManager.getSelectedCategory() : null;
+            var catId = (activeCategory && activeCategory.id) || 'cleaning';
+            window.location.href = 'c-order.html?category=' + encodeURIComponent(catId);
         }
 
         function goToPickup() {
@@ -816,7 +879,10 @@
                     window.location.href = 'c-index.html';
                     break;
                 case 'order':
-                    window.location.href = 'c-order.html';
+                    (function(){
+                        var ac = CategoryManager ? CategoryManager.getSelectedCategory() : null;
+                        window.location.href = 'c-order.html?category=' + encodeURIComponent((ac && ac.id) || 'cleaning');
+                    })();
                     break;
                 case 'orders':
                     window.location.href = 'c-orders.html';

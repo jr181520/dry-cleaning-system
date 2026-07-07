@@ -852,7 +852,25 @@
             
             // 读取URL品类参数，设置当前品类上下文
             var urlParams = new URLSearchParams(window.location.search);
-            currentCategoryId = urlParams.get('category') || 'cleaning';
+            currentCategoryId = urlParams.get('category') || null;
+            // 若URL无品类参数，从 localStorage 或预选门店推断
+            if (!currentCategoryId) {
+                try {
+                    var savedCat = JSON.parse(localStorage.getItem('selectedCategory') || 'null');
+                    if (savedCat && savedCat.id) currentCategoryId = savedCat.id;
+                } catch(e) {}
+            }
+            if (!currentCategoryId) {
+                // 尝试从预选门店推断品类
+                var preStore = localStorage.getItem('selectedStore');
+                if (preStore) {
+                    try {
+                        var ps = JSON.parse(preStore);
+                        if (ps.businessCategory) currentCategoryId = ps.businessCategory;
+                    } catch(e) {}
+                }
+            }
+            currentCategoryId = currentCategoryId || 'cleaning';
             if (typeof window.CategoryManager !== 'undefined') {
                 currentCategory = window.CategoryManager.getCategory(currentCategoryId);
             }

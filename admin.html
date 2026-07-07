@@ -114,6 +114,12 @@
                                     <span>客服中心</span>
                                 </a>
                             </li>
+                            <li>
+                                <a href="#marketing-campaigns" class="nav-link flex items-center space-x-3 p-2 rounded-lg text-gray-600 hover:bg-blue-50 hover:text-primary transition-all duration-300 ease-in-out hover:translate-x-1">
+                                    <i class="fa fa-bullhorn w-5 text-center"></i>
+                                    <span>营销活动</span>
+                                </a>
+                            </li>
                             <!-- 分隔线 -->
                             <li class="pt-2 mt-2 border-t border-gray-100"></li>
                             <!-- 品类入口动态渲染 -->
@@ -252,6 +258,18 @@
                                 </a>
                             </li>
                             <li>
+                                <a href="#settlement-center" class="nav-link flex items-center space-x-3 p-2 rounded-lg text-gray-600 hover:bg-blue-50 hover:text-primary transition-all duration-300 ease-in-out hover:translate-x-1">
+                                    <i class="fa fa-gavel w-5 text-center"></i>
+                                    <span>结算中心</span>
+                                </a>
+                            </li>
+                            <li>
+                                <a href="#invoice-center" class="nav-link flex items-center space-x-3 p-2 rounded-lg text-gray-600 hover:bg-blue-50 hover:text-primary transition-all duration-300 ease-in-out hover:translate-x-1">
+                                    <i class="fa fa-file-text-o w-5 text-center"></i>
+                                    <span>发票中心</span>
+                                </a>
+                            </li>
+                            <li>
                                 <a href="#store-supervision" class="nav-link flex items-center space-x-3 p-2 rounded-lg text-gray-600 hover:bg-blue-50 hover:text-primary transition-all duration-300 ease-in-out hover:translate-x-1">
                                     <i class="fa fa-building-o w-5 text-center"></i>
                                     <span>终端监管</span>
@@ -273,6 +291,12 @@
                                 <a href="#miniprogram" class="nav-link flex items-center space-x-3 p-2 rounded-lg text-gray-600 hover:bg-blue-50 hover:text-primary transition-all duration-300 ease-in-out hover:translate-x-1">
                                     <i class="fa fa-weixin w-5 text-center"></i>
                                     <span>C端小程序</span>
+                                </a>
+                            </li>
+                            <li>
+                                <a href="#ops-monitor" class="nav-link flex items-center space-x-3 p-2 rounded-lg text-gray-600 hover:bg-blue-50 hover:text-primary transition-all duration-300 ease-in-out hover:translate-x-1">
+                                    <i class="fa fa-desktop w-5 text-center"></i>
+                                    <span>运维监控</span>
                                 </a>
                             </li>
                         </ul>
@@ -318,14 +342,31 @@
                             <i class="fa fa-bell-o"></i>
                             <span class="bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">3</span>
                         </button>
-                        <div class="relative">
-                            <button class="flex items-center space-x-2 text-gray-600 hover:text-primary transition-colors">
-                                <div class="w-8 h-8 rounded-full bg-gray-300 flex items-center justify-center">
-                                    <i class="fa fa-user text-gray-600"></i>
+                        <div class="relative" id="user-menu-wrapper">
+                            <button id="user-menu-btn" class="flex items-center space-x-2 text-gray-600 hover:text-primary transition-colors">
+                                <div class="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+                                    <i class="fa fa-user text-primary"></i>
                                 </div>
-                                <span class="text-sm font-medium">总管理员</span>
+                                <span id="header-user-name" class="text-sm font-medium">总管理员</span>
                                 <i class="fa fa-chevron-down text-xs"></i>
                             </button>
+                            <!-- 用户下拉面板 -->
+                            <div id="user-dropdown" class="hidden absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-lg border border-gray-200 z-50">
+                                <div class="px-4 py-3 border-b border-gray-100">
+                                    <p id="dropdown-user-name" class="text-sm font-semibold text-gray-800">总管理员</p>
+                                    <p id="dropdown-user-role" class="text-xs text-gray-500">super_admin</p>
+                                </div>
+                                <div class="py-1">
+                                    <a href="admin-login.html" class="flex items-center space-x-2 px-4 py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-primary transition-colors">
+                                        <i class="fa fa-exchange w-4 text-center"></i>
+                                        <span>切换账户</span>
+                                    </a>
+                                    <button id="logout-btn" class="w-full flex items-center space-x-2 px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors">
+                                        <i class="fa fa-sign-out w-4 text-center"></i>
+                                        <span>退出登录</span>
+                                    </button>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -456,6 +497,18 @@
                         </h3>
                         <div id="dash-module-cards" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-3">
                             <div class="text-center text-gray-400 text-sm col-span-full py-4">加载中...</div>
+                        </div>
+                    </div>
+
+                    <!-- 角色专属区 -->
+                    <div id="dash-role-section" class="mt-6 hidden">
+                        <h3 class="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+                            <i class="fa fa-star text-yellow-500"></i> <span id="dash-role-title">专属工作台</span>
+                        </h3>
+                        <div id="dash-role-cards" class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4"></div>
+                        <div id="dash-role-todos" class="bg-white rounded-xl shadow-sm border p-4 hidden">
+                            <h4 class="text-sm font-semibold text-gray-700 mb-2">待办事项</h4>
+                            <div id="dash-todo-list" class="space-y-2"></div>
                         </div>
                     </div>
                 </div>
@@ -1989,9 +2042,72 @@
                 <div id="settings-content" class="content-section hidden">
                     <div class="mb-6">
                         <h2 class="text-2xl font-bold text-gray-800">系统设置</h2>
-                        <p class="text-gray-600">系统配置</p>
+                        <p class="text-gray-600">管理平台配置参数</p>
                     </div>
-                    <p>系统设置内容</p>
+                    <div id="settings-panels" class="space-y-6">
+                        <!-- 结算配置 -->
+                        <div class="bg-white rounded-xl shadow-card p-6">
+                            <h3 class="text-lg font-semibold text-gray-800 mb-4"><i class="fa fa-money text-green-500 mr-2"></i> 结算配置</h3>
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <div>
+                                    <label class="block text-sm text-gray-600 mb-1">自动结算阈值 (元)</label>
+                                    <input id="cfg-settlement-threshold" type="number" class="w-full border rounded-lg px-3 py-2 text-sm" value="5000">
+                                </div>
+                                <div>
+                                    <label class="block text-sm text-gray-600 mb-1">结算周期 (T+N天)</label>
+                                    <input id="cfg-settlement-cycle" type="number" class="w-full border rounded-lg px-3 py-2 text-sm" value="7">
+                                </div>
+                                <div class="flex items-center gap-2 pt-6">
+                                    <input id="cfg-settlement-auto" type="checkbox" class="w-4 h-4" checked>
+                                    <label class="text-sm text-gray-700">启用自动结算</label>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- 发票配置 -->
+                        <div class="bg-white rounded-xl shadow-card p-6">
+                            <h3 class="text-lg font-semibold text-gray-800 mb-4"><i class="fa fa-file-text-o text-purple-500 mr-2"></i> 发票配置</h3>
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <div class="flex items-center gap-2">
+                                    <input id="cfg-invoice-auto" type="checkbox" class="w-4 h-4" checked>
+                                    <label class="text-sm text-gray-700">自动开具电子发票</label>
+                                </div>
+                                <div>
+                                    <label class="block text-sm text-gray-600 mb-1">发票模板</label>
+                                    <select id="cfg-invoice-template" class="w-full border rounded-lg px-3 py-2 text-sm">
+                                        <option value="default">默认模板</option>
+                                        <option value="detailed">详细模板</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- 通用配置 -->
+                        <div class="bg-white rounded-xl shadow-card p-6">
+                            <h3 class="text-lg font-semibold text-gray-800 mb-4"><i class="fa fa-cogs text-blue-500 mr-2"></i> 通用配置</h3>
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <div>
+                                    <label class="block text-sm text-gray-600 mb-1">平台服务费比例 (%)</label>
+                                    <input id="cfg-service-fee" type="number" class="w-full border rounded-lg px-3 py-2 text-sm" value="10">
+                                </div>
+                                <div>
+                                    <label class="block text-sm text-gray-600 mb-1">数据备份周期</label>
+                                    <select id="cfg-backup-cycle" class="w-full border rounded-lg px-3 py-2 text-sm">
+                                        <option value="daily">每日</option>
+                                        <option value="weekly">每周</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="block text-sm text-gray-600 mb-1">BD招募审核模式</label>
+                                    <select id="cfg-bd-approval" class="w-full border rounded-lg px-3 py-2 text-sm">
+                                        <option value="manual">人工审核</option>
+                                        <option value="auto">自动审核</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="flex justify-end">
+                            <button onclick="saveSettings()" class="px-6 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors">保存配置</button>
+                        </div>
+                    </div>
                 </div>
                 
                 <!-- 资金管理 -->
@@ -2793,6 +2909,120 @@
                         </div>
                     </div>
                 </div>
+
+                <!-- 结算中心 -->
+                <div id="settlement-center-content" class="content-section hidden">
+                    <div class="mb-6 flex justify-between items-center">
+                        <div>
+                            <h2 class="text-2xl font-bold text-gray-800">结算中心</h2>
+                            <p class="text-gray-600">管理门店结算申请审核与打款</p>
+                        </div>
+                        <button onclick="createDemoSettlement()" class="px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors text-sm">+ 模拟结算申请</button>
+                    </div>
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                        <div class="bg-white rounded-xl shadow-sm border p-4"><p class="text-xs text-gray-500">待审核</p><p id="stl-pending" class="text-2xl font-bold text-orange-600">-</p></div>
+                        <div class="bg-white rounded-xl shadow-sm border p-4"><p class="text-xs text-gray-500">今日已审</p><p id="stl-today" class="text-2xl font-bold text-green-600">-</p></div>
+                        <div class="bg-white rounded-xl shadow-sm border p-4"><p class="text-xs text-gray-500">本月结算总额</p><p id="stl-month" class="text-2xl font-bold text-blue-600">-</p></div>
+                        <div class="bg-white rounded-xl shadow-sm border p-4"><p class="text-xs text-gray-500">自动审核占比</p><p id="stl-auto" class="text-2xl font-bold text-purple-600">-</p></div>
+                    </div>
+                    <div class="bg-white rounded-xl shadow-card p-4">
+                        <div class="flex items-center gap-2 mb-4">
+                            <select id="stl-status-filter" onchange="loadSettlementList()" class="border rounded-lg px-3 py-1.5 text-sm">
+                                <option value="">全部状态</option>
+                                <option value="pending_review">待审核</option>
+                                <option value="auto_approved">自动通过</option>
+                                <option value="approved">已审核</option>
+                                <option value="rejected">已拒绝</option>
+                            </select>
+                        </div>
+                        <table class="w-full text-sm">
+                            <thead class="bg-gray-50"><tr>
+                                <th class="px-3 py-2 text-left text-gray-600">结算单号</th><th class="px-3 py-2 text-left text-gray-600">门店</th>
+                                <th class="px-3 py-2 text-right text-gray-600">金额</th><th class="px-3 py-2 text-right text-gray-600">服务费</th>
+                                <th class="px-3 py-2 text-left text-gray-600">审核类型</th><th class="px-3 py-2 text-left text-gray-600">状态</th>
+                                <th class="px-3 py-2 text-left text-gray-600">时间</th><th class="px-3 py-2 text-center text-gray-600">操作</th>
+                            </tr></thead>
+                            <tbody id="stl-table-body"><tr><td colspan="8" class="px-6 py-8 text-center text-gray-400">加载中...</td></tr></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- 发票中心 -->
+                <div id="invoice-center-content" class="content-section hidden">
+                    <div class="mb-6">
+                        <h2 class="text-2xl font-bold text-gray-800">发票中心</h2>
+                        <p class="text-gray-600">管理电子发票申请、开具与发送</p>
+                    </div>
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                        <div class="bg-white rounded-xl shadow-sm border p-4"><p class="text-xs text-gray-500">待开票</p><p id="inv-pending" class="text-2xl font-bold text-orange-600">-</p></div>
+                        <div class="bg-white rounded-xl shadow-sm border p-4"><p class="text-xs text-gray-500">本月已开票</p><p id="inv-month" class="text-2xl font-bold text-green-600">-</p></div>
+                        <div class="bg-white rounded-xl shadow-sm border p-4"><p class="text-xs text-gray-500">开票金额</p><p id="inv-amount" class="text-2xl font-bold text-blue-600">-</p></div>
+                        <div class="bg-white rounded-xl shadow-sm border p-4"><p class="text-xs text-gray-500">电子发票占比</p><p id="inv-ratio" class="text-2xl font-bold text-purple-600">-</p></div>
+                    </div>
+                    <div class="bg-white rounded-xl shadow-card p-4">
+                        <table class="w-full text-sm">
+                            <thead class="bg-gray-50"><tr>
+                                <th class="px-3 py-2 text-left text-gray-600">发票号</th><th class="px-3 py-2 text-left text-gray-600">申请方</th>
+                                <th class="px-3 py-2 text-left text-gray-600">类型</th><th class="px-3 py-2 text-right text-gray-600">金额</th>
+                                <th class="px-3 py-2 text-left text-gray-600">状态</th><th class="px-3 py-2 text-left text-gray-600">时间</th>
+                                <th class="px-3 py-2 text-center text-gray-600">操作</th>
+                            </tr></thead>
+                            <tbody id="inv-table-body"><tr><td colspan="7" class="px-6 py-8 text-center text-gray-400">加载中...</td></tr></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- 运维监控内容区 -->
+                <div id="ops-monitor-content" class="content-section hidden">
+                    <div class="mb-6">
+                        <h2 class="text-2xl font-bold text-gray-800">运维监控</h2>
+                        <p class="text-gray-600">系统运行状态、服务健康检查与运维工具</p>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <div class="bg-white rounded-xl shadow-card p-6">
+                            <h3 class="text-lg font-semibold text-gray-800 mb-4"><i class="fa fa-heartbeat text-red-500 mr-2"></i> 服务状态</h3>
+                            <div id="ops-service-status" class="space-y-3">
+                                <div class="flex justify-between items-center py-2 border-b"><span>API服务</span><span class="text-green-600 font-semibold">运行中</span></div>
+                                <div class="flex justify-between items-center py-2 border-b"><span>MongoDB</span><span class="text-green-600 font-semibold">已连接</span></div>
+                                <div class="flex justify-between items-center py-2"><span>内存使用</span><span id="ops-memory" class="text-blue-600">-</span></div>
+                            </div>
+                        </div>
+                        <div class="bg-white rounded-xl shadow-card p-6">
+                            <h3 class="text-lg font-semibold text-gray-800 mb-4"><i class="fa fa-clock-o text-blue-500 mr-2"></i> 系统信息</h3>
+                            <div id="ops-sys-info" class="space-y-2 text-sm text-gray-600">
+                                <p>启动时间: <span id="ops-uptime">-</span></p>
+                                <p>Node版本: <span id="ops-node-ver">-</span></p>
+                                <p>环境: <span id="ops-env">-</span></p>
+                            </div>
+                        </div>
+                        <div class="bg-white rounded-xl shadow-card p-6">
+                            <h3 class="text-lg font-semibold text-gray-800 mb-4"><i class="fa fa-wrench text-orange-500 mr-2"></i> 快捷操作</h3>
+                            <div class="space-y-2">
+                                <button onclick="alert('已触发数据完整性检查')" class="w-full text-left px-3 py-2 rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-100 transition-colors text-sm">数据完整性检查</button>
+                                <button onclick="alert('已触发缓存清理')" class="w-full text-left px-3 py-2 rounded-lg bg-yellow-50 text-yellow-700 hover:bg-yellow-100 transition-colors text-sm">清理缓存</button>
+                                <button onclick="alert('日志导出功能开发中')" class="w-full text-left px-3 py-2 rounded-lg bg-green-50 text-green-700 hover:bg-green-100 transition-colors text-sm">导出系统日志</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 营销活动内容区 -->
+                <div id="marketing-campaigns-content" class="content-section hidden">
+                    <div class="mb-6">
+                        <h2 class="text-2xl font-bold text-gray-800">营销活动</h2>
+                        <p class="text-gray-600">创建和管理促销活动、优惠券及会员营销</p>
+                    </div>
+                    <div class="bg-white rounded-xl shadow-card p-6">
+                        <div class="flex justify-between items-center mb-4">
+                            <h3 class="text-lg font-semibold text-gray-800">活动列表</h3>
+                            <button class="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors text-sm">+ 新建活动</button>
+                        </div>
+                        <div class="text-center text-gray-400 py-12">
+                            <i class="fa fa-bullhorn text-4xl mb-3"></i>
+                            <p>营销活动管理功能开发中...</p>
+                        </div>
+                    </div>
+                </div>
             </main>
         </div>
     </div>
@@ -2801,7 +3031,7 @@
         // 权限配置
         const permissions = {
             '总管理员': {
-                navigation: ['dashboard', 'orders', 'customers', 'items', 'members', 'stores', 'provincial-summary', 'light-system', 'store-categories', 'store-apply', 'store-approval', 'bd-management', 'bd-communication', 'customer-service', 'users', 'messages', 'statistics', 'fund-management', 'store-supervision', 'settings', 'backup', 'miniprogram', 'business-orders', 'business-customers', 'business-members', 'chain-list', 'chain-create', 'chain-stores'],
+                navigation: ['dashboard', 'orders', 'customers', 'items', 'members', 'stores', 'provincial-summary', 'light-system', 'store-categories', 'store-apply', 'store-approval', 'bd-management', 'bd-communication', 'customer-service', 'users', 'messages', 'statistics', 'fund-management', 'settlement-center', 'invoice-center', 'store-supervision', 'settings', 'backup', 'miniprogram', 'ops-monitor', 'marketing-campaigns', 'business-orders', 'business-customers', 'business-members', 'chain-list', 'chain-create', 'chain-stores'],
                 canViewAllData: true,
                 canManageUsers: true,
                 canManageStores: true,
@@ -2837,7 +3067,7 @@
                 canChangeSettings: true
             },
             '财务管理员': {
-                navigation: ['dashboard', 'statistics', 'messages', 'fund-management', 'store-supervision', 'miniprogram'],
+                navigation: ['dashboard', 'statistics', 'messages', 'fund-management', 'settlement-center', 'invoice-center', 'store-supervision', 'miniprogram'],
                 canViewAllData: true,
                 canManageUsers: false,
                 canManageStores: false,
@@ -2846,6 +3076,78 @@
                 canViewFundManagement: true,
                 canViewStoreSupervision: true,
                 canSendMessages: true,
+                canChangeSettings: false
+            },
+            '客服人员': {
+                navigation: ['dashboard', 'orders', 'customers', 'customer-service', 'messages'],
+                canViewAllData: false,
+                canManageUsers: false,
+                canManageStores: false,
+                canManageMembers: false,
+                canViewStatistics: false,
+                canViewFundManagement: false,
+                canViewStoreSupervision: false,
+                canSendMessages: true,
+                canChangeSettings: false
+            },
+            'BD人员': {
+                navigation: ['dashboard', 'stores', 'store-apply', 'store-approval', 'bd-management', 'bd-communication', 'statistics'],
+                canViewAllData: false,
+                canManageUsers: false,
+                canManageStores: false,
+                canManageMembers: false,
+                canViewStatistics: true,
+                canViewFundManagement: false,
+                canViewStoreSupervision: false,
+                canSendMessages: false,
+                canChangeSettings: false
+            },
+            '运维/技术人员': {
+                navigation: ['dashboard', 'settings', 'backup', 'light-system', 'store-supervision', 'ops-monitor', 'statistics'],
+                canViewAllData: false,
+                canManageUsers: false,
+                canManageStores: false,
+                canManageMembers: false,
+                canViewStatistics: true,
+                canViewFundManagement: false,
+                canViewStoreSupervision: true,
+                canSendMessages: false,
+                canChangeSettings: true
+            },
+            '市场运营': {
+                navigation: ['dashboard', 'statistics', 'members', 'business-customers', 'business-orders', 'messages', 'marketing-campaigns'],
+                canViewAllData: false,
+                canManageUsers: false,
+                canManageStores: false,
+                canManageMembers: true,
+                canViewStatistics: true,
+                canViewFundManagement: false,
+                canViewStoreSupervision: false,
+                canSendMessages: true,
+                canChangeSettings: false
+            },
+            'BD主管': {
+                navigation: ['dashboard', 'stores', 'store-apply', 'store-approval', 'bd-management', 'bd-communication', 'statistics'],
+                canViewAllData: false,
+                canManageUsers: false,
+                canManageStores: false,
+                canManageMembers: false,
+                canViewStatistics: true,
+                canViewFundManagement: false,
+                canViewStoreSupervision: false,
+                canSendMessages: false,
+                canChangeSettings: false
+            },
+            'BD总监': {
+                navigation: ['dashboard', 'stores', 'store-apply', 'store-approval', 'bd-management', 'bd-communication', 'statistics', 'store-supervision'],
+                canViewAllData: true,
+                canManageUsers: false,
+                canManageStores: true,
+                canManageMembers: false,
+                canViewStatistics: true,
+                canViewFundManagement: false,
+                canViewStoreSupervision: true,
+                canSendMessages: false,
                 canChangeSettings: false
             }
         };
@@ -2887,12 +3189,20 @@
                     name: '总管理员',
                     email: 'admin@example.com',
                     role: '总管理员',
+                    roleKey: 'super_admin',
                     status: '活跃'
                 };
                 localStorage.setItem('adminUser', JSON.stringify(defaultUser));
                 return defaultUser;
             } else {
-                return JSON.parse(user);
+                const parsed = JSON.parse(user);
+                // 向后兼容：旧用户没有roleKey时根据role推断
+                if (!parsed.roleKey) {
+                    const roleKeyMap = { '总管理员':'super_admin','区域管理员':'region_admin','门店管理员':'store_admin','财务管理员':'finance_admin' };
+                    parsed.roleKey = roleKeyMap[parsed.role] || 'super_admin';
+                    localStorage.setItem('adminUser', JSON.stringify(parsed));
+                }
+                return parsed;
             }
         }
         
@@ -4116,6 +4426,10 @@
                                 if (target === 'statistics') loadStatistics();
                                 if (target === 'members') loadMembers();
                                 if (target === 'chain-stores') loadChainStoresSelect();
+                                if (target === 'store-approval') loadPendingApprovals();
+                                if (target === 'settlement-center') { loadSettlementList(); loadSettlementStats(); }
+                                if (target === 'invoice-center') { loadInvoiceList(); loadInvoiceStats(); }
+                                if (target === 'settings') loadSettings();
                             } else {
                                 console.warn('内容区域未找到:', sectionId);
                             }
@@ -4353,6 +4667,39 @@
             // 检查登录状态
             const currentUser = checkLogin();
             console.log('登录用户:', currentUser);
+            
+            // 更新顶部用户信息
+            const headerName = document.getElementById('header-user-name');
+            const dropdownName = document.getElementById('dropdown-user-name');
+            const dropdownRole = document.getElementById('dropdown-user-role');
+            if (headerName) headerName.textContent = currentUser.name || currentUser.role || '总管理员';
+            if (dropdownName) dropdownName.textContent = currentUser.name || '总管理员';
+            if (dropdownRole) dropdownRole.textContent = currentUser.roleKey || 'super_admin';
+            
+            // 头像下拉菜单交互
+            const userMenuBtn = document.getElementById('user-menu-btn');
+            const userDropdown = document.getElementById('user-dropdown');
+            if (userMenuBtn && userDropdown) {
+                userMenuBtn.addEventListener('click', function(e) {
+                    e.stopPropagation();
+                    userDropdown.classList.toggle('hidden');
+                });
+                document.addEventListener('click', function(e) {
+                    if (!document.getElementById('user-menu-wrapper').contains(e.target)) {
+                        userDropdown.classList.add('hidden');
+                    }
+                });
+            }
+            // 退出登录
+            const logoutBtn = document.getElementById('logout-btn');
+            if (logoutBtn) {
+                logoutBtn.addEventListener('click', function() {
+                    localStorage.removeItem('adminUser');
+                    localStorage.removeItem('adminToken');
+                    localStorage.removeItem('adminAuthToken');
+                    window.location.href = 'admin-login.html';
+                });
+            }
             
             // 初始化管理员token（异步）
             await initAdminToken();
@@ -6236,6 +6583,9 @@
                 });
                 document.getElementById('dash-module-cards').innerHTML = moduleHtml;
                 
+                // -- 角色专属工作台 --
+                loadRoleDashboard();
+                
             } catch (e) {
                 console.error('[仪表盘] 加载失败:', e);
                 ['dash-users','dash-dau','dash-mau','dash-stores','dash-orders','dash-today-orders','dash-revenue'].forEach(id => {
@@ -6345,6 +6695,7 @@
                     if (target === 'users' && typeof loadUsers === 'function') loadUsers();
                     if (target === 'chain-list' && typeof loadChainList === 'function') loadChainList();
                     if (target === 'chain-stores' && typeof loadChainStoresSelect === 'function') loadChainStoresSelect();
+                    if (target === 'store-approval' && typeof loadPendingApprovals === 'function') loadPendingApprovals();
                 }
             }
         };
@@ -7174,5 +7525,261 @@
         (function initNewFeatures() {
             setTimeout(() => { loadBDOptions(); }, 1500);
         })();
+
+        // ============================================
+        // 角色专属仪表盘
+        // ============================================
+        async function loadRoleDashboard() {
+            const user = JSON.parse(localStorage.getItem('adminUser') || '{}');
+            const roleKey = user.roleKey || 'super_admin';
+            if (roleKey === 'super_admin') {
+                document.getElementById('dash-role-section').classList.add('hidden');
+                return;
+            }
+            const section = document.getElementById('dash-role-section');
+            section.classList.remove('hidden');
+            const roleNames = { finance_admin:'财务工作台', bd_user:'BD工作台', bd_manager:'BD主管工作台', bd_director:'BD总监工作台', customer_service:'客服工作台', ops_engineer:'运维工作台', marketing:'运营工作台', region_admin:'区域工作台' };
+            document.getElementById('dash-role-title').textContent = roleNames[roleKey] || '专属工作台';
+
+            const token = localStorage.getItem('adminToken') || '';
+            try {
+                const resp = await fetch('http://localhost:3000/api/admin/dashboard/role-stats', { headers: { 'Authorization': `Bearer ${token}` } });
+                const result = await resp.json();
+                if (result.success && result.data?.cards?.length > 0) {
+                    const cardsEl = document.getElementById('dash-role-cards');
+                    cardsEl.innerHTML = result.data.cards.map(c => {
+                        const colorMap = { green:'#10b981', blue:'#3b82f6', orange:'#f59e0b', red:'#ef4444', purple:'#8b5cf6', yellow:'#eab308', teal:'#14b8a6' };
+                        const clr = colorMap[c.color] || '#6b7280';
+                        return `<div class="bg-white rounded-xl shadow-sm border p-4">
+                            <div class="flex items-center gap-2 mb-2"><i class="fa ${c.icon}" style="color:${clr}"></i><span class="text-xs text-gray-500">${c.label}</span></div>
+                            <p class="text-2xl font-bold" style="color:${clr}">${c.value}</p>
+                        </div>`;
+                    }).join('');
+                }
+                // 加载待办
+                const todoResp = await fetch('http://localhost:3000/api/admin/dashboard/todos', { headers: { 'Authorization': `Bearer ${token}` } });
+                const todoResult = await todoResp.json();
+                if (todoResult.success && todoResult.data?.length > 0) {
+                    document.getElementById('dash-role-todos').classList.remove('hidden');
+                    document.getElementById('dash-todo-list').innerHTML = todoResult.data.map(t => 
+                        `<div class="flex items-center justify-between py-2 border-b border-gray-100 text-sm">
+                            <span class="text-gray-700">${t.title}</span>
+                            <span class="text-xs text-gray-400">${t.time ? new Date(t.time).toLocaleDateString('zh-CN') : ''}</span>
+                        </div>`
+                    ).join('');
+                }
+            } catch (e) { console.error('[角色仪表盘]', e); }
+        }
+
+        // ============================================
+        // 系统设置
+        // ============================================
+        async function loadSettings() {
+            const token = localStorage.getItem('adminToken') || '';
+            try {
+                const resp = await fetch('http://localhost:3000/api/admin/system-settings', { headers: { 'Authorization': `Bearer ${token}` } });
+                const result = await resp.json();
+                if (result.success) {
+                    const s = result.data;
+                    const el = (id) => document.getElementById(id);
+                    if (el('cfg-settlement-threshold')) el('cfg-settlement-threshold').value = s.settlementAutoThreshold || 5000;
+                    if (el('cfg-settlement-cycle')) el('cfg-settlement-cycle').value = s.settlementCycle || 7;
+                    if (el('cfg-settlement-auto')) el('cfg-settlement-auto').checked = s.settlementAutoEnabled !== false;
+                    if (el('cfg-invoice-auto')) el('cfg-invoice-auto').checked = s.invoiceAutoEnabled !== false;
+                    if (el('cfg-service-fee')) el('cfg-service-fee').value = s.platformServiceFeeRatio || 10;
+                    if (el('cfg-backup-cycle')) el('cfg-backup-cycle').value = s.backupCycle || 'daily';
+                    if (el('cfg-bd-approval')) el('cfg-bd-approval').value = s.bdRecruitApproval || 'manual';
+                }
+            } catch (e) { console.error('[设置加载失败]', e); }
+        }
+
+        async function saveSettings() {
+            const token = localStorage.getItem('adminToken') || '';
+            const data = {
+                settlementAutoThreshold: parseInt(document.getElementById('cfg-settlement-threshold')?.value) || 5000,
+                settlementCycle: parseInt(document.getElementById('cfg-settlement-cycle')?.value) || 7,
+                settlementAutoEnabled: document.getElementById('cfg-settlement-auto')?.checked !== false,
+                invoiceAutoEnabled: document.getElementById('cfg-invoice-auto')?.checked !== false,
+                invoiceTemplate: document.getElementById('cfg-invoice-template')?.value || 'default',
+                platformServiceFeeRatio: parseInt(document.getElementById('cfg-service-fee')?.value) || 10,
+                backupCycle: document.getElementById('cfg-backup-cycle')?.value || 'daily',
+                bdRecruitApproval: document.getElementById('cfg-bd-approval')?.value || 'manual'
+            };
+            try {
+                const resp = await fetch('http://localhost:3000/api/admin/system-settings', {
+                    method: 'PUT', headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+                const result = await resp.json();
+                alert(result.success ? '配置已保存' : '保存失败: ' + result.error);
+            } catch (e) { alert('保存失败: ' + e.message); }
+        }
+
+        // ============================================
+        // 结算中心
+        // ============================================
+        async function loadSettlementStats() {
+            const token = localStorage.getItem('adminToken') || '';
+            try {
+                const resp = await fetch('http://localhost:3000/api/admin/settlement-stats', { headers: { 'Authorization': `Bearer ${token}` } });
+                const result = await resp.json();
+                if (result.success) {
+                    document.getElementById('stl-pending').textContent = result.data.pending || 0;
+                    document.getElementById('stl-today').textContent = result.data.todayApproved || 0;
+                    document.getElementById('stl-month').textContent = '¥' + (result.data.monthTotal || 0).toLocaleString();
+                    document.getElementById('stl-auto').textContent = (result.data.autoRatio || 0) + '%';
+                }
+            } catch (e) { console.error('[结算统计]', e); }
+        }
+
+        async function loadSettlementList() {
+            const token = localStorage.getItem('adminToken') || '';
+            const status = document.getElementById('stl-status-filter')?.value || '';
+            try {
+                const resp = await fetch(`http://localhost:3000/api/admin/settlement-requests?status=${status}&pageSize=50`, { headers: { 'Authorization': `Bearer ${token}` } });
+                const result = await resp.json();
+                const tbody = document.getElementById('stl-table-body');
+                if (!result.success || !result.data?.list?.length) {
+                    tbody.innerHTML = '<tr><td colspan="8" class="px-6 py-8 text-center text-gray-400">暂无结算申请</td></tr>';
+                    return;
+                }
+                const statusMap = { pending:'待审核', pending_review:'待人工审核', auto_approved:'自动通过', approved:'已审核', rejected:'已拒绝', settled:'已打款' };
+                const statusColors = { pending:'bg-yellow-100 text-yellow-800', pending_review:'bg-orange-100 text-orange-800', auto_approved:'bg-green-100 text-green-800', approved:'bg-blue-100 text-blue-800', rejected:'bg-red-100 text-red-800', settled:'bg-gray-100 text-gray-800' };
+                tbody.innerHTML = result.data.list.map(s => {
+                    const actions = ['pending','pending_review'].includes(s.status) 
+                        ? `<button onclick="approveSettlement('${s._id}')" class="text-xs px-2 py-1 bg-green-500 text-white rounded mr-1">通过</button><button onclick="rejectSettlement('${s._id}')" class="text-xs px-2 py-1 bg-red-500 text-white rounded">拒绝</button>`
+                        : '-';
+                    return `<tr class="border-b hover:bg-gray-50">
+                        <td class="px-3 py-2 text-xs font-mono">${s.settlementNo || '-'}</td>
+                        <td class="px-3 py-2">${s.storeName || s.storeId}</td>
+                        <td class="px-3 py-2 text-right font-semibold">¥${(s.amount || 0).toLocaleString()}</td>
+                        <td class="px-3 py-2 text-right text-gray-500">¥${(s.serviceFee || 0).toFixed(2)}</td>
+                        <td class="px-3 py-2 text-xs">${s.reviewType === 'auto' ? '🤖自动' : '👤人工'}</td>
+                        <td class="px-3 py-2"><span class="px-2 py-0.5 rounded-full text-xs ${statusColors[s.status] || ''}">${statusMap[s.status] || s.status}</span></td>
+                        <td class="px-3 py-2 text-xs text-gray-500">${s.createdAt ? new Date(s.createdAt).toLocaleDateString('zh-CN') : '-'}</td>
+                        <td class="px-3 py-2 text-center">${actions}</td>
+                    </tr>`;
+                }).join('');
+                loadSettlementStats();
+            } catch (e) { console.error('[结算列表]', e); }
+        }
+
+        async function approveSettlement(id) {
+            if (!confirm('确认审核通过？')) return;
+            const token = localStorage.getItem('adminToken') || '';
+            try {
+                const resp = await fetch(`http://localhost:3000/api/admin/settlement-requests/${id}/approve`, {
+                    method: 'PUT', headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ note: '人工审核通过' })
+                });
+                const result = await resp.json();
+                alert(result.success ? '已通过' : '失败: ' + result.error);
+                loadSettlementList();
+            } catch (e) { alert('操作失败: ' + e.message); }
+        }
+
+        async function rejectSettlement(id) {
+            const note = prompt('请输入拒绝理由:', '不符合结算条件');
+            if (!note) return;
+            const token = localStorage.getItem('adminToken') || '';
+            try {
+                const resp = await fetch(`http://localhost:3000/api/admin/settlement-requests/${id}/reject`, {
+                    method: 'PUT', headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ note })
+                });
+                const result = await resp.json();
+                alert(result.success ? '已拒绝' : '失败: ' + result.error);
+                loadSettlementList();
+            } catch (e) { alert('操作失败: ' + e.message); }
+        }
+
+        async function createDemoSettlement() {
+            const token = localStorage.getItem('adminToken') || '';
+            const amount = Math.round(Math.random() * 10000 + 500);
+            const stores = [{ id: 'ST001', name: '干洗店A' }, { id: 'ST002', name: '干洗店B' }, { id: 'ST003', name: '干洗店C' }];
+            const store = stores[Math.floor(Math.random() * stores.length)];
+            try {
+                const resp = await fetch('http://localhost:3000/api/admin/settlement-requests', {
+                    method: 'POST', headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ storeId: store.id, storeName: store.name, amount, orderCount: Math.floor(Math.random() * 50 + 5), periodStart: new Date(Date.now() - 7 * 86400000).toISOString(), periodEnd: new Date().toISOString() })
+                });
+                const result = await resp.json();
+                alert(result.success ? `结算申请已创建 (¥${amount})，${result.data?.reviewType === 'auto' ? '已自动审核通过' : '待人工审核'}` : '创建失败: ' + result.error);
+                loadSettlementList();
+            } catch (e) { alert('创建失败: ' + e.message); }
+        }
+
+        // ============================================
+        // 发票中心
+        // ============================================
+        async function loadInvoiceStats() {
+            const token = localStorage.getItem('adminToken') || '';
+            try {
+                const resp = await fetch('http://localhost:3000/api/admin/invoice-stats', { headers: { 'Authorization': `Bearer ${token}` } });
+                const result = await resp.json();
+                if (result.success) {
+                    document.getElementById('inv-pending').textContent = result.data.pending || 0;
+                    document.getElementById('inv-month').textContent = result.data.monthIssued || 0;
+                    document.getElementById('inv-amount').textContent = '¥' + (result.data.monthAmount || 0).toLocaleString();
+                    document.getElementById('inv-ratio').textContent = (result.data.electronicRatio || 0) + '%';
+                }
+            } catch (e) { console.error('[发票统计]', e); }
+        }
+
+        async function loadInvoiceList() {
+            const token = localStorage.getItem('adminToken') || '';
+            try {
+                const resp = await fetch('http://localhost:3000/api/admin/invoice-requests?pageSize=50', { headers: { 'Authorization': `Bearer ${token}` } });
+                const result = await resp.json();
+                const tbody = document.getElementById('inv-table-body');
+                if (!result.success || !result.data?.list?.length) {
+                    tbody.innerHTML = '<tr><td colspan="7" class="px-6 py-8 text-center text-gray-400">暂无发票申请</td></tr>';
+                    return;
+                }
+                const statusMap = { pending:'待开票', issued:'已开具', sent:'已发送', rejected:'已拒绝' };
+                const statusColors = { pending:'bg-yellow-100 text-yellow-800', issued:'bg-blue-100 text-blue-800', sent:'bg-green-100 text-green-800', rejected:'bg-red-100 text-red-800' };
+                tbody.innerHTML = result.data.list.map(inv => {
+                    let actions = '';
+                    if (inv.status === 'pending') actions = `<button onclick="issueInvoice('${inv._id}')" class="text-xs px-2 py-1 bg-blue-500 text-white rounded">开具</button>`;
+                    else if (inv.status === 'issued') actions = `<button onclick="sendInvoice('${inv._id}')" class="text-xs px-2 py-1 bg-green-500 text-white rounded">发送</button>`;
+                    else actions = '-';
+                    return `<tr class="border-b hover:bg-gray-50">
+                        <td class="px-3 py-2 text-xs font-mono">${inv.invoiceNo || '-'}</td>
+                        <td class="px-3 py-2">${inv.applicantName || inv.applicantId || '-'}</td>
+                        <td class="px-3 py-2 text-xs">${inv.invoiceType === 'special' ? '专用发票' : '普通发票'}</td>
+                        <td class="px-3 py-2 text-right font-semibold">¥${(inv.amount || 0).toLocaleString()}</td>
+                        <td class="px-3 py-2"><span class="px-2 py-0.5 rounded-full text-xs ${statusColors[inv.status] || ''}">${statusMap[inv.status] || inv.status}</span></td>
+                        <td class="px-3 py-2 text-xs text-gray-500">${inv.createdAt ? new Date(inv.createdAt).toLocaleDateString('zh-CN') : '-'}</td>
+                        <td class="px-3 py-2 text-center">${actions}</td>
+                    </tr>`;
+                }).join('');
+                loadInvoiceStats();
+            } catch (e) { console.error('[发票列表]', e); }
+        }
+
+        async function issueInvoice(id) {
+            const token = localStorage.getItem('adminToken') || '';
+            try {
+                const resp = await fetch(`http://localhost:3000/api/admin/invoice-requests/${id}/issue`, { method: 'POST', headers: { 'Authorization': `Bearer ${token}` } });
+                const result = await resp.json();
+                alert(result.success ? `发票 ${result.data?.invoiceNo} 已开具` : '开具失败: ' + result.error);
+                loadInvoiceList();
+            } catch (e) { alert('操作失败: ' + e.message); }
+        }
+
+        async function sendInvoice(id) {
+            const method = prompt('发送方式 (email/sms/wechat):', 'email');
+            if (!method) return;
+            const token = localStorage.getItem('adminToken') || '';
+            try {
+                const resp = await fetch(`http://localhost:3000/api/admin/invoice-requests/${id}/send`, {
+                    method: 'POST', headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ method })
+                });
+                const result = await resp.json();
+                alert(result.success ? '发票已发送 via ' + method : '发送失败: ' + result.error);
+                loadInvoiceList();
+            } catch (e) { alert('操作失败: ' + e.message); }
+        }
     </script>
 </html>

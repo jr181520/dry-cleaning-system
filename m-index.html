@@ -5413,6 +5413,12 @@
             const isLoggedIn = (storeUserObj && (storeUserObj.username || storeUserObj.id || storeUserObj.storeId || storeUserObj.userId || isMerchant)) ||
                               (currentStoreObj && currentStoreObj.storeId);
             
+            // 早期预览模式检测：merchant用户且无storeId立即进入预览模式
+            if (isMerchant && !storeUserObj.storeId) {
+                window.__isPreviewMode = true;
+                console.log('[初始化] merchant用户无storeId，立即进入预览模式');
+            }
+            
             // 检查是否是访客模式（已经取消过登录的用户）
             const isGuestMode = localStorage.getItem('guestModeHandled') === 'true';
             
@@ -5453,8 +5459,10 @@
                 const currentStore = localStorage.getItem('currentStore');
                 if (!currentStore || currentStore === '{}') {
                     const resolvedName = storeUserObj.storeName || storeUserObj.name || '干洗店';
+                    // merchant用户不使用ST002回退，保持null storeId
+                    const fallbackStoreId = isMerchant ? null : (storeUserObj.storeId || 'ST002');
                     localStorage.setItem('currentStore', JSON.stringify({
-                        storeId: storeUserObj.storeId || 'ST002',
+                        storeId: fallbackStoreId,
                         name: resolvedName,
                         storeName: resolvedName,
                         address: '门店地址'
@@ -5470,8 +5478,12 @@
             const options = { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' };
             document.getElementById('current-date').textContent = currentDate.toLocaleDateString('zh-CN', options);
             
-            // 加载用户订单
-            loadStoreOrders();
+            // 加载用户订单（merchant预览模式跳过）
+            if (!isMerchant && !window.__isPreviewMode) {
+                loadStoreOrders();
+            } else {
+                console.log('[初始化] merchant用户预览模式，跳过订单加载');
+            }
             
             // ⚠️ 轮询同步已禁用 — MQTT WebSocket (OrderEventClient) 接管实时推送
             // 如需启用轮询，取消下行注释：OrderSyncManager.start();
@@ -5485,12 +5497,12 @@
             // 提取门店ID（外层作用域，供后续代码使用）
             const _storeUser = JSON.parse(localStorage.getItem('storeUser') || '{}');
             const _currentStore = JSON.parse(localStorage.getItem('currentStore') || '{}');
-            const myStoreId = _currentStore.storeId || _storeUser.storeId || 'ST002';
+            const myStoreId = _currentStore.storeId || _storeUser.storeId || (isMerchant ? null : 'ST002');
 
-            // 启动订单实时事件监听（MQTT WebSocket）
+            // 启动订单实时事件监听（MQTT WebSocket，merchant用户跳过）
             try {
                 
-                if (typeof OrderEventClient !== 'undefined') {
+                if (myStoreId && typeof OrderEventClient !== 'undefined') {
                     OrderEventClient.start({
                         storeId: myStoreId,
                         mode: 'store',
@@ -13750,10 +13762,40 @@ ${(order.items || order.services || []).map((item, idx) => `${idx + 1}. ${item.n
             if (phone) {
                 try {
                     var baseUrl = window.API_CONFIG ? API_CONFIG.baseUrl : 'http://localhost:' + (window.location.port || 3000) + '/api';
-                    var resp = await fetch(baseUrl + '/auth/application-status?phone=' + encodeURIComponent(phone));
+                    var resp = await fetch(baseUrl + '/store-applications/status?phone=' + encodeURIComponent(phone));
                     var result = await resp.json();
                     if (result.success && result.data.status === 'approved') {
-                        console.log('[入驻检查] 已通过');
+                        console.log('[入驻检查] 已通过，门店ID:', result.data.storeId);
+                        // 审批通过：更新 storeUser、退出预览模式、刷新页面
+                        if (result.data.storeId) {
+                            storeUser.storeId = result.data.storeId;
+                            storeUser.roles = ['store_admin'];
+                            if (result.data.storeName) storeUser.storeName = result.data.storeName;
+                            localStorage.setItem('storeUser', JSON.stringify(storeUser));
+                            // 同步更新 currentStore
+                            var currentStore = JSON.parse(localStorage.getItem('currentStore') || '{}');
+                            currentStore.storeId = result.data.storeId;
+                            currentStore.storeName = result.data.storeName || storeUser.storeName || '';
+                            localStorage.setItem('currentStore', JSON.stringify(currentStore));
+                        }
+                        // 清除预览模式
+                        window.__isPreviewMode = false;
+                        localStorage.removeItem('previewMode');
+                        // 隐藏预览通知
+                        var notice = document.getElementById('m-dashboard-preview-notice');
+                        if (notice) notice.style.display = 'none';
+                        var banner = document.getElementById('m-preview-banner');
+                        if (banner) banner.style.display = 'none';
+                        // 恢复统计卡片
+                        var stats = document.getElementById('m-dashboard-stats');
+                        if (stats) stats.style.filter = '';
+                        // 停止轮询
+                        if (window._merchantPollTimer) {
+                            clearInterval(window._merchantPollTimer);
+                            window._merchantPollTimer = null;
+                        }
+                        // 刷新页面以加载完整功能
+                        window.location.reload();
                         return;
                     }
                     if (result.success && result.data.status === 'pending') {
@@ -13762,16 +13804,18 @@ ${(order.items || order.services || []).map((item, idx) => `${idx + 1}. ${item.n
                         var banner = document.getElementById('m-preview-banner');
                         if (banner) banner.style.display = 'block';
                         if (typeof window.activateDashboardPreview === 'function') window.activateDashboardPreview();
+                        if (typeof window.startMerchantPolling === 'function') window.startMerchantPolling();
                         return;
                     }
                 } catch (e) {
-                    console.warn('[入驻检查] API不可用');
+                    console.warn('[入驻检查] API不可用:', e.message);
                 }
             }
             // 未提交申请，先激活预览模式，再弹出表单
             window.__isPreviewMode = true;
             localStorage.setItem('previewMode', 'true');
             if (typeof window.activateDashboardPreview === 'function') window.activateDashboardPreview();
+            if (typeof window.startMerchantPolling === 'function') window.startMerchantPolling();
             setTimeout(function() { window.showStoreApplyModal(); }, 800);
         }
         
@@ -13780,6 +13824,18 @@ ${(order.items || order.services || []).map((item, idx) => `${idx + 1}. ${item.n
             if (banner) banner.style.display = 'block';
             if (typeof window.activateDashboardPreview === 'function') window.activateDashboardPreview();
         }
+    };
+    
+    // 审批状态轮询：预览模式下每15秒检查一次
+    window.startMerchantPolling = function() {
+        if (window._merchantPollTimer) return; // 避免重复启动
+        window._merchantPollTimer = setInterval(function() {
+            if (window.__isPreviewMode) {
+                console.log('[入驻轮询] 检查审批状态...');
+                window.checkMerchantApplication();
+            }
+        }, 15000);
+        console.log('[入驻轮询] 已启动，每15秒检查审批状态');
     };
     
     // 表单提交
@@ -13850,10 +13906,18 @@ ${(order.items || order.services || []).map((item, idx) => `${idx + 1}. ${item.n
     
     // 页面加载后检查
     if (document.readyState === 'complete' || document.readyState === 'interactive') {
-        setTimeout(function() { window.checkMerchantApplication(); }, 1500);
+        setTimeout(function() { 
+            window.checkMerchantApplication();
+            // 预览模式下启动轮询
+            if (window.__isPreviewMode) window.startMerchantPolling();
+        }, 1500);
     } else {
         document.addEventListener('DOMContentLoaded', function() {
-            setTimeout(function() { window.checkMerchantApplication(); }, 1500);
+            setTimeout(function() { 
+                window.checkMerchantApplication();
+                // 预览模式下启动轮询
+                if (window.__isPreviewMode) window.startMerchantPolling();
+            }, 1500);
         });
     }
 })();

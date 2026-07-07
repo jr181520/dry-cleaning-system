@@ -14,6 +14,9 @@ class AdminService {
     this.Chain = this.getChainModel();
     this.BDTeam = this.getBDTeamModel();
     this.ServiceTicket = this.getServiceTicketModel();
+    this.SystemSettings = this.getSystemSettingsModel();
+    this.SettlementRequest = this.getSettlementRequestModel();
+    this.InvoiceRequest = this.getInvoiceRequestModel();
   }
 
   // 获取用户模型
@@ -118,6 +121,7 @@ class AdminService {
       businessHours: { start: String, end: String },
       services: [{ type: String }],
       status: { type: String, enum: ['active', 'pending', 'disabled'], default: 'pending' },
+      bdUserId: { type: String, index: true }, // BD人员关联ID
       stats: {
         totalOrders: { type: Number, default: 0 },
         totalAmount: { type: Number, default: 0 },
@@ -442,7 +446,7 @@ class AdminService {
    */
   async getStores(params) {
     try {
-      const { page = 1, pageSize = 20, keyword, status, businessCategory } = params;
+      const { page = 1, pageSize = 20, keyword, status, businessCategory, bdUserId, bdManagerId } = params;
       
       const filter = {};
       if (keyword) {
@@ -453,6 +457,16 @@ class AdminService {
       }
       if (status) filter.status = status;
       if (businessCategory) filter.businessCategory = businessCategory;
+      if (bdUserId) filter.bdUserId = bdUserId; // 基层BD数据隔离
+      // BD主管: 查找团队所有下级BD的门店
+      if (bdManagerId && !bdUserId) {
+        try {
+          const teamBDs = await this.BDTeam.find({ parentBdId: bdManagerId });
+          const teamBdIds = teamBDs.map(b => b.bdNo || b._id.toString());
+          teamBdIds.push(bdManagerId); // 包含主管自己
+          filter.bdUserId = { $in: teamBdIds };
+        } catch (e) { /* BDTeam模型不存在时忽略 */ }
+      }
 
       const [stores, total] = await Promise.all([
         this.Store.find(filter)
@@ -872,6 +886,7 @@ class AdminService {
           applicationId: application.applicationId,
           storeName: application.storeName,
           status: application.status,
+          storeId: application.storeId || null,
           createTime: application.createTime,
           updateTime: application.updateTime,
           needsApplication: application.status !== 'approved'
@@ -888,7 +903,7 @@ class AdminService {
    */
   async getOrders(params) {
     try {
-      const { page = 1, pageSize = 20, keyword, status, orderType, startDate, endDate } = params;
+      const { page = 1, pageSize = 20, keyword, status, orderType, startDate, endDate, bdUserId, bdManagerId } = params;
       
       const filter = {};
       if (keyword) {
@@ -903,6 +918,25 @@ class AdminService {
         filter.createdAt = {};
         if (startDate) filter.createdAt.$gte = new Date(startDate);
         if (endDate) filter.createdAt.$lte = new Date(endDate);
+      }
+      // BD数据隔离：只查询BD管理的门店的订单
+      let effectiveBdUserId = bdUserId;
+      if (bdManagerId && !bdUserId) {
+        try {
+          const teamBDs = await this.BDTeam.find({ parentBdId: bdManagerId });
+          const teamBdIds = teamBDs.map(b => b.bdNo || b._id.toString());
+          teamBdIds.push(bdManagerId);
+          const teamStores = await this.Store.find({ bdUserId: { $in: teamBdIds } }).select('_id storeNo').lean();
+          filter.storeId = { $in: teamStores.map(s => s._id.toString()) };
+        } catch (e) { /* 忽略 */ }
+      } else if (effectiveBdUserId) {
+        const bdStores = await this.Store.find({ bdUserId }).select('_id storeNo').lean();
+        const storeNos = bdStores.map(s => s.storeNo);
+        filter.storeId = { $in: bdStores.map(s => s._id.toString()) };
+        if (storeNos.length > 0) {
+          filter.$or = filter.$or || [];
+          filter.$or.push({ storeNo: { $in: storeNos } });
+        }
       }
 
       const [orders, total] = await Promise.all([
@@ -3118,7 +3152,7 @@ class AdminService {
 
   async getBDTeamList(params) {
     try {
-      const { page = 1, pageSize = 50, keyword, status, level } = params;
+      const { page = 1, pageSize = 50, keyword, status, level, parentBdId } = params;
       const filter = {};
       if (keyword) {
         filter.$or = [
@@ -3129,6 +3163,7 @@ class AdminService {
       }
       if (status) filter.status = status;
       if (level) filter.level = level;
+      if (parentBdId) filter.parentBdId = parentBdId; // BD主管只看团队下级
 
       const [list, total] = await Promise.all([
         this.BDTeam.find(filter).sort({ level: 1, createdAt: -1 }).skip((page - 1) * pageSize).limit(pageSize),
@@ -3445,6 +3480,488 @@ class AdminService {
       return { success: true, data: { total, open, processing, resolved, todayCount, urgentCount } };
     } catch (error) {
       return { success: false, error: error.message };
+    }
+  }
+
+  // ============================================
+  // SystemSettings 模型
+  // ============================================
+  getSystemSettingsModel() {
+    const schema = new mongoose.Schema({
+      key: { type: String, required: true, unique: true },
+      value: mongoose.Schema.Types.Mixed,
+      category: { type: String, default: 'general' },
+      label: String,
+      description: String,
+      updatedAt: { type: Date, default: Date.now }
+    });
+    return mongoose.models.SystemSettings || mongoose.model('SystemSettings', schema);
+  }
+
+  // 获取全部系统设置
+  async getSystemSettings() {
+    try {
+      const docs = await this.SystemSettings.find().lean();
+      const settings = {};
+      docs.forEach(d => { settings[d.key] = d.value; });
+      // 默认值填充
+      const defaults = {
+        settlementAutoThreshold: 5000,
+        settlementCycle: 7,
+        settlementAutoEnabled: true,
+        invoiceAutoEnabled: true,
+        invoiceTemplate: 'default',
+        bdRecruitApproval: 'manual',
+        platformServiceFeeRatio: 10,
+        backupCycle: 'daily'
+      };
+      Object.keys(defaults).forEach(k => {
+        if (settings[k] === undefined) settings[k] = defaults[k];
+      });
+      return { success: true, data: settings };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  }
+
+  // 更新系统设置
+  async updateSystemSettings(updates) {
+    try {
+      for (const [key, value] of Object.entries(updates)) {
+        await this.SystemSettings.findOneAndUpdate(
+          { key },
+          { value, updatedAt: new Date() },
+          { upsert: true, new: true }
+        );
+      }
+      return { success: true, message: '设置已更新' };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  }
+
+  // ============================================
+  // SettlementRequest 模型
+  // ============================================
+  getSettlementRequestModel() {
+    const schema = new mongoose.Schema({
+      settlementNo: { type: String, unique: true, index: true },
+      storeId: { type: String, required: true, index: true },
+      storeName: String,
+      amount: { type: Number, required: true },
+      serviceFee: { type: Number, default: 0 },
+      netAmount: Number,
+      orderCount: Number,
+      periodStart: Date,
+      periodEnd: Date,
+      status: { type: String, enum: ['pending', 'auto_approved', 'pending_review', 'approved', 'rejected', 'settled'], default: 'pending' },
+      reviewType: { type: String, enum: ['auto', 'manual'], default: 'auto' },
+      reviewer: String,
+      reviewNote: String,
+      reviewedAt: Date,
+      settledAt: Date,
+      createdAt: { type: Date, default: Date.now }
+    });
+    schema.index({ status: 1, createdAt: -1 });
+    return mongoose.models.SettlementRequest || mongoose.model('SettlementRequest', schema);
+  }
+
+  // 获取结算申请列表
+  async getSettlementRequests({ page = 1, pageSize = 20, status, storeId } = {}) {
+    try {
+      const filter = {};
+      if (status) filter.status = status;
+      if (storeId) filter.storeId = storeId;
+      const total = await this.SettlementRequest.countDocuments(filter);
+      const list = await this.SettlementRequest.find(filter)
+        .sort({ createdAt: -1 })
+        .skip((page - 1) * pageSize)
+        .limit(pageSize)
+        .lean();
+      return { success: true, data: { list, total, page, pageSize } };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  }
+
+  // 审核结算申请（智能审核引擎）
+  async reviewSettlement(id, action, reviewer, note) {
+    try {
+      const req = await this.SettlementRequest.findById(id);
+      if (!req) return { success: false, error: '结算申请不存在' };
+      if (!['pending', 'pending_review'].includes(req.status)) {
+        return { success: false, error: '当前状态不可审核' };
+      }
+      if (action === 'approve') {
+        req.status = 'approved';
+        req.reviewer = reviewer;
+        req.reviewNote = note || '审核通过';
+        req.reviewedAt = new Date();
+      } else {
+        req.status = 'rejected';
+        req.reviewer = reviewer;
+        req.reviewNote = note || '审核拒绝';
+        req.reviewedAt = new Date();
+      }
+      await req.save();
+      // 审核通过后自动创建发票申请
+      if (action === 'approve') {
+        await this._autoCreateInvoiceRequest(req);
+      }
+      return { success: true, data: req };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  }
+
+  // 创建结算申请（模拟门店发起结算）
+  async createSettlementRequest(data) {
+    try {
+      const settings = await this.getSystemSettings();
+      const threshold = settings.data.settlementAutoThreshold || 5000;
+      const autoEnabled = settings.data.settlementAutoEnabled !== false;
+
+      const no = 'ST' + Date.now().toString(36).toUpperCase() + Math.random().toString(36).substr(2, 4).toUpperCase();
+      const serviceFee = Math.round((data.amount || 0) * ((settings.data.platformServiceFeeRatio || 10) / 100) * 100) / 100;
+      const doc = await this.SettlementRequest.create({
+        settlementNo: no,
+        storeId: data.storeId,
+        storeName: data.storeName || '',
+        amount: data.amount,
+        serviceFee,
+        netAmount: data.amount - serviceFee,
+        orderCount: data.orderCount || 0,
+        periodStart: data.periodStart,
+        periodEnd: data.periodEnd,
+        status: (autoEnabled && data.amount <= threshold) ? 'auto_approved' : 'pending_review',
+        reviewType: (autoEnabled && data.amount <= threshold) ? 'auto' : 'manual',
+        reviewer: (autoEnabled && data.amount <= threshold) ? '系统自动审核' : null
+      });
+      // 自动审核通过时也创建发票申请
+      if (doc.status === 'auto_approved') {
+        await this._autoCreateInvoiceRequest(doc);
+      }
+      return { success: true, data: doc };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  }
+
+  // 结算统计
+  async getSettlementStats() {
+    try {
+      const today = new Date(); today.setHours(0, 0, 0, 0);
+      const monthStart = new Date(); monthStart.setDate(1); monthStart.setHours(0, 0, 0, 0);
+      const [pending, todayApproved, monthTotal, autoCount, manualCount] = await Promise.all([
+        this.SettlementRequest.countDocuments({ status: { $in: ['pending', 'pending_review'] } }),
+        this.SettlementRequest.countDocuments({ status: 'approved', reviewedAt: { $gte: today } }),
+        this.SettlementRequest.aggregate([
+          { $match: { status: { $in: ['approved', 'settled', 'auto_approved'] }, createdAt: { $gte: monthStart } } },
+          { $group: { _id: null, total: { $sum: '$amount' } } }
+        ]),
+        this.SettlementRequest.countDocuments({ reviewType: 'auto' }),
+        this.SettlementRequest.countDocuments({ reviewType: 'manual' })
+      ]);
+      const totalReviewed = autoCount + manualCount;
+      return {
+        success: true,
+        data: {
+          pending,
+          todayApproved,
+          monthTotal: monthTotal[0]?.total || 0,
+          autoRatio: totalReviewed > 0 ? Math.round(autoCount / totalReviewed * 100) : 0
+        }
+      };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  }
+
+  // ============================================
+  // InvoiceRequest 模型
+  // ============================================
+  getInvoiceRequestModel() {
+    const schema = new mongoose.Schema({
+      invoiceNo: { type: String, unique: true, index: true },
+      applicantType: { type: String, enum: ['store', 'user', 'chain'], default: 'store' },
+      applicantId: String,
+      applicantName: String,
+      invoiceType: { type: String, enum: ['normal', 'special'], default: 'normal' },
+      amount: { type: Number, required: true },
+      taxNo: String,
+      status: { type: String, enum: ['pending', 'issued', 'sent', 'rejected'], default: 'pending' },
+      settlementId: String,
+      issuedAt: Date,
+      sentAt: Date,
+      sendMethod: String,
+      createdAt: { type: Date, default: Date.now }
+    });
+    schema.index({ status: 1, createdAt: -1 });
+    return mongoose.models.InvoiceRequest || mongoose.model('InvoiceRequest', schema);
+  }
+
+  // 获取发票申请列表
+  async getInvoiceRequests({ page = 1, pageSize = 20, status } = {}) {
+    try {
+      const filter = {};
+      if (status) filter.status = status;
+      const total = await this.InvoiceRequest.countDocuments(filter);
+      const list = await this.InvoiceRequest.find(filter)
+        .sort({ createdAt: -1 })
+        .skip((page - 1) * pageSize)
+        .limit(pageSize)
+        .lean();
+      return { success: true, data: { list, total, page, pageSize } };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  }
+
+  // 结算审核后自动创建发票申请（内部辅助方法）
+  async _autoCreateInvoiceRequest(settlementDoc) {
+    try {
+      const settings = await this.getSystemSettings();
+      if (settings.data.invoiceAutoEnabled === false) return; // 自动开票关闭则跳过
+      const invoiceNo = 'INV' + Date.now().toString(36).toUpperCase() + Math.random().toString(36).substr(2, 4).toUpperCase();
+      await this.InvoiceRequest.create({
+        invoiceNo,
+        applicantType: 'store',
+        applicantId: settlementDoc.storeId,
+        applicantName: settlementDoc.storeName || settlementDoc.storeId,
+        invoiceType: 'normal',
+        amount: settlementDoc.amount,
+        taxNo: '',
+        status: 'pending',
+        settlementId: settlementDoc.settlementNo
+      });
+      console.log(`[发票] 结算${settlementDoc.settlementNo}自动创建发票申请 ${invoiceNo}`);
+    } catch (e) {
+      console.error('[发票] 自动创建发票申请失败:', e.message);
+    }
+  }
+
+  // 开具电子发票（桩函数）
+  async issueInvoice(id) {
+    try {
+      const req = await this.InvoiceRequest.findById(id);
+      if (!req) return { success: false, error: '发票申请不存在' };
+      if (req.status !== 'pending') return { success: false, error: '当前状态不可开具' };
+      req.invoiceNo = 'INV' + Date.now().toString(36).toUpperCase() + Math.random().toString(36).substr(2, 4).toUpperCase();
+      req.status = 'issued';
+      req.issuedAt = new Date();
+      await req.save();
+      return { success: true, data: req };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  }
+
+  // 发送发票（桩函数）
+  async sendInvoice(id, method) {
+    try {
+      const req = await this.InvoiceRequest.findById(id);
+      if (!req) return { success: false, error: '发票申请不存在' };
+      if (req.status !== 'issued') return { success: false, error: '发票尚未开具' };
+      req.status = 'sent';
+      req.sentAt = new Date();
+      req.sendMethod = method || 'email';
+      await req.save();
+      console.log(`[发票] 模拟发送发票 ${req.invoiceNo} 给 ${req.applicantName} via ${req.sendMethod}`);
+      return { success: true, data: req };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  }
+
+  // 发票统计
+  async getInvoiceStats() {
+    try {
+      const monthStart = new Date(); monthStart.setDate(1); monthStart.setHours(0, 0, 0, 0);
+      const [pending, monthIssued, totalAmount, electronicCount] = await Promise.all([
+        this.InvoiceRequest.countDocuments({ status: 'pending' }),
+        this.InvoiceRequest.countDocuments({ status: { $in: ['issued', 'sent'] }, issuedAt: { $gte: monthStart } }),
+        this.InvoiceRequest.aggregate([
+          { $match: { status: { $in: ['issued', 'sent'] }, createdAt: { $gte: monthStart } } },
+          { $group: { _id: null, total: { $sum: '$amount' } } }
+        ]),
+        this.InvoiceRequest.countDocuments({ status: { $in: ['issued', 'sent'] } })
+      ]);
+      const totalIssued = await this.InvoiceRequest.countDocuments({ status: { $in: ['issued', 'sent', 'pending'] } });
+      return {
+        success: true,
+        data: {
+          pending,
+          monthIssued,
+          monthAmount: totalAmount[0]?.total || 0,
+          electronicRatio: totalIssued > 0 ? Math.round(electronicCount / totalIssued * 100) : 100
+        }
+      };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  }
+
+  // ============================================
+  // 角色专属仪表盘
+  // ============================================
+  async getRoleDashboardStats(roleKey, user) {
+    try {
+      const today = new Date(); today.setHours(0, 0, 0, 0);
+      const monthStart = new Date(); monthStart.setDate(1); monthStart.setHours(0, 0, 0, 0);
+
+      switch (roleKey) {
+        case 'finance_admin': {
+          const [pendingSettlement, pendingInvoice, monthSettlement, monthServiceFee] = await Promise.all([
+            this.SettlementRequest.countDocuments({ status: { $in: ['pending', 'pending_review'] } }),
+            this.InvoiceRequest.countDocuments({ status: 'pending' }),
+            this.SettlementRequest.aggregate([
+              { $match: { status: { $in: ['approved', 'settled', 'auto_approved'] }, createdAt: { $gte: monthStart } } },
+              { $group: { _id: null, total: { $sum: '$amount' } } }
+            ]),
+            this.SettlementRequest.aggregate([
+              { $match: { status: { $in: ['approved', 'settled', 'auto_approved'] }, createdAt: { $gte: monthStart } } },
+              { $group: { _id: null, total: { $sum: '$serviceFee' } } }
+            ])
+          ]);
+          return {
+            cards: [
+              { label: '待审核结算', value: pendingSettlement, icon: 'fa-gavel', color: 'orange' },
+              { label: '待开票', value: pendingInvoice, icon: 'fa-file-text-o', color: 'purple' },
+              { label: '本月结算总额', value: '¥' + ((monthSettlement[0]?.total || 0) / 100).toFixed(0), icon: 'fa-money', color: 'green' },
+              { label: '平台服务费收入', value: '¥' + ((monthServiceFee[0]?.total || 0) / 100).toFixed(0), icon: 'fa-percent', color: 'blue' }
+            ]
+          };
+        }
+        case 'bd_user': {
+          const bdUserId = user?.bdUserId;
+          const storeFilter = bdUserId ? { bdUserId } : {};
+          const myStores = await this.Store.find(storeFilter).select('_id storeNo').lean();
+          const storeIds = myStores.map(s => s._id.toString());
+          const storeNos = myStores.map(s => s.storeNo);
+          const monthNewStores = await this.Store.countDocuments({ ...storeFilter, createdAt: { $gte: monthStart } });
+          const orderFilter = storeIds.length > 0
+            ? { $or: [{ storeId: { $in: storeIds } }, { storeNo: { $in: storeNos } }] }
+            : { storeId: { $in: [] } };
+          const orderCount = await this.Order.countDocuments(orderFilter);
+          return {
+            cards: [
+              { label: '我的门店', value: myStores.length, icon: 'fa-building', color: 'green' },
+              { label: '本月新增门店', value: monthNewStores, icon: 'fa-plus-circle', color: 'blue' },
+              { label: '门店总订单数', value: orderCount, icon: 'fa-file-text', color: 'purple' }
+            ]
+          };
+        }
+        case 'bd_manager': case 'bd_director': {
+          const [totalBD, totalStores, monthNewStores] = await Promise.all([
+            this.BDTeam.countDocuments({ status: 'active' }),
+            this.Store.countDocuments({ status: 'active' }),
+            this.Store.countDocuments({ createdAt: { $gte: monthStart } })
+          ]);
+          return {
+            cards: [
+              { label: roleKey === 'bd_director' ? '全国BD总数' : '团队BD数', value: totalBD, icon: 'fa-id-badge', color: 'blue' },
+              { label: roleKey === 'bd_director' ? '全国门店总数' : '团队门店总数', value: totalStores, icon: 'fa-building', color: 'green' },
+              { label: '本月新增门店', value: monthNewStores, icon: 'fa-plus-circle', color: 'orange' }
+            ]
+          };
+        }
+        case 'customer_service': {
+          const [todayTickets, openTickets, resolvedTickets] = await Promise.all([
+            this.ServiceTicket.countDocuments({ createdAt: { $gte: today } }),
+            this.ServiceTicket.countDocuments({ status: 'open' }),
+            this.ServiceTicket.countDocuments({ status: { $in: ['resolved', 'closed'] } })
+          ]);
+          const satisfaction = resolvedTickets > 0 ? Math.round(resolvedTickets / Math.max(resolvedTickets + openTickets, 1) * 100) : 100;
+          return {
+            cards: [
+              { label: '今日新工单', value: todayTickets, icon: 'fa-ticket', color: 'orange' },
+              { label: '待处理工单', value: openTickets, icon: 'fa-exclamation-circle', color: 'red' },
+              { label: '已解决', value: resolvedTickets, icon: 'fa-check-circle', color: 'green' },
+              { label: '好评率', value: satisfaction + '%', icon: 'fa-thumbs-up', color: 'blue' }
+            ]
+          };
+        }
+        case 'ops_engineer': {
+          return {
+            cards: [
+              { label: '服务状态', value: '运行中', icon: 'fa-heartbeat', color: 'green' },
+              { label: 'MongoDB', value: '已连接', icon: 'fa-database', color: 'blue' },
+              { label: 'Node进程', value: '正常', icon: 'fa-server', color: 'purple' },
+              { label: 'MQTT', value: '已连接', icon: 'fa-wifi', color: 'teal' }
+            ]
+          };
+        }
+        case 'marketing': {
+          const [totalMembers, monthNewMembers] = await Promise.all([
+            this.User.countDocuments({ memberLevel: { $ne: 'normal' } }),
+            this.User.countDocuments({ memberLevel: { $ne: 'normal' }, createdAt: { $gte: monthStart } })
+          ]);
+          return {
+            cards: [
+              { label: '会员总数', value: totalMembers, icon: 'fa-user-circle', color: 'purple' },
+              { label: '月新增会员', value: monthNewMembers, icon: 'fa-user-plus', color: 'blue' },
+              { label: '营销活动', value: 0, icon: 'fa-bullhorn', color: 'orange' },
+              { label: '优惠券核销率', value: '0%', icon: 'fa-ticket', color: 'green' }
+            ]
+          };
+        }
+        case 'region_admin': {
+          const [regionStores, regionOrders] = await Promise.all([
+            this.Store.countDocuments({ status: 'active' }),
+            this.Order.countDocuments()
+          ]);
+          const revenueAgg = await this.Order.aggregate([
+            { $group: { _id: null, total: { $sum: '$amounts.total' } } }
+          ]);
+          return {
+            cards: [
+              { label: '区域门店数', value: regionStores, icon: 'fa-building', color: 'green' },
+              { label: '区域订单数', value: regionOrders, icon: 'fa-file-text', color: 'blue' },
+              { label: '区域营收', value: '¥' + ((revenueAgg[0]?.total || 0) / 100).toFixed(0), icon: 'fa-cny', color: 'orange' },
+              { label: '平均评分', value: '4.8', icon: 'fa-star', color: 'yellow' }
+            ]
+          };
+        }
+        default:
+          return { cards: [] };
+      }
+    } catch (error) {
+      console.error('[角色仪表盘] 失败:', error);
+      return { cards: [] };
+    }
+  }
+
+  // 角色待办事项
+  async getRoleTodos(roleKey, user) {
+    try {
+      const todos = [];
+      switch (roleKey) {
+        case 'finance_admin': {
+          const pendingSettlement = await this.SettlementRequest.find({ status: { $in: ['pending', 'pending_review'] } }).sort({ createdAt: -1 }).limit(5).lean();
+          pendingSettlement.forEach(s => {
+            todos.push({ type: 'settlement', title: `${s.storeName || s.storeId} 结算申请 ¥${s.amount}`, id: s._id, time: s.createdAt });
+          });
+          const pendingInvoice = await this.InvoiceRequest.find({ status: 'pending' }).sort({ createdAt: -1 }).limit(3).lean();
+          pendingInvoice.forEach(inv => {
+            todos.push({ type: 'invoice', title: `${inv.applicantName || '商家'} 发票申请 ¥${inv.amount}`, id: inv._id, time: inv.createdAt });
+          });
+          break;
+        }
+        case 'customer_service': {
+          const openTickets = await this.ServiceTicket.find({ status: 'open' }).sort({ createdAt: -1 }).limit(5).lean();
+          openTickets.forEach(t => {
+            todos.push({ type: 'ticket', title: `工单 #${t.ticketNo}: ${t.subject || t.category}`, id: t._id, time: t.createdAt });
+          });
+          break;
+        }
+        case 'bd_user': case 'bd_manager': case 'bd_director': {
+          // BD待办可以加门店申请审批等
+          break;
+        }
+      }
+      return { success: true, data: todos };
+    } catch (error) {
+      return { success: true, data: [] };
     }
   }
 }

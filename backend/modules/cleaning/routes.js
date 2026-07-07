@@ -729,7 +729,7 @@ router.get('/store-config/:storeId', async (req, res) => {
  */
 router.post('/stores/pricing', async (req, res) => {
   try {
-    const { selectedServices } = req.body;
+    const { selectedServices, categoryId } = req.body;
     if (!selectedServices || !Array.isArray(selectedServices) || selectedServices.length === 0) {
       return res.json({ success: true, data: [], message: '未选择服务' });
     }
@@ -780,8 +780,8 @@ router.post('/stores/pricing', async (req, res) => {
       return { totalDiscount: totalDiscount, appliedPromos: appliedPromos };
     }
 
-    // 获取所有活跃门店
-    const storeResult = await storeService.getStores({ page: 1, pageSize: 50 });
+    // 获取所有活跃门店（按品类过滤）
+    const storeResult = await storeService.getStores({ page: 1, pageSize: 50, businessCategory: categoryId || 'cleaning' });
     const stores = storeResult.list || [];
 
     // 默认服务价格表（当门店无配置时兜底）
@@ -977,7 +977,10 @@ const storeService = require('./services/storeService');
  */
 router.get('/stores', async (req, res) => {
   try {
-    const result = await storeService.getStores({ page: 1, pageSize: 50 });
+    const categoryId = req.query.categoryId || req.query.businessCategory || null;
+    const storeParams = { page: 1, pageSize: 50 };
+    if (categoryId) storeParams.businessCategory = categoryId;
+    const result = await storeService.getStores(storeParams);
     const stores = result.list || [];
 
     // 加载门店配置（服务/促销信息）
@@ -1018,6 +1021,7 @@ router.get('/stores', async (req, res) => {
         contactPhone: store.phone || '',
         hours: store.businessHours || '09:00-21:00',
         businessHours: store.businessHours || '09:00-21:00',
+        businessCategory: store.businessCategory || 'cleaning',
         status: store.status === 'active' ? 'online' : 'offline',
         isOnline: store.status === 'active',
         rating: store.rating || 4.5,
@@ -1342,8 +1346,8 @@ router.post('/stores/recommend', async (req, res) => {
     const cat = categoryService.getCategory(categoryId || 'cleaning');
     const catServices = cat ? cat.services : [];
 
-    // 获取所有活跃门店
-    const storeResult = await storeService.getStores({ page: 1, pageSize: 100 });
+    // 获取所有活跃门店（按品类过滤）
+    const storeResult = await storeService.getStores({ page: 1, pageSize: 100, businessCategory: categoryId || 'cleaning' });
     const stores = storeResult.list || [];
 
     function loadStoreConfig(storeId) {

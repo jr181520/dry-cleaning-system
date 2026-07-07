@@ -9,9 +9,10 @@ const adminService = require('../services/adminService');
 const { authMiddleware, requireRoles } = require('../../common/middlewares/auth');
 const MODULE_CONFIG = require('../../../config/modules');
 
-// 所有路由需要管理员权限
+// 所有路由需要认证（角色权限在各路由上细分）
 router.use(authMiddleware);
-router.use(requireRoles('admin'));
+// 注意：已移除全局 requireRoles('admin')，改为按路由组细分权限
+// 所有角色都包含 'admin'，因此向后兼容
 
 // ============================================
 // 仪表盘
@@ -36,8 +37,8 @@ router.get('/dashboard', async (req, res) => {
 // 用户管理
 // ============================================
 
-// 获取用户列表
-router.get('/users', async (req, res) => {
+// 获取用户列表（仅管理员）
+router.get('/users', requireRoles('admin'), async (req, res) => {
   try {
     const { page, pageSize, keyword, role, status } = req.query;
     const result = await adminService.getUsers({
@@ -58,8 +59,8 @@ router.get('/users', async (req, res) => {
   }
 });
 
-// 获取用户详情
-router.get('/users/:id', async (req, res) => {
+// 获取用户详情（仅管理员）
+router.get('/users/:id', requireRoles('admin'), async (req, res) => {
   try {
     const result = await adminService.getUserById(req.params.id);
     res.json(result);
@@ -73,8 +74,8 @@ router.get('/users/:id', async (req, res) => {
   }
 });
 
-// 更新用户状态
-router.put('/users/:id/status', async (req, res) => {
+// 更新用户状态（仅管理员）
+router.put('/users/:id/status', requireRoles('admin'), async (req, res) => {
   try {
     const { status } = req.body;
     const result = await adminService.updateUserStatus(req.params.id, status);
@@ -93,16 +94,26 @@ router.put('/users/:id/status', async (req, res) => {
 // 门店管理
 // ============================================
 
-// 获取门店列表
-router.get('/stores', async (req, res) => {
+// 获取门店列表（BD三级数据隔离）
+router.get('/stores', requireRoles('admin', 'region_admin', 'store_admin', 'bd_user', 'bd_manager', 'bd_director'), async (req, res) => {
   try {
     const { page, pageSize, keyword, status, businessCategory } = req.query;
+    // BD三级数据隔离
+    let bdUserId = null, bdManagerId = null;
+    if (req.user.roleKey === 'bd_user') {
+      bdUserId = req.user.bdUserId; // 基层BD: 仅自己门店
+    } else if (req.user.roleKey === 'bd_manager') {
+      bdManagerId = req.user.bdUserId; // BD主管: 团队所有门店
+    }
+    // bd_director: 无过滤，看全部
     const result = await adminService.getStores({
       page: parseInt(page) || 1,
       pageSize: parseInt(pageSize) || 20,
       keyword,
       status,
-      businessCategory
+      businessCategory,
+      bdUserId,
+      bdManagerId
     });
     res.json(result);
   } catch (error) {
@@ -337,10 +348,18 @@ router.get('/store-applications/:id/messages', async (req, res) => {
 // 订单管理
 // ============================================
 
-// 获取订单列表
-router.get('/orders', async (req, res) => {
+// 获取订单列表（客服+BD三级可查看）
+router.get('/orders', requireRoles('admin', 'region_admin', 'store_admin', 'customer_service', 'bd_user', 'bd_manager', 'bd_director'), async (req, res) => {
   try {
     const { page, pageSize, keyword, status, orderType, startDate, endDate } = req.query;
+    // BD三级数据隔离
+    let bdUserId = null, bdManagerId = null;
+    if (req.user.roleKey === 'bd_user') {
+      bdUserId = req.user.bdUserId;
+    } else if (req.user.roleKey === 'bd_manager') {
+      bdManagerId = req.user.bdUserId;
+    }
+    // bd_director: 无过滤
     const result = await adminService.getOrders({
       page: parseInt(page) || 1,
       pageSize: parseInt(pageSize) || 20,
@@ -348,7 +367,9 @@ router.get('/orders', async (req, res) => {
       status,
       orderType,
       startDate,
-      endDate
+      endDate,
+      bdUserId,
+      bdManagerId
     });
     res.json(result);
   } catch (error) {
@@ -361,8 +382,8 @@ router.get('/orders', async (req, res) => {
   }
 });
 
-// 获取订单详情
-router.get('/orders/:id', async (req, res) => {
+// 获取订单详情（客服可查看）
+router.get('/orders/:id', requireRoles('admin', 'region_admin', 'store_admin', 'customer_service'), async (req, res) => {
   try {
     const result = await adminService.getOrderById(req.params.id);
     res.json(result);
@@ -457,8 +478,8 @@ router.post('/admins', async (req, res) => {
 // 系统设置
 // ============================================
 
-// 获取系统配置
-router.get('/settings', (req, res) => {
+// 获取系统配置（运维+管理员）
+router.get('/settings', requireRoles('admin', 'ops_engineer'), (req, res) => {
   res.json({
     success: true,
     data: {
@@ -473,8 +494,8 @@ router.get('/settings', (req, res) => {
   });
 });
 
-// 更新系统配置
-router.put('/settings', async (req, res) => {
+// 更新系统配置（运维+管理员）
+router.put('/settings', requireRoles('admin', 'ops_engineer'), async (req, res) => {
   try {
     const { platformRatio } = req.body;
 
@@ -792,8 +813,8 @@ router.post('/delivery/create', async (req, res) => {
 // 会员管理
 // ============================================
 
-// 获取所有用户会员信息列表
-router.get('/members', async (req, res) => {
+// 获取所有用户会员信息列表（市场运营可查看）
+router.get('/members', requireRoles('admin', 'region_admin', 'store_admin', 'marketing'), async (req, res) => {
   try {
     const { page, pageSize, keyword, level } = req.query;
     const result = await adminService.getMembers({
@@ -813,8 +834,8 @@ router.get('/members', async (req, res) => {
   }
 });
 
-// 获取单个用户会员详情
-router.get('/members/:userId', async (req, res) => {
+// 获取单个用户会员详情（市场运营可查看）
+router.get('/members/:userId', requireRoles('admin', 'region_admin', 'store_admin', 'marketing'), async (req, res) => {
   try {
     const result = await adminService.getMemberDetail(req.params.userId);
     res.json(result);
@@ -840,8 +861,8 @@ router.get('/business/categories', (req, res) => {
   });
 });
 
-// 获取品类的业务统计概览
-router.get('/business/:category/stats', async (req, res) => {
+// 获取品类的业务统计概览（市场运营可查看）
+router.get('/business/:category/stats', requireRoles('admin', 'region_admin', 'store_admin', 'finance_admin', 'marketing', 'bd_user'), async (req, res) => {
   try {
     const result = await adminService.getCategoryStats(req.params.category);
     res.json(result);
@@ -899,8 +920,8 @@ router.get('/business/:category/members', async (req, res) => {
 // 数据完整性校验
 // ============================================
 
-// 全量数据完整性检查
-router.get('/data-integrity', async (req, res) => {
+// 全量数据完整性检查（运维+管理员）
+router.get('/data-integrity', requireRoles('admin', 'ops_engineer'), async (req, res) => {
   try {
     const result = await adminService.checkDataIntegrity();
     res.json(result);
@@ -914,8 +935,8 @@ router.get('/data-integrity', async (req, res) => {
   }
 });
 
-// 数据导出（全量数据JSON）
-router.get('/data-export', async (req, res) => {
+// 数据导出（运维+管理员）
+router.get('/data-export', requireRoles('admin', 'ops_engineer'), async (req, res) => {
   try {
     const { type } = req.query; // users, orders, stores, all
     const result = await adminService.exportData(type || 'all');
@@ -1063,7 +1084,7 @@ router.get('/unchained-stores', authMiddleware, requireRoles('admin'), async (re
 // ============================================
 
 // 资金概览
-router.get('/chains/:chainId/finance/overview', authMiddleware, requireRoles('admin', 'chain_admin'), async (req, res) => {
+router.get('/chains/:chainId/finance/overview', requireRoles('admin', 'chain_admin', 'finance_admin'), async (req, res) => {
   try {
     const result = await adminService.getChainFinanceOverview(req.params.chainId);
     res.json(result);
@@ -1074,7 +1095,7 @@ router.get('/chains/:chainId/finance/overview', authMiddleware, requireRoles('ad
 });
 
 // 资金流水记录
-router.get('/chains/:chainId/finance/records', authMiddleware, requireRoles('admin', 'chain_admin'), async (req, res) => {
+router.get('/chains/:chainId/finance/records', requireRoles('admin', 'chain_admin', 'finance_admin'), async (req, res) => {
   try {
     const { page, pageSize, type, startDate, endDate } = req.query;
     const result = await adminService.getChainFinanceRecords(req.params.chainId, {
@@ -1090,7 +1111,7 @@ router.get('/chains/:chainId/finance/records', authMiddleware, requireRoles('adm
 });
 
 // 门店资金统计
-router.get('/chains/:chainId/finance/stores', authMiddleware, requireRoles('admin', 'chain_admin'), async (req, res) => {
+router.get('/chains/:chainId/finance/stores', requireRoles('admin', 'chain_admin', 'finance_admin'), async (req, res) => {
   try {
     const result = await adminService.getChainStoreFinance(req.params.chainId);
     res.json(result);
@@ -1101,7 +1122,7 @@ router.get('/chains/:chainId/finance/stores', authMiddleware, requireRoles('admi
 });
 
 // 资金趋势
-router.get('/chains/:chainId/finance/trend', authMiddleware, requireRoles('admin', 'chain_admin'), async (req, res) => {
+router.get('/chains/:chainId/finance/trend', requireRoles('admin', 'chain_admin', 'finance_admin'), async (req, res) => {
   try {
     const result = await adminService.getChainFinanceTrend(req.params.chainId);
     res.json(result);
@@ -1207,19 +1228,20 @@ router.post('/chains/:chainId/settlement/stores/batch-update', authMiddleware, r
 // BD管理
 // ============================================
 
-router.get('/bd-team', async (req, res) => {
+router.get('/bd-team', requireRoles('admin', 'region_admin', 'bd_user', 'bd_manager', 'bd_director'), async (req, res) => {
   try {
     const { page, pageSize, keyword, status, level } = req.query;
-    const result = await adminService.getBDTeamList({
-      page: parseInt(page) || 1, pageSize: parseInt(pageSize) || 50, keyword, status, level
-    });
+    // BD三级: 主管只看自己团队，总监看全部
+    const filterOpts = { page: parseInt(page) || 1, pageSize: parseInt(pageSize) || 50, keyword, status, level };
+    if (req.user.roleKey === 'bd_manager') filterOpts.parentBdId = req.user.bdUserId;
+    const result = await adminService.getBDTeamList(filterOpts);
     res.json(result);
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }
 });
 
-router.get('/bd-team/active', async (req, res) => {
+router.get('/bd-team/active', requireRoles('admin', 'region_admin', 'bd_user', 'bd_manager', 'bd_director'), async (req, res) => {
   try {
     const result = await adminService.getActiveBDList();
     res.json(result);
@@ -1228,7 +1250,7 @@ router.get('/bd-team/active', async (req, res) => {
   }
 });
 
-router.get('/bd-team/stats', async (req, res) => {
+router.get('/bd-team/stats', requireRoles('admin', 'region_admin', 'bd_user', 'bd_manager', 'bd_director'), async (req, res) => {
   try {
     const result = await adminService.getBDStats();
     res.json(result);
@@ -1237,7 +1259,7 @@ router.get('/bd-team/stats', async (req, res) => {
   }
 });
 
-router.get('/bd-team/:id', async (req, res) => {
+router.get('/bd-team/:id', requireRoles('admin', 'region_admin', 'bd_user', 'bd_manager', 'bd_director'), async (req, res) => {
   try {
     const result = await adminService.getBDById(req.params.id);
     res.json(result);
@@ -1246,7 +1268,7 @@ router.get('/bd-team/:id', async (req, res) => {
   }
 });
 
-router.post('/bd-team', async (req, res) => {
+router.post('/bd-team', requireRoles('admin', 'region_admin'), async (req, res) => {
   try {
     const result = await adminService.createBD(req.body);
     res.json(result);
@@ -1255,7 +1277,7 @@ router.post('/bd-team', async (req, res) => {
   }
 });
 
-router.put('/bd-team/:id', async (req, res) => {
+router.put('/bd-team/:id', requireRoles('admin', 'region_admin'), async (req, res) => {
   try {
     const result = await adminService.updateBD(req.params.id, req.body);
     res.json(result);
@@ -1264,7 +1286,7 @@ router.put('/bd-team/:id', async (req, res) => {
   }
 });
 
-router.delete('/bd-team/:id', async (req, res) => {
+router.delete('/bd-team/:id', requireRoles('admin', 'region_admin'), async (req, res) => {
   try {
     const result = await adminService.deleteBD(req.params.id);
     res.json(result);
@@ -1277,7 +1299,7 @@ router.delete('/bd-team/:id', async (req, res) => {
 // 客服中心
 // ============================================
 
-router.get('/service-tickets', async (req, res) => {
+router.get('/service-tickets', requireRoles('admin', 'region_admin', 'customer_service'), async (req, res) => {
   try {
     const { page, pageSize, status, priority, keyword, storeId } = req.query;
     const result = await adminService.getTickets({ page, pageSize, status, priority, keyword, storeId });
@@ -1287,7 +1309,7 @@ router.get('/service-tickets', async (req, res) => {
   }
 });
 
-router.get('/service-tickets/stats', async (req, res) => {
+router.get('/service-tickets/stats', requireRoles('admin', 'region_admin', 'customer_service'), async (req, res) => {
   try {
     const result = await adminService.getTicketStats();
     res.json(result);
@@ -1296,7 +1318,7 @@ router.get('/service-tickets/stats', async (req, res) => {
   }
 });
 
-router.get('/service-tickets/:id', async (req, res) => {
+router.get('/service-tickets/:id', requireRoles('admin', 'region_admin', 'customer_service'), async (req, res) => {
   try {
     const result = await adminService.getTicketById(req.params.id);
     res.json(result);
@@ -1305,7 +1327,7 @@ router.get('/service-tickets/:id', async (req, res) => {
   }
 });
 
-router.post('/service-tickets', async (req, res) => {
+router.post('/service-tickets', requireRoles('admin', 'customer_service'), async (req, res) => {
   try {
     const result = await adminService.createTicket(req.body);
     res.json(result);
@@ -1314,7 +1336,7 @@ router.post('/service-tickets', async (req, res) => {
   }
 });
 
-router.post('/service-tickets/:id/chat', async (req, res) => {
+router.post('/service-tickets/:id/chat', requireRoles('admin', 'customer_service'), async (req, res) => {
   try {
     const { message } = req.body;
     const result = await adminService.aiAgentRespond(req.params.id, message);
@@ -1324,12 +1346,153 @@ router.post('/service-tickets/:id/chat', async (req, res) => {
   }
 });
 
-router.put('/service-tickets/:id', async (req, res) => {
+router.put('/service-tickets/:id', requireRoles('admin', 'customer_service'), async (req, res) => {
   try {
     const result = await adminService.updateTicket(req.params.id, req.body);
     res.json(result);
   } catch (error) {
     res.status(400).json({ success: false, error: error.message });
+  }
+});
+
+// ============================================
+// 角色专属仪表盘
+// ============================================
+router.get('/dashboard/role-stats', async (req, res) => {
+  try {
+    const roleKey = req.user.roleKey || 'super_admin';
+    const stats = await adminService.getRoleDashboardStats(roleKey, req.user);
+    res.json({ success: true, data: stats });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+router.get('/dashboard/todos', async (req, res) => {
+  try {
+    const roleKey = req.user.roleKey || 'super_admin';
+    const result = await adminService.getRoleTodos(roleKey, req.user);
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// ============================================
+// 系统设置（数据库版）
+// ============================================
+router.get('/system-settings', requireRoles('admin', 'ops_engineer', 'finance_admin'), async (req, res) => {
+  try {
+    const result = await adminService.getSystemSettings();
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+router.put('/system-settings', requireRoles('admin', 'ops_engineer'), async (req, res) => {
+  try {
+    const result = await adminService.updateSystemSettings(req.body);
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// ============================================
+// 结算中心
+// ============================================
+router.get('/settlement-requests', requireRoles('admin', 'finance_admin'), async (req, res) => {
+  try {
+    const { page, pageSize, status, storeId } = req.query;
+    const result = await adminService.getSettlementRequests({
+      page: parseInt(page) || 1,
+      pageSize: parseInt(pageSize) || 20,
+      status, storeId
+    });
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+router.get('/settlement-stats', requireRoles('admin', 'finance_admin'), async (req, res) => {
+  try {
+    const result = await adminService.getSettlementStats();
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+router.put('/settlement-requests/:id/approve', requireRoles('admin', 'finance_admin'), async (req, res) => {
+  try {
+    const result = await adminService.reviewSettlement(req.params.id, 'approve', req.user.roleKey, req.body.note);
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+router.put('/settlement-requests/:id/reject', requireRoles('admin', 'finance_admin'), async (req, res) => {
+  try {
+    const result = await adminService.reviewSettlement(req.params.id, 'reject', req.user.roleKey, req.body.note);
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+router.post('/settlement-requests', requireRoles('admin', 'finance_admin'), async (req, res) => {
+  try {
+    const result = await adminService.createSettlementRequest(req.body);
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// ============================================
+// 发票中心
+// ============================================
+router.get('/invoice-requests', requireRoles('admin', 'finance_admin'), async (req, res) => {
+  try {
+    const { page, pageSize, status } = req.query;
+    const result = await adminService.getInvoiceRequests({
+      page: parseInt(page) || 1,
+      pageSize: parseInt(pageSize) || 20,
+      status
+    });
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+router.get('/invoice-stats', requireRoles('admin', 'finance_admin'), async (req, res) => {
+  try {
+    const result = await adminService.getInvoiceStats();
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+router.post('/invoice-requests/:id/issue', requireRoles('admin', 'finance_admin'), async (req, res) => {
+  try {
+    const result = await adminService.issueInvoice(req.params.id);
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+router.post('/invoice-requests/:id/send', requireRoles('admin', 'finance_admin'), async (req, res) => {
+  try {
+    const result = await adminService.sendInvoice(req.params.id, req.body.method);
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
   }
 });
 

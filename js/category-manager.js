@@ -27,32 +27,34 @@
   // 品类对应的服务项（兜底数据，优先从后端API加载）
   const CATEGORY_SERVICES = {
     cleaning: [
-      { id: 'suit',    icon: '👔', name: '西装干洗',    desc: '专业熨烫定型',         price: 50,  unit: '件' },
-      { id: 'shirt',   icon: '👕', name: '衬衫清洗',    desc: '轻柔手洗护理',         price: 30,  unit: '件' },
-      { id: 'down',    icon: '🧥', name: '羽绒服清洗',  desc: '杀菌除螨护理',         price: 80,  unit: '件' },
-      { id: 'shoes',   icon: '👟', name: '运动鞋清洗',  desc: '深度清洁保养',         price: 40,  unit: '双' },
-      { id: 'tie',     icon: '👔', name: '领带清洗',    desc: '轻柔水洗护理',         price: 20,  unit: '条' },
-      { id: 'curtain', icon: '🪟', name: '窗帘清洗',    desc: '除螨杀菌护理',         price: 120, unit: '幅' }
+      { id: 'suit_dry', icon: '👔', name: '西装干洗',    desc: '专业熨烫定型',         price: 50,  unit: '件' },
+      { id: 'shirt',    icon: '👕', name: '衬衫清洗',    desc: '轻柔手洗护理',         price: 30,  unit: '件' },
+      { id: 'down',     icon: '🧥', name: '羽绒服清洗',  desc: '杀菌除螨护理',         price: 80,  unit: '件' },
+      { id: 'shoes',    icon: '👟', name: '运动鞋清洗',  desc: '深度清洁保养',         price: 40,  unit: '双' },
+      { id: 'tie',      icon: '👔', name: '领带清洗',    desc: '轻柔水洗护理',         price: 20,  unit: '条' },
+      { id: 'curtain',  icon: '🪟', name: '窗帘清洗',    desc: '除螨杀菌护理',         price: 120, unit: '幅' }
     ],
     shoe_care: [
-      { id: 'deep',    icon: '🧹', name: '深度清洁',    desc: '顽固污渍+杀菌',        price: 49,  unit: '双' },
-      { id: 'restore', icon: '🔧', name: '修复翻新',    desc: '开胶修复+划痕处理',    price: 89,  unit: '双' },
-      { id: 'water',   icon: '💧', name: '防水护理',    desc: '纳米防水涂层',         price: 69,  unit: '双' },
-      { id: 'deod',    icon: '🌿', name: '杀菌除臭',    desc: 'UV杀菌+活性炭',        price: 39,  unit: '双' },
-      { id: 'leather', icon: '👢', name: '皮靴护理',    desc: '皮革清洁+滋养',        price: 99,  unit: '双' }
+      { id: 'deep_clean', icon: '🧹', name: '深度清洁',    desc: '顽固污渍+杀菌',        price: 49,  unit: '双' },
+      { id: 'restore',    icon: '🔧', name: '修复翻新',    desc: '开胶修复+划痕处理',    price: 89,  unit: '双' },
+      { id: 'waterproof', icon: '💧', name: '防水护理',    desc: '纳米防水涂层',         price: 69,  unit: '双' },
+      { id: 'deodorize',  icon: '🌿', name: '杀菌除臭',    desc: 'UV杀菌+活性炭',        price: 39,  unit: '双' },
+      { id: 'leather',    icon: '👢', name: '皮靴护理',    desc: '皮革清洁+滋养',        price: 99,  unit: '双' }
     ],
     luxury_care: [
-      { id: 'bag_cln', icon: '👜', name: '箱包清洁',    desc: '内外深层清洁',         price: 199, unit: '件' },
-      { id: 'bag_rst', icon: '🔧', name: '包包修复',    desc: '五金更换+皮面修复',    price: 399, unit: '件' },
-      { id: 'belt',    icon: '🧣', name: '皮带护理',    desc: '清洁滋养+保养封层',   price: 129, unit: '条' },
-      { id: 'color',   icon: '🎨', name: '补色翻新',    desc: '褪色补色+颜色还原',    price: 299, unit: '件' }
+      { id: 'bag_clean',    icon: '👜', name: '箱包清洁',    desc: '内外深层清洁',         price: 199, unit: '件' },
+      { id: 'bag_restore',  icon: '🔧', name: '包包修复',    desc: '五金更换+皮面修复',    price: 399, unit: '件' },
+      { id: 'belt_care',    icon: '🧣', name: '皮带护理',    desc: '清洁滋养+保养封层',   price: 129, unit: '条' },
+      { id: 'color_restore', icon: '🎨', name: '补色翻新',    desc: '褰色补色+颜色还原',    price: 299, unit: '件' },
+      { id: 'metal_polish', icon: '✨', name: '五金抛光',    desc: '金属件抛光翻新',       price: 89,  unit: '处' }
     ],
     pet_grooming: [
-      { id: 'wash',    icon: '🛁', name: '基础洗护',    desc: '洗澡+吹干+梳毛',       price: 69,  unit: '只' },
-      { id: 'groom',   icon: '✂',  name: '精致美容',    desc: '洗护+造型+剪指甲',     price: 129, unit: '只' },
-      { id: 'spa',     icon: '💆', name: 'SPA护理',      desc: '深层清洁+按摩',        price: 199, unit: '只' },
-      { id: 'large',   icon: '🐕', name: '大型犬洗护',  desc: '大型犬全套美容',        price: 299, unit: '只' },
-      { id: 'boarding',icon: '🏠', name: '宠物寄养',    desc: '按天寄养,粮可选',      price: 0,   unit: '天', isBoarding: true }
+      { id: 'basic_wash',  icon: '🛁', name: '基础洗护',    desc: '洗澡+吹干+梳毛',       price: 69,  unit: '只' },
+      { id: 'deep_groom',  icon: '✂',  name: '精致美容',    desc: '洗护+造型+剪指甲',     price: 129, unit: '只' },
+      { id: 'spa',         icon: '💆', name: 'SPA护理',      desc: '深层清洁+按摩',        price: 199, unit: '只' },
+      { id: 'med_bath',    icon: '💊', name: '药浴护理',    desc: '皮肤病专用药浴',       price: 159, unit: '只' },
+      { id: 'large_groom', icon: '🐕', name: '大型犬洗护',  desc: '大型犬全套美容',        price: 299, unit: '只' },
+      { id: 'boarding',    icon: '🏠', name: '宠物寄养',    desc: '按天寄养,粮可选',      price: 0,   unit: '天', isBoarding: true }
     ],
     electronics_repair: [
       { id: 'screen',       icon: '📱', name: '屏幕维修',   desc: '液晶屏/触屏更换',       price: 199, unit: '次' },
@@ -228,9 +230,9 @@
       this.selectCategory(categoryId);
       this.renderCategoryTabs(containerId);
 
-      // 如果有回调，传递品类信息
-      if (hasCallback && typeof arguments[2] === 'function') {
-        // skip
+      // 触发全局品类切换回调（用于刷新门店列表等）
+      if (typeof window.onCategoryChange === 'function') {
+        window.onCategoryChange(categoryId);
       }
     },
 

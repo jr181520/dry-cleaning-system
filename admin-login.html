@@ -100,7 +100,9 @@
     </style>
 </head>
 <body class="bg-gradient-to-br from-blue-50 to-indigo-100 min-h-screen flex items-center justify-center">
-    <div class="w-full max-w-md p-6">
+    <div class="w-full max-w-4xl p-6">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <!-- 登录表单 -->
         <div class="bg-white rounded-2xl shadow-card p-8 border border-gray-200 animate-fade-in">
             <div class="text-center mb-8">
                 <div class="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-4">
@@ -138,22 +140,67 @@
             </form>
         </div>
 
+        <!-- 模拟用户角色说明卡片 -->
+        <div class="bg-white rounded-2xl shadow-card p-6 border border-gray-200 animate-fade-in">
+            <h2 class="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
+                <i class="fa fa-users text-primary"></i>
+                模拟登录账号
+            </h2>
+            <p class="text-xs text-gray-500 mb-4">点击任意账号自动填入登录信息</p>
+            <div class="space-y-2" id="roleCards"></div>
+        </div>
+        </div>
+
         <div class="mt-6 text-center text-sm text-gray-500">
             <p>© 2025 干洗店管理系统. 保留所有权利.</p>
         </div>
     </div>
 
     <script>
-        // 模拟用户数据
+        // 模拟用户数据（含8个角色）
         const users = [
-            { id: 1, username: 'admin', password: 'admin123', role: '总管理员', name: '总管理员' },
-            { id: 2, username: 'region_admin', password: 'region123', role: '区域管理员', name: '区域管理员', region: '广东省' },
-            { id: 3, username: 'store_admin', password: 'store123', role: '门店管理员', name: '门店管理员', storeId: 'ST009' },
-            { id: 4, username: 'finance_admin', password: 'finance123', role: '财务管理员', name: '财务管理员' }
+            { id: 1, username: 'admin', password: 'admin123', role: '总管理员', roleKey: 'super_admin', name: '总管理员', icon: 'fa-star', color: 'text-yellow-600', desc: '拥有全部权限' },
+            { id: 2, username: 'region_admin', password: 'region123', role: '区域管理员', roleKey: 'region_admin', name: '区域管理员', region: '广东省', icon: 'fa-map-marker', color: 'text-blue-600', desc: '管理广东省门店与订单' },
+            { id: 3, username: 'store_admin', password: 'store123', role: '门店管理员', roleKey: 'store_admin', name: '门店管理员', storeId: 'ST009', icon: 'fa-home', color: 'text-green-600', desc: '管理门店ST009运营' },
+            { id: 4, username: 'finance_admin', password: 'finance123', role: '财务管理员', roleKey: 'finance_admin', name: '财务管理员', icon: 'fa-calculator', color: 'text-purple-600', desc: '查看资金流与结算' },
+            { id: 5, username: 'service', password: 'service123', role: '客服人员', roleKey: 'customer_service', name: '客服人员', icon: 'fa-headphones', color: 'text-teal-600', desc: '处理订单异常与客诉' },
+            { id: 6, username: 'bd', password: 'bd123', role: 'BD人员', roleKey: 'bd_user', name: 'BD人员', bdUserId: 'BD001', icon: 'fa-handshake-o', color: 'text-orange-600', desc: '查看自己管理的门店' },
+            { id: 9, username: 'bdmgr', password: 'bdmgr123', role: 'BD主管', roleKey: 'bd_manager', name: 'BD主管', bdUserId: 'BDM01', icon: 'fa-users', color: 'text-amber-600', desc: '查看团队BD和门店数据' },
+            { id: 10, username: 'bddir', password: 'bddir123', role: 'BD总监', roleKey: 'bd_director', name: 'BD总监', icon: 'fa-trophy', color: 'text-indigo-600', desc: '全局拓展视图，管理所有BD' },
+            { id: 7, username: 'ops', password: 'ops123', role: '运维/技术人员', roleKey: 'ops_engineer', name: '运维人员', icon: 'fa-cogs', color: 'text-gray-700', desc: '系统配置与数据备份' },
+            { id: 8, username: 'marketing', password: 'market123', role: '市场运营', roleKey: 'marketing', name: '市场运营', icon: 'fa-bullhorn', color: 'text-pink-600', desc: '营销活动与会员运营' }
         ];
+
+        // 渲染角色卡片
+        function renderRoleCards() {
+            const container = document.getElementById('roleCards');
+            users.forEach(u => {
+                const card = document.createElement('div');
+                card.className = 'flex items-center gap-3 p-2 rounded-lg cursor-pointer hover:bg-blue-50 transition-colors border border-transparent hover:border-blue-200';
+                card.innerHTML = `
+                    <div class="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center flex-shrink-0">
+                        <i class="fa ${u.icon} ${u.color} text-sm"></i>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <div class="flex items-center gap-2">
+                            <span class="text-sm font-semibold text-gray-800">${u.role}</span>
+                            <span class="text-xs text-gray-400">${u.username}</span>
+                        </div>
+                        <p class="text-xs text-gray-500 truncate">${u.desc}</p>
+                    </div>
+                `;
+                card.addEventListener('click', () => {
+                    document.querySelector('#login-form input[type="text"]').value = u.username;
+                    document.querySelector('#login-form input[type="password"]').value = u.password;
+                });
+                container.appendChild(card);
+            });
+        }
 
         // 页面加载完成后执行
         document.addEventListener('DOMContentLoaded', function() {
+            renderRoleCards();
+
             // 登录表单提交
             const loginForm = document.getElementById('login-form');
             if (loginForm) {
@@ -170,9 +217,10 @@
                         // 存储登录状态
                         localStorage.setItem('adminUser', JSON.stringify(user));
                         
-                        // 存储 dev-admin token（后端auth中间件会识别并赋予admin角色）
-                        localStorage.setItem('adminToken', 'dev-admin-' + user.id);
-                        localStorage.setItem('adminAuthToken', 'dev-admin-' + user.id);
+                        // 存储 dev-admin-{roleKey}-{id} token
+                        const token = `dev-admin-${user.roleKey}-${user.id}`;
+                        localStorage.setItem('adminToken', token);
+                        localStorage.setItem('adminAuthToken', token);
                         
                         // 跳转到主页面
                         window.location.href = 'admin.html';

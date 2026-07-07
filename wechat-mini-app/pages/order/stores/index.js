@@ -146,7 +146,8 @@ Page({
   async loadStoresFallback() {
     console.log('[智慧推荐] 使用传统方式加载门店...');
     try {
-      const result = await app.request('/cleaning/stores');
+      const categoryId = app.globalData.orderCategory || 'cleaning';
+      const result = await app.request('/cleaning/stores?categoryId=' + encodeURIComponent(categoryId));
       if (result.success && result.data && result.data.length > 0) {
         const stores = result.data.map(store => ({
           id: store.storeId || store.id,
@@ -158,6 +159,7 @@ Page({
           phone: store.phone || store.contactPhone || '',
           rating: store.rating || 4.5,
           serviceCount: store.serviceCount || 0,
+          businessCategory: store.businessCategory || 'cleaning',
           isOnline: store.status !== 'closed' && store.status !== 'offline',
           isRecommended: store.isRecommended || false,
           hasPromotion: store.hasPromotion || false,
