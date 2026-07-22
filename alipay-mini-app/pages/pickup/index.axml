@@ -1,0 +1,27 @@
+<view class="container">
+  <view class="scan-section">
+    <view class="scan-button" onTap="onScanTap">
+      <text class="scan-icon">📷</text>
+      <text class="scan-text">扫码取件</text>
+    </view>
+  </view>
+
+  <view class="input-section">
+    <text class="section-title">手动输入取件码</text>
+    <input class="code-input" placeholder="请输入取件码" value="{{pickupCode}}" onInput="onCodeInput" />
+    <button class="verify-btn" onTap="onVerifyTap">验证取件</button>
+  </view>
+
+  <view class="recent-section" a:if="{{recentPickups.length > 0}}">
+    <text class="section-title">最近取件</text>
+    <view class="pickup-list">
+      <view class="pickup-item" a:for="{{recentPickups}}" key="id">
+        <view class="pickup-info">
+          <text class="pickup-no">{{item.orderNo}}</text>
+          <text class="pickup-time">{{item.pickupTime}}</text>
+        </view>
+        <text class="pickup-status">已取件</text>
+      </view>
+    </view>
+  </view>
+</view>

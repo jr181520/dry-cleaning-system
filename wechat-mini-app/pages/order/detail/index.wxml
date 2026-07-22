@@ -41,7 +41,7 @@
     <view class="warehouse-header">
       <view class="warehouse-icon">📦</view>
       <view class="warehouse-title-section">
-        <view class="warehouse-title">衣物已入库</view>
+        <view class="warehouse-title">{{categoryItemName}}已入库</view>
         <view class="warehouse-subtitle">门店已收件，等待处理中</view>
       </view>
     </view>
@@ -204,7 +204,7 @@
   <!-- 跑腿服务商选择面板 -->
   <view class="courier-panel {{showCourierPanel ? 'show' : ''}}">
     <view class="courier-panel-header">
-      <view class="courier-panel-title">选择跑腿服务</view>
+      <view class="courier-panel-title">{{courierPanelTitle}}</view>
       <view class="courier-panel-close" bindtap="onCloseCourierPanel">
         <text class="iconfont icon-close"></text>
       </view>

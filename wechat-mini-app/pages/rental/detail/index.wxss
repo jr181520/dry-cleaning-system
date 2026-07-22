@@ -1,0 +1,51 @@
+.container { background: #f8fafc; min-height: 100vh; }
+.image-swiper { width: 100%; height: 750rpx; }
+.swiper-img { width: 100%; height: 100%; }
+.swiper-placeholder { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; background: #f3f4f6; }
+.placeholder-text { font-size: 100rpx; color: #d1d5db; }
+
+.info-section { background: #fff; padding: 30rpx; margin-bottom: 16rpx; }
+.item-name { font-size: 36rpx; font-weight: bold; color: #1f2937; display: block; }
+.info-row { display: flex; align-items: center; gap: 16rpx; margin-top: 8rpx; }
+.item-brand { font-size: 26rpx; color: #6b7280; }
+.category-tag { font-size: 22rpx; background: #f3f4f6; color: #6b7280; padding: 4rpx 16rpx; border-radius: 6rpx; }
+.price-row { display: flex; align-items: baseline; margin-top: 16rpx; }
+.price { font-size: 44rpx; font-weight: bold; color: #ef4444; }
+.unit { font-size: 26rpx; color: #9ca3af; margin-left: 4rpx; }
+.deposit-row { display: flex; align-items: center; gap: 16rpx; margin-top: 12rpx; }
+.deposit-badge { font-size: 22rpx; padding: 4rpx 16rpx; border-radius: 8rpx; }
+.deposit-deposit { background: #fef3c7; color: #d97706; }
+.deposit-credit_free { background: #dbeafe; color: #2563eb; }
+.deposit-both { background: #ede9fe; color: #7c3aed; }
+.stock-info { font-size: 24rpx; color: #9ca3af; }
+
+.section { background: #fff; padding: 30rpx; margin-bottom: 16rpx; }
+.section-title { font-size: 30rpx; font-weight: 500; color: #1f2937; display: block; margin-bottom: 20rpx; }
+.spec-grid { display: flex; flex-wrap: wrap; gap: 12rpx; }
+.spec-item { width: 50%; font-size: 26rpx; color: #4b5563; }
+.spec-label { color: #9ca3af; margin-right: 8rpx; }
+
+.day-selector { display: flex; flex-wrap: wrap; gap: 16rpx; margin-bottom: 20rpx; }
+.day-btn { padding: 16rpx 32rpx; border: 2rpx solid #e5e7eb; border-radius: 12rpx; font-size: 26rpx; color: #4b5563; }
+.day-btn.active { border-color: #7c3aed; background: #7c3aed; color: #fff; }
+.custom-days { display: flex; align-items: center; gap: 12rpx; }
+.custom-label { font-size: 26rpx; color: #6b7280; }
+.custom-input { width: 120rpx; border: 2rpx solid #e5e7eb; border-radius: 8rpx; padding: 8rpx 16rpx; text-align: center; font-size: 26rpx; }
+.custom-unit { font-size: 26rpx; color: #6b7280; }
+
+.deposit-options { display: flex; flex-direction: column; gap: 16rpx; }
+.deposit-option { display: flex; justify-content: space-between; align-items: center; padding: 24rpx; border: 2rpx solid #e5e7eb; border-radius: 12rpx; }
+.deposit-option.active { border-color: #7c3aed; background: #f5f3ff; }
+.option-title { font-size: 28rpx; color: #1f2937; }
+.option-amount { font-size: 28rpx; font-weight: bold; }
+
+.description { font-size: 28rpx; color: #4b5563; line-height: 1.6; }
+.notice-list { display: flex; flex-direction: column; gap: 12rpx; }
+.notice-item { font-size: 26rpx; color: #6b7280; }
+
+.bottom-bar { position: fixed; bottom: 0; left: 0; right: 0; background: #fff; padding: 20rpx 30rpx; padding-bottom: calc(20rpx + env(safe-area-inset-bottom)); display: flex; align-items: center; box-shadow: 0 -4rpx 20rpx rgba(0,0,0,0.05); }
+.total-info { flex: 1; }
+.total-label { font-size: 24rpx; color: #6b7280; display: block; }
+.total-price { font-size: 40rpx; font-weight: bold; color: #ef4444; }
+.total-deposit { font-size: 22rpx; color: #9ca3af; margin-left: 8rpx; }
+.order-btn { background: #7c3aed; color: #fff; border: none; border-radius: 16rpx; padding: 24rpx 60rpx; font-size: 30rpx; font-weight: 500; }

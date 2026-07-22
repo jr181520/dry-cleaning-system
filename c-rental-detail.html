@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>商品详情 - 租物</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f8fafc; }
+        .swiper-container { overflow: hidden; position: relative; }
+        .swiper-wrapper { display: flex; transition: transform 0.3s; }
+        .swiper-slide { min-width: 100%; }
+        .day-btn { transition: all 0.2s; }
+        .day-btn.active { background: #7c3aed; color: white; border-color: #7c3aed; }
+    </style>
+</head>
+<body>
+    <!-- 顶部导航 -->
+    <header class="fixed top-0 left-0 right-0 bg-white/95 backdrop-blur-sm shadow-sm z-50">
+        <div class="flex items-center justify-between px-4 py-3">
+            <a href="c-rental.html" class="text-gray-600">
+                <i class="fa fa-arrow-left text-lg"></i>
+            </a>
+            <h1 class="font-bold text-lg">商品详情</h1>
+            <button onclick="shareItem()" class="text-gray-600">
+                <i class="fa fa-share-alt text-lg"></i>
+            </button>
+        </div>
+    </header>
+
+    <!-- 主内容 -->
+    <main class="pt-14 pb-24">
+        <!-- 商品图片轮播 -->
+        <div class="swiper-container bg-gray-100 aspect-square" id="image-swiper">
+            <div class="swiper-wrapper" id="swiper-wrapper">
+                <div class="swiper-slide flex items-center justify-center">
+                    <i class="fa fa-diamond text-5xl text-gray-300"></i>
+                </div>
+            </div>
+            <div class="absolute bottom-3 left-1/2 -translate-x-1/2 bg-black/30 text-white text-xs px-2 py-1 rounded-full" id="image-counter">1/1</div>
+        </div>
+
+        <!-- 商品信息 -->
+        <div class="bg-white px-4 py-4">
+            <div class="flex items-start justify-between">
+                <div class="flex-1">
+                    <h1 id="item-name" class="text-lg font-bold text-gray-800">加载中...</h1>
+                    <div class="flex items-center gap-2 mt-1">
+                        <span id="item-brand" class="text-sm text-gray-500"></span>
+                        <span id="item-category-tag" class="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded"></span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="flex items-baseline gap-2 mt-3">
+                <span class="text-2xl font-bold text-red-500">¥<span id="item-price">0.00</span></span>
+                <span class="text-sm text-gray-400">/天</span>
+            </div>
+
+            <div class="flex items-center gap-3 mt-2">
+                <span id="deposit-badge" class="text-xs px-2 py-1 rounded bg-purple-100 text-purple-600">押金 ¥0</span>
+                <span id="stock-info" class="text-xs text-gray-400">库存: --</span>
+                <span id="rented-count" class="text-xs text-gray-400">已租: --</span>
+            </div>
+        </div>
+
+        <!-- 规格信息 -->
+        <div class="bg-white mt-2 px-4 py-4">
+            <h3 class="font-medium text-gray-800 mb-3">规格信息</h3>
+            <div class="grid grid-cols-2 gap-2 text-sm">
+                <div class="flex"><span class="text-gray-400 w-16">尺码:</span><span id="item-size" class="text-gray-700">--</span></div>
+                <div class="flex"><span class="text-gray-400 w-16">颜色:</span><span id="item-color" class="text-gray-700">--</span></div>
+                <div class="flex"><span class="text-gray-400 w-16">品牌:</span><span id="item-brand-detail" class="text-gray-700">--</span></div>
+                <div class="flex"><span class="text-gray-400 w-16">最短租期:</span><span id="item-min-days" class="text-gray-700">--</span></div>
+            </div>
+        </div>
+
+        <!-- 租期选择 -->
+        <div class="bg-white mt-2 px-4 py-4">
+            <h3 class="font-medium text-gray-800 mb-3">选择租期</h3>
+            <div class="flex flex-wrap gap-2" id="day-selector">
+                <!-- 动态生成 -->
+            </div>
+            <div class="mt-3 flex items-center gap-2">
+                <span class="text-sm text-gray-500">自定义天数:</span>
+                <input type="number" id="custom-days" min="1" class="w-20 border rounded px-2 py-1 text-sm text-center" placeholder="天">
+            </div>
+        </div>
+
+        <!-- 押金模式选择 -->
+        <div class="bg-white mt-2 px-4 py-4" id="deposit-section">
+            <h3 class="font-medium text-gray-800 mb-3">押金方式</h3>
+            <div id="deposit-options" class="space-y-2">
+                <!-- 动态生成 -->
+            </div>
+        </div>
+
+        <!-- 商品描述 -->
+        <div class="bg-white mt-2 px-4 py-4">
+            <h3 class="font-medium text-gray-800 mb-3">商品详情</h3>
+            <p id="item-description" class="text-sm text-gray-600 leading-relaxed">暂无描述</p>
+        </div>
+
+        <!-- 租赁须知 -->
+        <div class="bg-white mt-2 px-4 py-4 mb-4">
+            <h3 class="font-medium text-gray-800 mb-3">租赁须知</h3>
+            <ul class="text-sm text-gray-500 space-y-2">
+                <li><i class="fa fa-check text-green-500 mr-2"></i>租期从签收次日开始计算</li>
+                <li><i class="fa fa-check text-green-500 mr-2"></i>到期后请及时归还，逾期将收取逾期费</li>
+                <li><i class="fa fa-check text-green-500 mr-2"></i>归还时如物品损坏，押金将部分或全部扣除</li>
+                <li><i class="fa fa-check text-green-500 mr-2"></i>双程跑腿配送，归还时再叫一次跑腿即可</li>
+            </ul>
+        </div>
+    </main>
+
+    <!-- 底部操作栏 -->
+    <div class="fixed bottom-0 left-0 right-0 bg-white shadow-lg border-t z-40 px-4 py-3 flex items-center gap-3" style="padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 12px);">
+        <div class="flex-1">
+            <div class="text-xs text-gray-400">合计费用</div>
+            <div class="text-xl font-bold text-red-500">¥<span id="total-price">0.00</span></div>
+            <div class="text-xs text-gray-400">含押金¥<span id="total-deposit">0.00</span></div>
+        </div>
+        <button onclick="goToOrder()" class="bg-purple-600 text-white px-8 py-3 rounded-xl font-medium hover:bg-purple-700 transition-colors">
+            立即租赁
+        </button>
+    </div>
+
+    <script>
+        const API_BASE = '/api/rental';
+        let itemData = null;
+        let selectedDays = 1;
+        let selectedDepositMode = 'deposit';
+        let currentImageIndex = 0;
+
+        // 获取商品ID
+        const urlParams = new URLSearchParams(window.location.search);
+        const itemId = urlParams.get('id');
+
+        // 加载商品详情
+        async function loadItem() {
+            if (!itemId) return alert('商品不存在');
+            try {
+                const resp = await fetch(`${API_BASE}/items/${itemId}`);
+                const data = await resp.json();
+                if (!data.success) return alert('商品不存在');
+                itemData = data.item;
+                renderDetail();
+            } catch(e) {
+                alert('加载失败');
+            }
+        }
+
+        function renderDetail() {
+            if (!itemData) return;
+
+            document.getElementById('item-name').textContent = itemData.name;
+            document.getElementById('item-brand').textContent = itemData.brand || '';
+            document.getElementById('item-category-tag').textContent = getCategoryLabel(itemData.category);
+            document.getElementById('item-price').textContent = (itemData.dailyRate || 0).toFixed(2);
+            document.getElementById('item-size').textContent = itemData.size || '均码';
+            document.getElementById('item-color').textContent = itemData.color || '--';
+            document.getElementById('item-brand-detail').textContent = itemData.brand || '--';
+            document.getElementById('item-min-days').textContent = (itemData.rentalPeriodMin || 1) + '天';
+            document.getElementById('item-description').textContent = itemData.description || '暂无描述';
+            document.getElementById('stock-info').textContent = '库存: ' + (itemData.availableStock || 0);
+            document.getElementById('rented-count').textContent = '已租: ' + (itemData.totalRented || 0);
+
+            // 押金标签
+            const depositBadge = document.getElementById('deposit-badge');
+            if (itemData.depositMode === 'credit_free') {
+                depositBadge.textContent = '信用免押';
+                depositBadge.className = 'text-xs px-2 py-1 rounded bg-blue-100 text-blue-600';
+            } else if (itemData.depositMode === 'both') {
+                depositBadge.textContent = '押金/免押 可选';
+                depositBadge.className = 'text-xs px-2 py-1 rounded bg-purple-100 text-purple-600';
+            } else {
+                depositBadge.textContent = '押金 ¥' + (itemData.depositAmount || 0).toFixed(0);
+                depositBadge.className = 'text-xs px-2 py-1 rounded bg-orange-100 text-orange-600';
+            }
+
+            // 图片轮播
+            renderImages();
+            // 租期选择器
+            renderDaySelector();
+            // 押金选项
+            renderDepositOptions();
+            // 计算费用
+            updateTotal();
+        }
+
+        function renderImages() {
+            const wrapper = document.getElementById('swiper-wrapper');
+            const images = itemData.images || [];
+            if (images.length === 0) {
+                wrapper.innerHTML = '<div class="swiper-slide flex items-center justify-center"><i class="fa fa-diamond text-5xl text-gray-300"></i></div>';
+                document.getElementById('image-counter').textContent = '1/1';
+                return;
+            }
+            wrapper.innerHTML = images.map(img => 
+                `<div class="swiper-slide"><img src="${img}" class="w-full h-full object-cover" onerror="this.parentElement.innerHTML='<div class=\\'flex items-center justify-center h-full\\'><i class=\\'fa fa-diamond text-5xl text-gray-300\\'></i></div>'"></div>`
+            ).join('');
+            document.getElementById('image-counter').textContent = `1/${images.length}`;
+
+            // 简单轮播
+            let idx = 0;
+            setInterval(() => {
+                idx = (idx + 1) % images.length;
+                wrapper.style.transform = `translateX(-${idx * 100}%)`;
+                document.getElementById('image-counter').textContent = `${idx + 1}/${images.length}`;
+            }, 3000);
+        }
+
+        function renderDaySelector() {
+            const container = document.getElementById('day-selector');
+            const minDays = itemData.rentalPeriodMin || 1;
+            const maxDays = itemData.rentalPeriodMax || 30;
+            const presets = [1, 3, 7, 14, 30].filter(d => d >= minDays && d <= maxDays);
+            
+            if (presets.length === 0) presets.push(minDays);
+            
+            selectedDays = minDays;
+            document.getElementById('custom-days').min = minDays;
+            document.getElementById('custom-days').max = maxDays;
+
+            container.innerHTML = presets.map(d => 
+                `<button class="day-btn px-4 py-2 border rounded-lg text-sm ${d === minDays ? 'active' : ''}" data-days="${d}" onclick="selectDays(${d}, this)">${d}天</button>`
+            ).join('');
+        }
+
+        function selectDays(days, btn) {
+            selectedDays = days;
+            document.querySelectorAll('.day-btn').forEach(b => b.classList.remove('active'));
+            if (btn) btn.classList.add('active');
+            document.getElementById('custom-days').value = days;
+            updateTotal();
+        }
+
+        document.getElementById('custom-days').addEventListener('input', (e) => {
+            const days = parseInt(e.target.value) || 1;
+            selectedDays = Math.max(itemData.rentalPeriodMin || 1, Math.min(itemData.rentalPeriodMax || 30, days));
+            document.querySelectorAll('.day-btn').forEach(b => {
+                b.classList.toggle('active', parseInt(b.dataset.days) === selectedDays);
+            });
+            updateTotal();
+        });
+
+        function renderDepositOptions() {
+            const container = document.getElementById('deposit-options');
+            const section = document.getElementById('deposit-section');
+
+            if (itemData.depositMode === 'deposit') {
+                selectedDepositMode = 'deposit';
+                container.innerHTML = `
+                    <div class="flex items-center justify-between p-3 border rounded-lg border-orange-200 bg-orange-50">
+                        <div>
+                            <div class="font-medium text-sm">缴纳押金</div>
+                            <div class="text-xs text-gray-400">归还后退还</div>
+                        </div>
+                        <div class="text-orange-600 font-bold">¥${(itemData.depositAmount || 0).toFixed(2)}</div>
+                    </div>`;
+            } else if (itemData.depositMode === 'credit_free') {
+                selectedDepositMode = 'credit_free';
+                container.innerHTML = `
+                    <div class="flex items-center justify-between p-3 border rounded-lg border-blue-200 bg-blue-50">
+                        <div>
+                            <div class="font-medium text-sm">信用免押</div>
+                            <div class="text-xs text-gray-400">信用达标免缴押金</div>
+                        </div>
+                        <div class="text-blue-600 font-bold">免押</div>
+                    </div>`;
+            } else {
+                // both - 用户选择
+                selectedDepositMode = 'deposit';
+                container.innerHTML = `
+                    <label class="flex items-center justify-between p-3 border rounded-lg cursor-pointer hover:bg-orange-50" onclick="selectDepositMode('deposit')">
+                        <div class="flex items-center gap-3">
+                            <input type="radio" name="deposit-mode" value="deposit" checked class="text-purple-600">
+                            <div>
+                                <div class="font-medium text-sm">缴纳押金</div>
+                                <div class="text-xs text-gray-400">归还后全额退还</div>
+                            </div>
+                        </div>
+                        <div class="text-orange-600 font-bold">¥${(itemData.depositAmount || 0).toFixed(2)}</div>
+                    </label>
+                    <label class="flex items-center justify-between p-3 border rounded-lg cursor-pointer hover:bg-blue-50 mt-2" onclick="selectDepositMode('credit_free')">
+                        <div class="flex items-center gap-3">
+                            <input type="radio" name="deposit-mode" value="credit_free" class="text-purple-600">
+                            <div>
+                                <div class="font-medium text-sm">信用免押</div>
+                                <div class="text-xs text-gray-400">信用分达标可免押金</div>
+                            </div>
+                        </div>
+                        <div class="text-blue-600 font-bold">免押</div>
+                    </label>`;
+            }
+        }
+
+        function selectDepositMode(mode) {
+            selectedDepositMode = mode;
+            updateTotal();
+        }
+
+        function updateTotal() {
+            if (!itemData) return;
+            const rentalCost = (itemData.dailyRate || 0) * selectedDays;
+            const deposit = selectedDepositMode === 'credit_free' ? 0 : (itemData.depositAmount || 0);
+            const total = rentalCost + deposit;
+            
+            document.getElementById('total-price').textContent = total.toFixed(2);
+            document.getElementById('total-deposit').textContent = deposit.toFixed(2);
+        }
+
+        function getCategoryLabel(cat) {
+            const labels = { clothing: '服饰', digital: '数码', outdoor: '户外', electronics: '电子', luxury: '轻奢', baby: '母婴', sports: '运动', tools: '工具', other: '其他' };
+            return labels[cat] || cat;
+        }
+
+        function goToOrder() {
+            if (!itemData) return;
+            const params = new URLSearchParams({
+                itemId: itemData._id,
+                storeId: itemData.storeId,
+                days: selectedDays,
+                depositMode: selectedDepositMode
+            });
+            window.location.href = 'c-rental-order.html?' + params.toString();
+        }
+
+        function shareItem() {
+            if (navigator.share) {
+                navigator.share({
+                    title: itemData?.name || '租物',
+                    text: `来看看这个: ${itemData?.name}，仅¥${itemData?.dailyRate}/天`,
+                    url: window.location.href
+                });
+            } else {
+                alert('链接已复制');
+            }
+        }
+
+        // 初始化
+        loadItem();
+    </script>
+</body>
+</html>

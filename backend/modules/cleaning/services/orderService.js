@@ -41,6 +41,7 @@ const orderSchema = new mongoose.Schema({
   items: [{
     itemId: String,
     name: String,
+    serviceName: String,   // 服务名称（兼容显示）
     itemType: String,
     serviceType: String,
     material: String,
@@ -49,7 +50,14 @@ const orderSchema = new mongoose.Schema({
     subtotal: Number,
     specialReq: String,
     pickupCode: String,
-    status: { type: String, default: 'pending' }
+    barcode: String,        // 物品条码（扫码出库用）
+    status: { type: String, default: 'pending' },
+    itemStatus: String,     // 物品级状态（M端双写兼容）
+    statusUpdatedAt: Date,  // 物品状态最后更新时间
+    receivedAt: Date,       // 入库时间
+    outboundTime: Date,     // 出库时间
+    image: String,          // 物品图片
+    category: String        // 物品品类
   }],
   amounts: {
     subtotal: Number,
@@ -678,7 +686,7 @@ class OrderService {
     }
     
     if (!order) throw new Error('订单不存在');
-    if (order.status !== 'paid' && order.status !== 'delivering') {
+    if (order.status !== 'paid' && order.status !== 'delivering' && order.status !== 'awaiting_store_confirm') {
       throw new Error('订单状态不允许收件');
     }
     
@@ -872,12 +880,24 @@ class OrderService {
     }
     
     // 状态流转映射 - 放宽限制，支持更多状态转换（含M端操作流程）
+    // 品类化：根据订单品类获取状态文本
+    const categoryService = require('../../common/services/categoryService');
+    const categoryId = order.categoryId || 'cleaning';
+    const categoryDef = categoryService.getCategory(categoryId);
+    const categoryStatusMap = {};
+    if (categoryDef && categoryDef.statusFlow) {
+      categoryDef.statusFlow.forEach(s => { categoryStatusMap[s.key] = s.label; });
+    }
+    
     const statusFlow = {
-      'received': { from: ['paid', 'pending', 'awaiting_store_confirm', 'out'], text: '已入库' },
-      'cleaning': { from: ['paid', 'received', 'processing', 'pending', 'awaiting_store_confirm', 'out'], text: '清洗中' },
+      'received': { from: ['paid', 'pending', 'awaiting_store_confirm', 'out'], text: categoryStatusMap['received'] || '已入库' },
+      'awaiting_store_confirm': { from: ['paid', 'delivering'], text: '跑腿已送达，待确认入库' },
+      'cleaning': { from: ['paid', 'received', 'processing', 'pending', 'awaiting_store_confirm', 'out'], text: categoryStatusMap['processing'] || categoryStatusMap['cleaning'] || '清洗中' },
       'cleaned': { from: ['processing', 'cleaning', 'in_progress', 'received', 'out'], text: '清洗完成' },
-      'ready': { from: ['processing', 'cleaned', 'cleaning', 'in_progress', 'received', 'out'], text: '待取件' },
-      'completed': { from: ['ready', 'delivered', 'awaiting_pickup_scan', 'awaiting_store_outbound', 'store_outbound', 'delivering_back', 'cleaned', 'cleaning', 'received', 'out', 'pending'], text: '已完成' }
+      'ready': { from: ['processing', 'cleaned', 'cleaning', 'in_progress', 'received', 'out'], text: categoryStatusMap['ready'] || '待取件' },
+      'store_outbound': { from: ['ready', 'cleaned', 'out', 'awaiting_store_outbound'], text: '已出库' },
+      'delivering_back': { from: ['ready', 'cleaned', 'out', 'awaiting_store_outbound', 'store_outbound'], text: '配送中（送回客户）' },
+      'completed': { from: ['ready', 'delivered', 'awaiting_pickup_scan', 'awaiting_store_outbound', 'store_outbound', 'delivering_back', 'cleaned', 'cleaning', 'received', 'out', 'pending', 'customer_received'], text: categoryStatusMap['completed'] || '已完成' }
     };
     
     const flow = statusFlow[status];
@@ -924,6 +944,22 @@ class OrderService {
       orderEventService.onOrderStatusChanged(order, oldStatus);
     } catch (err) {
       console.error('[订单事件] 发布状态变更事件失败:', err.message);
+    }
+    
+    // 第二程跑腿配送：出库后启动跑腿跟踪模拟器（REAL模式读服务商API / MOCK模式模拟进度）
+    if (status === 'delivering_back') {
+      try {
+        const courierTracker = require('../../../services/courierTrackingSimulator');
+        if (courierTracker.shouldStartSimulation(order)) {
+          courierTracker.startSimulation(order);
+          console.log(`[updateOrderStatus] 第二程跑腿跟踪已启动: ${order.orderNo}`);
+        } else {
+          // 即使不满足模拟器启动条件，也确保courier状态正确
+          console.log(`[updateOrderStatus] 第二程跑腿跟踪未启动（不满足条件）: ${order.orderNo}`);
+        }
+      } catch (trackerErr) {
+        console.error('[updateOrderStatus] 启动第二程跑腿跟踪失败:', trackerErr.message);
+      }
     }
     
     return order;
@@ -1256,18 +1292,16 @@ class OrderService {
       phone: pickupInfo.contactPhone || ''
     };
     
-    // 如果选择配送到家，设置配送状态
+    // 如果选择配送到家，仅保存配送信息（不改变状态、不触发配送）
+    // 状态变更和配送触发由 payDeliveryFee 在支付配送费后处理
     if (pickupInfo.method === 'home_delivery') {
-      order.status = 'delivering_back';
+      order.deliveryMethod = 'courier';
       order.statusHistory.push({
-        status: 'delivering_back',
+        status: order.status,
         time: new Date(),
         actorId: auth.userId,
-        note: '用户选择配送到家，等待配送员取件'
+        note: '用户选择配送到家，等待选择服务商并支付配送费'
       });
-      
-      // 触发配送服务（传递 order._id 确保是 ObjectId 格式）
-      await this.triggerDelivery(order._id, auth);
     } else {
       // 到店自提，触发智能灯条
       await this.triggerSmartLight(order.storeId, {
@@ -1405,14 +1439,20 @@ class OrderService {
     // 启动跑腿配送跟踪模拟（模拟服务商实时回传骑手位置）
     try {
       const courierTracker = require('../../../services/courierTrackingSimulator');
+      // 强制清理该订单可能残留的第一程模拟任务
+      if (courierTracker.stopSimulation) {
+        courierTracker.stopSimulation(order._id.toString());
+      }
+      console.log(`[配送费支付] 检查是否启动第二程模拟器: orderNo=${order.orderNo}, courier.status=${order.courier?.status}, shouldStart=${courierTracker.shouldStartSimulation(order)}`);
       if (courierTracker.shouldStartSimulation(order)) {
         courierTracker.startSimulation(order);
+        console.log(`[配送费支付] ✅ 第二程跑腿跟踪模拟器已启动`);
+      } else {
+        console.warn(`[配送费支付] ⚠️ 第二程模拟器未启动 (shouldStartSimulation=false)`);
       }
     } catch (trackErr) {
       console.error('[跑腿跟踪] 启动模拟失败:', trackErr.message);
     }
-    
-    // 通过MQTT发布订单事件通知门店
     try {
       const orderEventService = require('../../../services/orderEventService');
       orderEventService.publishOrderEvent('delivery_fee_paid', {

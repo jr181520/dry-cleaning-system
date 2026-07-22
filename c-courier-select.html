@@ -5,6 +5,21 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>选择跑腿服务</title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <script>
+    // ===== 品类化配置 =====
+    const CATEGORY_NAMES = {
+      cleaning:           { full: '衣物干洗', short: '干洗', item: '衣物' },
+      shoe_care:          { full: '鞋类洗护', short: '洗鞋', item: '鞋类' },
+      luxury_care:        { full: '奢侈品护理', short: '奢护', item: '物品' },
+      pet_grooming:       { full: '宠物清洗', short: '宠物', item: '宠物' },
+      electronics_repair: { full: '电子产品维修', short: '维修', item: '设备' },
+      rental:             { full: '服饰租赁', short: '租衣', item: '服饰' },
+      rental_leisure:     { full: '小件商品租赁', short: '租物', item: '物品' }
+    };
+    function getCategoryInfo(catId) {
+      return CATEGORY_NAMES[catId] || CATEGORY_NAMES['cleaning'];
+    }
+  </script>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
@@ -244,6 +259,8 @@
       display: none;
     }
   </style>
+  <!-- 用户数据隔离模块 -->
+  <script src="js/user-data-isolation.js"></script>
 </head>
 <body>
   <!-- 顶部导航 -->
@@ -315,6 +332,7 @@
     let deliveryMode = 'solo';
     let providers = [];
     let orderId = null;
+    let categoryId = 'cleaning';
     let deliveryAddress = '';
     let deliveryContact = '';
     let deliveryPhone = '';
@@ -323,6 +341,12 @@
     (function init() {
       const params = new URLSearchParams(window.location.search);
       orderId = params.get('orderId') || params.get('id') || '';
+      categoryId = params.get('categoryId') || 'cleaning';
+
+      // 品类化页面标题
+      const catInfo = getCategoryInfo(categoryId);
+      document.title = '选择跑腿服务 - ' + catInfo.full;
+      document.querySelector('.header .title').textContent = '选择跑腿服务';
 
       if (!orderId) {
         showError('缺少订单ID，请从订单详情页进入');
@@ -558,13 +582,23 @@
         console.warn('[跑腿选择] API不可用，使用本地流程:', error.message);
       }
 
+      // 确保 currentOrder 已设置（从 orders 数组中查找）
+      if (!localStorage.getItem('currentOrder')) {
+        const allOrders = getUserOrders();
+        const foundOrder = allOrders.find(o => (o.orderId || o.id || o._id || o.orderNo) === orderId);
+        if (foundOrder) {
+          localStorage.setItem('currentOrder', JSON.stringify(foundOrder));
+        }
+      }
+
       // 跳转到支付页面
       const params = new URLSearchParams({
         orderId: orderId,
         type: 'delivery',
         provider: selectedProvider,
         fee: selectedPricing?.fee || 0,
-        mode: deliveryMode
+        mode: deliveryMode,
+        categoryId: categoryId
       });
       window.location.href = `c-payment.html?${params.toString()}`;
     }

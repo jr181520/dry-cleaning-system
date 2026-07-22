@@ -5,17 +5,39 @@
 
 const app = getApp();
 
+// 品类化物品名称映射
+const CATEGORY_ITEM_NAMES = {
+  cleaning: '衣物', shoe_care: '鞋类', luxury_care: '物品',
+  pet_grooming: '宠物', electronics_repair: '设备',
+  rental: '服饰', rental_leisure: '物品'
+};
+function getCategoryItemName(catId) {
+  return CATEGORY_ITEM_NAMES[catId] || '物品';
+}
+
+// 品类化状态描述（使用 {item} 占位符，运行时替换）
+const CATEGORY_STATUS_DESC = {
+  delivering: '您的{item}正在配送至门店途中',
+  received: '您的{item}已送达门店并入库，等待处理',
+  processing: '正在处理您的{item}',
+  cleaning: '您的{item}正在处理中，请耐心等待',
+  cleaned: '处理已完成，等待质检和打包',
+  ready: '您的{item}已处理完成，请选择取件方式',
+  delivering_back: '您的{item}正在送回途中',
+  completed: '订单已完成，感谢您的使用'
+};
+
 // 订单状态配置（完整覆盖所有后端可能返回的状态）
 const STATUS_CONFIG = {
   pending: { text: '待支付', icon: 'clock-o', color: '#ff9800', gradient: 'linear-gradient(135deg, #ff9800, #ff5722)', desc: '订单已创建，请尽快完成支付' },
   paid: { text: '已支付', icon: 'check-circle', color: '#4caf50', gradient: 'linear-gradient(135deg, #4caf50, #2e7d32)', desc: '支付成功，等待门店收件入库' },
-  delivering: { text: '取件配送中', icon: 'truck', color: '#2196f3', gradient: 'linear-gradient(135deg, #2196f3, #1976d2)', desc: '衣物正在配送至门店途中' },
-  received: { text: '已入库', icon: 'inbox', color: '#9c27b0', gradient: 'linear-gradient(135deg, #9c27b0, #7b1fa2)', desc: '衣物已送达门店并入库，等待处理' },
-  processing: { text: '处理中', icon: 'refresh', color: '#ff5722', gradient: 'linear-gradient(135deg, #ff5722, #e64a19)', desc: '正在处理您的衣物' },
-  cleaning: { text: '清洗中', icon: 'refresh', color: '#ff9800', gradient: 'linear-gradient(135deg, #ff9800, #f57c00)', desc: '衣物正在清洗中，请耐心等待' },
-  cleaned: { text: '清洗完成', icon: 'check-circle-o', color: '#00bcd4', gradient: 'linear-gradient(135deg, #00bcd4, #0097a7)', desc: '清洗已完成，等待质检和打包' },
-  ready: { text: '待取件', icon: 'gift', color: '#00bcd4', gradient: 'linear-gradient(135deg, #00bcd4, #0097a7)', desc: '衣物已处理完成，请选择取件方式' },
-  delivering_back: { text: '送回中', icon: 'truck', color: '#2196f3', gradient: 'linear-gradient(135deg, #2196f3, #1976d2)', desc: '衣物正在送回途中' },
+  delivering: { text: '取件配送中', icon: 'truck', color: '#2196f3', gradient: 'linear-gradient(135deg, #2196f3, #1976d2)', desc: '正在配送至门店途中' },
+  received: { text: '已入库', icon: 'inbox', color: '#9c27b0', gradient: 'linear-gradient(135deg, #9c27b0, #7b1fa2)', desc: '已送达门店并入库，等待处理' },
+  processing: { text: '处理中', icon: 'refresh', color: '#ff5722', gradient: 'linear-gradient(135deg, #ff5722, #e64a19)', desc: '正在处理中' },
+  cleaning: { text: '清洗中', icon: 'refresh', color: '#ff9800', gradient: 'linear-gradient(135deg, #ff9800, #f57c00)', desc: '正在处理中，请耐心等待' },
+  cleaned: { text: '清洗完成', icon: 'check-circle-o', color: '#00bcd4', gradient: 'linear-gradient(135deg, #00bcd4, #0097a7)', desc: '处理已完成，等待质检和打包' },
+  ready: { text: '待取件', icon: 'gift', color: '#00bcd4', gradient: 'linear-gradient(135deg, #00bcd4, #0097a7)', desc: '已处理完成，请选择取件方式' },
+  delivering_back: { text: '送回中', icon: 'truck', color: '#2196f3', gradient: 'linear-gradient(135deg, #2196f3, #1976d2)', desc: '正在送回途中' },
   completed: { text: '已完成', icon: 'flag-checkered', color: '#4caf50', gradient: 'linear-gradient(135deg, #4caf50, #388e3c)', desc: '订单已完成，感谢您的使用' },
   cancelled: { text: '已取消', icon: 'times-circle', color: '#9e9e9e', gradient: 'linear-gradient(135deg, #9e9e9e, #757575)', desc: '订单已取消' },
   // C端/M端操作产生的中间态
@@ -82,6 +104,7 @@ Page({
 
     // 跑腿服务商选择面板
     showCourierPanel: false,
+    courierPanelTitle: '选择跑腿服务',  // 品类化标题
     courierProviders: [],         // 服务商报价列表
     selectedCourier: '',          // 选中的服务商ID
     deliveryMode: 'solo',         // solo: 一对一, shared: 拼单
@@ -92,6 +115,9 @@ Page({
     selectedPayMethod: 'wechat',
     showPayPanel: false,
     isPaying: false,
+
+    // 品类化物品名称
+    categoryItemName: '物品',
 
     // 灯条管理窗口
     showLightPanel: false,
@@ -110,9 +136,12 @@ Page({
   deliveryCompleted: false, // 防止重复处理已送达
 
   onLoad(options) {
-    const { id, mode } = options;
+    const { id, mode, action } = options;
     console.log('[订单详情] onLoad, options:', options);
     console.log('[订单详情] 接收到的id:', id);
+
+    // 记住 action 参数（用于加载后自动打开跑腿面板）
+    this._pendingAction = action || '';
     
     // 加载记忆的用户信息
     this.loadUserInfo();
@@ -205,6 +234,16 @@ Page({
       
       if (result.success && result.data) {
         this.updateOrderUI(result.data);
+
+        // 自动打开跑腿面板（从订单列表“跑腿配送”按钮跳转进来时）
+        if (this._pendingAction === 'courier') {
+          const orderStatus = result.data.status;
+          if (['ready', 'store_outbound', 'awaiting_pickup_scan', 'awaiting_store_outbound'].includes(orderStatus)) {
+            this.setData({ selectedPickupMethod: 'home_delivery' });
+            setTimeout(() => this.openCourierPanel(), 500);
+          }
+          this._pendingAction = '';
+        }
       } else {
         console.error('[订单详情] API返回失败:', result);
         // 尝试加载演示订单
@@ -247,7 +286,14 @@ Page({
     }
     
     const statusConfig = STATUS_CONFIG[order.status] || STATUS_CONFIG.pending;
-    
+
+    // 品类化状态描述：根据 categoryId 替换 {item} 占位符
+    const catId = order.categoryId || 'cleaning';
+    const itemName = getCategoryItemName(catId);
+    if (CATEGORY_STATUS_DESC[order.status]) {
+      statusConfig.desc = CATEGORY_STATUS_DESC[order.status].replace(/\{item\}/g, itemName);
+    }
+
     // 根据状态映射计算当前步骤索引（与C端6步对齐）
     const currentStep = STATUS_TO_STEP[order.status] !== undefined ? STATUS_TO_STEP[order.status] : -1;
     
@@ -340,7 +386,8 @@ Page({
       progressPercent,
       showPickupMethod,
       courierInfo,
-      showCourierTracker
+      showCourierTracker,
+      categoryItemName: itemName
     });
     
     // 跑腿订单 & 未送达 → 启动配送快速轮询
@@ -479,7 +526,17 @@ Page({
 
   // 打开跑腿服务商选择面板
   async openCourierPanel() {
-    this.setData({ showCourierPanel: true, courierLoading: true, selectedCourier: '', courierFee: 0 });
+    // 品类化面板标题
+    const CATEGORY_PANEL_TITLES = {
+      cleaning: '选择跑腿服务', shoe_care: '选择跑腿服务',
+      luxury_care: '选择奢护配送服务', pet_grooming: '选择送宠到家服务',
+      electronics_repair: '选择设备配送服务'
+    };
+    const catId = this.data.order?.categoryId || 'cleaning';
+    this.setData({
+      showCourierPanel: true, courierLoading: true, selectedCourier: '', courierFee: 0,
+      courierPanelTitle: CATEGORY_PANEL_TITLES[catId] || '选择跑腿服务'
+    });
     await this.loadCourierQuotes();
     this.setData({ courierLoading: false });
   },
@@ -1247,7 +1304,7 @@ Page({
         app.globalData.selectedStore = {
           id: order.storeId || order.store?.storeId,
           storeId: order.storeId || order.store?.storeId,
-          name: order.storeName || order.store?.name || '干洗店',
+          name: order.storeName || order.store?.name || getCategoryItemName(order.categoryId || 'cleaning') + '门店',
           address: order.storeAddress || order.store?.address || '',
           phone: order.storePhone || order.store?.phone || ''
         };

@@ -1,0 +1,33 @@
+<view class="container">
+  <view class="tabs">
+    <view class="tab-item {{currentTab === item.key ? 'active' : ''}}" 
+          a:for="{{tabs}}" key="key" 
+          onTap="onTabTap" data-key="{{item.key}}">
+      <text>{{item.name}}</text>
+    </view>
+  </view>
+
+  <view class="order-list">
+    <view class="order-card" a:for="{{orders}}" key="id" onTap="onOrderTap" data-id="{{item.id}}">
+      <view class="order-header">
+        <text class="order-no">{{item.orderNo}}</text>
+        <text class="status-tag status-{{item.status}}">{{item.statusText}}</text>
+      </view>
+      <view class="order-body">
+        <text class="service-name">{{item.serviceName}}</text>
+        <text class="store-name">{{item.storeName}}</text>
+      </view>
+      <view class="order-footer">
+        <text class="amount">¥{{item.amount}}</text>
+        <view class="actions">
+          <button a:if="{{item.status === 'pending'}}" size="mini" onTap="onPayTap" data-id="{{item.id}}">去支付</button>
+          <button a:if="{{item.status === 'pending'}}" size="mini" class="cancel-btn" onTap="onCancelTap" data-id="{{item.id}}">取消</button>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <view class="empty" a:if="{{orders.length === 0}}">
+    <text>暂无订单</text>
+  </view>
+</view>

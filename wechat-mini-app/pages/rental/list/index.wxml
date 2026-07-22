@@ -1,0 +1,59 @@
+<view class="container">
+  <!-- 搜索栏 -->
+  <view class="search-bar">
+    <view class="search-input-wrap">
+      <icon type="search" size="14" color="#999"/>
+      <input class="search-input" placeholder="搜索你想租的物品" bindinput="onSearch" value="{{keyword}}"/>
+    </view>
+  </view>
+
+  <!-- 品类筛选 -->
+  <scroll-view class="category-scroll" scroll-x>
+    <view class="category-tabs">
+      <view wx:for="{{categories}}" wx:key="value" 
+            class="category-tab {{currentCategory === item.value ? 'active' : ''}}"
+            bindtap="onCategoryTap" data-category="{{item.value}}">
+        {{item.label}}
+      </view>
+    </view>
+  </scroll-view>
+
+  <!-- 商品列表 -->
+  <view class="items-grid">
+    <view wx:for="{{items}}" wx:key="_id" class="item-card" bindtap="goDetail" data-id="{{item._id}}">
+      <view class="item-image">
+        <image wx:if="{{item.images && item.images[0]}}" src="{{item.images[0]}}" mode="aspectFill" class="item-img"/>
+        <view wx:else class="item-placeholder">
+          <text class="placeholder-icon">◇</text>
+        </view>
+        <view wx:if="{{item.tags && item.tags[0]}}" class="item-tag">{{item.tags[0]}}</view>
+      </view>
+      <view class="item-info">
+        <text class="item-name">{{item.name}}</text>
+        <text class="item-brand">{{item.brand || ''}}</text>
+        <view class="item-price-row">
+          <text class="item-price">¥{{item.dailyRate}}</text>
+          <text class="item-unit">/天</text>
+        </view>
+        <view class="item-deposit-row">
+          <view class="deposit-badge deposit-{{item.depositMode}}">
+            {{item.depositMode === 'credit_free' ? '免押' : item.depositMode === 'both' ? '押金/免押' : '押金'}}
+          </view>
+          <text class="deposit-amount">¥{{item.depositAmount}}</text>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 空状态 -->
+  <view wx:if="{{!loading && items.length === 0}}" class="empty-state">
+    <text class="empty-icon">◇</text>
+    <text class="empty-text">暂无可租物品</text>
+    <text class="empty-sub">商家正在上架中，请稍后再来</text>
+  </view>
+
+  <!-- 加载中 -->
+  <view wx:if="{{loading}}" class="loading-state">
+    <text>加载中...</text>
+  </view>
+</view>

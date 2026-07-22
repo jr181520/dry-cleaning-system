@@ -739,6 +739,8 @@
     <script src="js/store-config.js"></script>
     <!-- 多品类管理 -->
     <script src="js/category-manager.js"></script>
+    <!-- 用户数据隔离模块 -->
+    <script src="js/user-data-isolation.js"></script>
     <script>
         // 订单数据
         let orderData = {
@@ -2282,10 +2284,10 @@
                     orderNo: serverOrder.orderNo
                 };
                 
-                // 保存到localStorage
-                const orders = JSON.parse(localStorage.getItem('orders') || '[]');
+                // 【数据隔离】保存到用户隔离的 key，自动打上 userId
+                const orders = getUserOrders();
                 orders.unshift(order);
-                localStorage.setItem('orders', JSON.stringify(orders));
+                setUserOrders(orders);
                 localStorage.setItem('currentOrder', JSON.stringify(order));
                 
                 // 同步到门店订单（让M端能看到新订单）

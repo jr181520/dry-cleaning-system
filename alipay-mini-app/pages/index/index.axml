@@ -1,0 +1,52 @@
+<view class="container">
+  <view class="search-bar" onTap="onSearchTap">
+    <text class="search-icon">🔍</text>
+    <text class="search-text">搜索服务</text>
+  </view>
+
+  <swiper class="banner" indicator-dots autoplay interval="3000">
+    <block a:for="{{banners}}" key="id">
+      <swiper-item>
+        <image src="{{item.image}}" mode="aspectFill" />
+      </swiper-item>
+    </block>
+  </swiper>
+
+  <view class="pickup-notice" a:if="{{pendingPickup}}" onTap="onPickupTap">
+    <text>您有订单待取件</text>
+    <text class="arrow">›</text>
+  </view>
+
+  <view class="category-grid">
+    <view class="category-item" a:for="{{categories}}" key="id" onTap="onCategoryTap" data-id="{{item.id}}">
+      <view class="category-icon" style="background:{{item.color}}">
+        <text>{{item.icon}}</text>
+      </view>
+      <text class="category-name">{{item.name}}</text>
+    </view>
+  </view>
+
+  <view class="section">
+    <text class="section-title">热门服务</text>
+    <view class="service-list">
+      <view class="service-card" a:for="{{hotServices}}" key="id" onTap="onServiceTap" data-id="{{item.id}}">
+        <image src="{{item.image}}" mode="aspectFill" />
+        <text class="service-name">{{item.name}}</text>
+        <text class="service-price">¥{{item.price}}</text>
+      </view>
+    </view>
+  </view>
+
+  <view class="section">
+    <text class="section-title">附近门店</text>
+    <view class="store-list">
+      <view class="store-card" a:for="{{nearbyStores}}" key="id" onTap="onStoreTap" data-id="{{item.id}}">
+        <view class="store-info">
+          <text class="store-name">{{item.name}}</text>
+          <text class="store-address">{{item.address}}</text>
+        </view>
+        <text class="store-distance">{{item.distance}}km</text>
+      </view>
+    </view>
+  </view>
+</view>

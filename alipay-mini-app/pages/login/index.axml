@@ -1,0 +1,33 @@
+<view class="container">
+  <view class="logo-section">
+    <image class="logo" src="/images/logo.png" mode="aspectFit" />
+    <text class="app-name">干洗店</text>
+  </view>
+
+  <view class="login-section">
+    <button class="alipay-btn" onTap="onAlipayLogin">
+      <text class="btn-icon">💳</text>
+      <text>支付宝一键登录</text>
+    </button>
+
+    <view class="divider">
+      <view class="line"></view>
+      <text class="or-text">或</text>
+      <view class="line"></view>
+    </view>
+
+    <button class="phone-btn" onTap="onPhoneLogin">手机号登录</button>
+  </view>
+
+  <view class="agreement-section">
+    <checkbox-group onChange="onAgreementChange">
+      <label class="agreement-label">
+        <checkbox value="true" checked="{{agreed}}" />
+        <text class="agreement-text">
+          我已阅读并同意
+          <text class="link" onTap="onAgreementTap">《用户协议》</text>
+        </text>
+      </label>
+    </checkbox-group>
+  </view>
+</view>

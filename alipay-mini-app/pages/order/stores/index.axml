@@ -1,0 +1,24 @@
+<view class="container">
+  <view class="search-bar">
+    <input class="search-input" placeholder="搜索门店" value="{{keyword}}" onInput="onSearchInput" />
+  </view>
+
+  <view class="store-list">
+    <view class="store-card" a:for="{{filteredStores}}" key="id" onTap="onStoreTap" data-id="{{item.id}}">
+      <view class="store-info">
+        <text class="store-name">{{item.name}}</text>
+        <text class="store-address">{{item.address}}</text>
+        <view class="store-meta">
+          <text class="store-rating" a:if="{{item.rating}}">★ {{item.rating}}</text>
+        </view>
+      </view>
+      <view class="distance-badge" a:if="{{item.distance}}">
+        <text>{{item.distance}}km</text>
+      </view>
+    </view>
+  </view>
+
+  <view class="empty" a:if="{{filteredStores.length === 0}}">
+    <text>未找到门店</text>
+  </view>
+</view>

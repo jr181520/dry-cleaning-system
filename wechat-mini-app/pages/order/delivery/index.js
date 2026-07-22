@@ -347,6 +347,7 @@ Page({
       store: this.data.selectedStore,
       storeAutoAssigned: !this.data.selectedStore,
       services: this.data.selectedServices,
+      categoryId: app.globalData.orderCategory || 'cleaning',
       deliveryMethod: deliveryMethodMap[this.data.selectedDeliveryMethod] || 'store_pickup',
       deliveryType: this.data.deliveryType || 'solo',  // 一对一/拼单
       provider: this.data.selectedProvider,

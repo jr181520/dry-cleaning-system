@@ -1,0 +1,33 @@
+.container { padding: 20rpx; }
+.status-banner { background: linear-gradient(135deg, #1677ff, #0958d9); border-radius: 16rpx; padding: 40rpx; margin-bottom: 20rpx; box-shadow: 0 8rpx 30rpx rgba(22,119,255,0.2); }
+.status-banner.status-pending { background: linear-gradient(135deg, #fa8c16, #d46b08); box-shadow: 0 8rpx 30rpx rgba(250,140,22,0.2); }
+.status-banner.status-processing { background: linear-gradient(135deg, #1677ff, #0958d9); }
+.status-banner.status-completed { background: linear-gradient(135deg, #52c41a, #389e0d); box-shadow: 0 8rpx 30rpx rgba(82,196,26,0.2); }
+.status-text { display: block; color: #fff; font-size: 40rpx; font-weight: bold; margin-bottom: 10rpx; }
+.status-desc { display: block; color: rgba(255,255,255,0.8); font-size: 26rpx; }
+.timeline-card, .service-card { background: #fff; border-radius: 12rpx; padding: 30rpx; margin-bottom: 20rpx; box-shadow: 0 2rpx 10rpx rgba(0,0,0,0.05); }
+.card-title { display: block; font-size: 32rpx; font-weight: bold; margin-bottom: 30rpx; }
+.timeline { display: flex; flex-direction: column; }
+.timeline-item { display: flex; padding-bottom: 30rpx; position: relative; }
+.timeline-item:last-child { padding-bottom: 0; }
+.timeline-dot { width: 20rpx; height: 20rpx; border-radius: 50%; background: #e8e8e8; margin-right: 20rpx; margin-top: 10rpx; position: relative; z-index: 1; }
+.timeline-item.active .timeline-dot { background: #1677ff; }
+.timeline-item:not(:last-child)::after { content: ''; position: absolute; left: 10rpx; top: 30rpx; bottom: 0; width: 2rpx; background: #e8e8e8; }
+.timeline-content { flex: 1; }
+.timeline-title { display: block; font-size: 28rpx; margin-bottom: 10rpx; }
+.timeline-time { display: block; font-size: 24rpx; color: #999; }
+.service-item { display: flex; justify-content: space-between; align-items: center; padding: 20rpx 0; border-bottom: 1rpx solid #f0f0f0; }
+.service-item:last-child { border-bottom: none; }
+.service-info { display: flex; align-items: center; flex: 1; }
+.service-name { font-size: 28rpx; margin-right: 20rpx; }
+.service-qty { font-size: 26rpx; color: #999; }
+.service-price { font-size: 28rpx; font-weight: bold; }
+.fee-summary { margin-top: 30rpx; padding-top: 30rpx; border-top: 2rpx solid #f0f0f0; }
+.fee-row { display: flex; justify-content: space-between; padding: 15rpx 0; }
+.fee-label { font-size: 28rpx; color: #666; }
+.fee-value { font-size: 28rpx; }
+.fee-row.total { padding-top: 20rpx; margin-top: 10rpx; border-top: 1rpx solid #f0f0f0; }
+.fee-row.total .fee-value { font-size: 36rpx; font-weight: bold; color: #1677ff; }
+.action-section { display: flex; gap: 20rpx; margin-top: 40rpx; }
+.action-btn { flex: 1; height: 90rpx; border-radius: 45rpx; font-size: 30rpx; font-weight: bold; border: 2rpx solid #e8e8e8; background: #fff; color: #333; }
+.action-btn.primary { background: #1677ff; color: #fff; border-color: #1677ff; box-shadow: 0 8rpx 30rpx rgba(22,119,255,0.3); }

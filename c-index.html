@@ -14,6 +14,8 @@
     <script src="js/unified-sync.js"></script>
     <!-- 多品类管理器 -->
     <script src="js/category-manager.js"></script>
+    <!-- 用户数据隔离模块 -->
+    <script src="js/user-data-isolation.js"></script>
     
     <script>
         tailwind.config = {
@@ -387,6 +389,10 @@
                 <i class="fa fa-home text-xl"></i>
                 <span class="text-xs">首页</span>
             </div>
+            <div class="tab-item flex flex-col items-center gap-1 text-gray-500" onclick="window.location.href='c-rental.html'">
+                <i class="fa fa-diamond text-xl text-purple-500"></i>
+                <span class="text-xs">租物</span>
+            </div>
             <div class="tab-item flex flex-col items-center gap-1 text-gray-500" onclick="switchTab('order')">
                 <i class="fa fa-plus-circle text-xl"></i>
                 <span class="text-xs">下单</span>
@@ -666,9 +672,9 @@
 
         // 加载待取件订单
         function loadPendingOrders() {
-            // 优先从统一同步的c_orders读取，兼容旧的orders key
-            const syncedOrders = JSON.parse(localStorage.getItem('c_orders') || '[]');
-            const oldOrders = JSON.parse(localStorage.getItem('orders') || '[]');
+            // 【数据隔离】从用户隔离的 key 读取订单
+            const syncedOrders = getUserCOrders();
+            const oldOrders = getUserOrders();
             
             // 以统一同步数据为主，旧数据为补充（去重）
             const syncedIds = new Set(syncedOrders.map(o => o.orderId || o.orderNo || o.id));
@@ -680,8 +686,8 @@
                 }
             });
             
-            // 也写入旧key保持兼容
-            localStorage.setItem('orders', JSON.stringify(mergedOrders));
+            // 【数据隔离】写入用户隔离的 key
+            setUserOrders(mergedOrders);
             
             pendingOrders = mergedOrders.filter(order => order.status === 'ready' || order.status === 'delivered');
             

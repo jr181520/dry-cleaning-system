@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>租赁订单详情</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f8fafc; }
+        .timeline-dot { width: 12px; height: 12px; border-radius: 50%; border: 2px solid #7c3aed; background: white; }
+        .timeline-dot.active { background: #7c3aed; }
+        .timeline-line { width: 2px; background: #e5e7eb; min-height: 24px; }
+        .timeline-line.active { background: #7c3aed; }
+    </style>
+</head>
+<body>
+    <!-- 顶部导航 -->
+    <header class="fixed top-0 left-0 right-0 bg-white shadow-sm z-50">
+        <div class="flex items-center justify-between px-4 py-3">
+            <a href="c-orders.html" class="text-gray-600">
+                <i class="fa fa-arrow-left text-lg"></i>
+            </a>
+            <h1 class="font-bold text-lg">订单详情</h1>
+            <div class="w-6"></div>
+        </div>
+    </header>
+
+    <!-- 主内容 -->
+    <main class="pt-14 pb-24">
+        <!-- 订单状态 -->
+        <div id="order-status-banner" class="bg-gradient-to-r from-purple-600 to-purple-500 text-white px-4 py-5">
+            <div class="flex items-center gap-3">
+                <i id="status-icon" class="fa fa-clock text-2xl"></i>
+                <div>
+                    <h2 id="status-text" class="font-bold text-lg">加载中...</h2>
+                    <p id="status-desc" class="text-sm text-purple-100"></p>
+                </div>
+            </div>
+            <!-- 使用倒计时 -->
+            <div id="countdown-section" class="hidden mt-3 bg-white/20 rounded-lg p-3">
+                <div class="flex items-center justify-between">
+                    <span class="text-sm">剩余使用天数</span>
+                    <span id="days-remaining" class="font-bold text-xl">--</span>
+                </div>
+                <div class="text-xs text-purple-100 mt-1">到期日: <span id="due-date-text">--</span></div>
+            </div>
+        </div>
+
+        <!-- 商品信息 -->
+        <div class="bg-white px-4 py-4 mb-2">
+            <h3 class="font-medium text-gray-800 mb-3">租赁商品</h3>
+            <div id="order-items-list" class="space-y-3">
+                <!-- 动态加载 -->
+            </div>
+        </div>
+
+        <!-- 状态时间线 -->
+        <div class="bg-white px-4 py-4 mb-2">
+            <h3 class="font-medium text-gray-800 mb-3">订单进度</h3>
+            <div id="order-timeline" class="space-y-0">
+                <!-- 动态生成 -->
+            </div>
+        </div>
+
+        <!-- 配送信息（第一程） -->
+        <div id="delivery-section" class="bg-white px-4 py-4 mb-2 hidden">
+            <h3 class="font-medium text-gray-800 mb-3">
+                <i class="fa fa-truck text-purple-600 mr-2"></i>第一程配送（门店→您）
+            </h3>
+            <div id="delivery-info" class="text-sm text-gray-600">
+                <!-- 动态 -->
+            </div>
+        </div>
+
+        <!-- 归还配送（第二程） -->
+        <div id="return-section" class="bg-white px-4 py-4 mb-2 hidden">
+            <h3 class="font-medium text-gray-800 mb-3">
+                <i class="fa fa-undo text-green-600 mr-2"></i>第二程配送（归还→门店）
+            </h3>
+            <div id="return-info" class="text-sm text-gray-600">
+                <!-- 动态 -->
+            </div>
+        </div>
+
+        <!-- 费用明细 -->
+        <div class="bg-white px-4 py-4 mb-2">
+            <h3 class="font-medium text-gray-800 mb-3">费用明细</h3>
+            <div class="space-y-2 text-sm">
+                <div class="flex justify-between">
+                    <span class="text-gray-500">租金</span>
+                    <span id="fee-rental" class="text-gray-700">¥0.00</span>
+                </div>
+                <div class="flex justify-between">
+                    <span class="text-gray-500">押金</span>
+                    <span id="fee-deposit" class="text-gray-700">¥0.00</span>
+                </div>
+                <div id="fee-overdue-row" class="hidden flex justify-between">
+                    <span class="text-red-500">逾期费</span>
+                    <span id="fee-overdue" class="text-red-500">¥0.00</span>
+                </div>
+                <div class="border-t pt-2 flex justify-between font-medium">
+                    <span>合计</span>
+                    <span id="fee-total" class="text-red-500">¥0.00</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- 押金状态 -->
+        <div id="deposit-section" class="bg-white px-4 py-4 mb-2">
+            <h3 class="font-medium text-gray-800 mb-3">押金状态</h3>
+            <div id="deposit-status" class="text-sm">
+                <!-- 动态 -->
+            </div>
+        </div>
+
+        <!-- 订单信息 -->
+        <div class="bg-white px-4 py-4 mb-4">
+            <h3 class="font-medium text-gray-800 mb-3">订单信息</h3>
+            <div class="space-y-2 text-sm">
+                <div class="flex justify-between">
+                    <span class="text-gray-400">订单号</span>
+                    <span id="info-order-no" class="text-gray-700">--</span>
+                </div>
+                <div class="flex justify-between">
+                    <span class="text-gray-400">下单时间</span>
+                    <span id="info-create-time" class="text-gray-700">--</span>
+                </div>
+                <div class="flex justify-between">
+                    <span class="text-gray-400">租期</span>
+                    <span id="info-rental-days" class="text-gray-700">--</span>
+                </div>
+                <div class="flex justify-between">
+                    <span class="text-gray-400">押金模式</span>
+                    <span id="info-deposit-mode" class="text-gray-700">--</span>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- 底部操作栏 -->
+    <div id="bottom-actions" class="fixed bottom-0 left-0 right-0 bg-white shadow-lg border-t z-40 px-4 py-3 flex items-center gap-3" style="padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 12px); display: none;">
+        <!-- 动态按钮 -->
+    </div>
+
+    <!-- 归还弹窗 -->
+    <div id="return-modal" class="fixed inset-0 z-50 hidden" style="background:rgba(0,0,0,0.5);">
+        <div class="absolute inset-0 flex items-end">
+            <div class="bg-white w-full rounded-t-2xl p-4 pb-8">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="font-bold text-lg">发起归还</h3>
+                    <button onclick="closeReturnModal()" class="text-gray-400 text-xl">&times;</button>
+                </div>
+                <p class="text-sm text-gray-500 mb-4">选择归还方式，跑腿小哥将上门取件送回商家</p>
+                <div class="space-y-3">
+                    <div>
+                        <label class="block text-sm text-gray-600 mb-1">取件地址</label>
+                        <textarea id="return-address" rows="2" placeholder="您的当前地址" class="w-full border rounded-lg px-3 py-2 text-sm"></textarea>
+                    </div>
+                    <div>
+                        <label class="block text-sm text-gray-600 mb-1">联系方式</label>
+                        <input type="tel" id="return-phone" placeholder="手机号" class="w-full border rounded-lg px-3 py-2 text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-sm text-gray-600 mb-1">配送方式</label>
+                        <select id="return-delivery-type" class="w-full border rounded-lg px-3 py-2 text-sm">
+                            <option value="courier">跑腿配送（上门取件）</option>
+                            <option value="store_pickup">自行送回门店</option>
+                        </select>
+                    </div>
+                </div>
+                <button onclick="submitReturn()" class="w-full mt-4 bg-green-600 text-white py-3 rounded-xl font-medium">确认归还</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = '/api/rental';
+        let orderData = null;
+
+        const STATUS_CONFIG = {
+            reserved: { text: '待支付', desc: '请尽快完成支付', icon: 'fa-clock', color: 'from-yellow-500 to-orange-500' },
+            paid: { text: '待发货', desc: '商家正在准备发货', icon: 'fa-box', color: 'from-blue-500 to-blue-600' },
+            shipped: { text: '配送中', desc: '跑腿小哥正在为您配送', icon: 'fa-truck', color: 'from-blue-500 to-cyan-500' },
+            using: { text: '使用中', desc: '请妥善保管，到期前归还', icon: 'fa-hand-holding-heart', color: 'from-purple-500 to-purple-600' },
+            due: { text: '即将到期', desc: '请尽快发起归还', icon: 'fa-exclamation-circle', color: 'from-orange-500 to-red-500' },
+            overdue: { text: '已逾期', desc: '请尽快归还，逾期将产生额外费用', icon: 'fa-exclamation-triangle', color: 'from-red-500 to-red-600' },
+            returning: { text: '归还中', desc: '跑腿小哥正在将物品送回门店', icon: 'fa-undo', color: 'from-green-500 to-green-600' },
+            returned: { text: '已归还', desc: '商家确认后将退还押金', icon: 'fa-check-circle', color: 'from-green-500 to-emerald-500' },
+            completed: { text: '已完成', desc: '感谢您的使用', icon: 'fa-star', color: 'from-purple-500 to-pink-500' },
+            cancelled: { text: '已取消', desc: '订单已取消', icon: 'fa-times-circle', color: 'from-gray-400 to-gray-500' }
+        };
+
+        const DEPOSIT_MODE_LABELS = { deposit: '纯押金', credit_free: '信用免押', both: '押金/免押' };
+
+        // 获取订单ID
+        const urlParams = new URLSearchParams(window.location.search);
+        const orderNo = urlParams.get('orderNo') || urlParams.get('id');
+
+        async function loadOrder() {
+            if (!orderNo) return alert('订单不存在');
+            try {
+                const resp = await fetch(`${API_BASE}/orders/${orderNo}`);
+                const data = await resp.json();
+                if (!data.success) return alert('订单不存在');
+                orderData = data.order;
+                renderOrder();
+            } catch(e) {
+                alert('加载失败');
+            }
+        }
+
+        function renderOrder() {
+            if (!orderData) return;
+            const status = STATUS_CONFIG[orderData.status] || STATUS_CONFIG.reserved;
+
+            // 状态横幅
+            document.getElementById('order-status-banner').className = `bg-gradient-to-r ${status.color} text-white px-4 py-5`;
+            document.getElementById('status-icon').className = `fa ${status.icon} text-2xl`;
+            document.getElementById('status-text').textContent = status.text;
+            document.getElementById('status-desc').textContent = status.desc;
+
+            // 倒计时
+            if (['using', 'due'].includes(orderData.status) && orderData.dueDate) {
+                document.getElementById('countdown-section').classList.remove('hidden');
+                const due = new Date(orderData.dueDate);
+                const now = new Date();
+                const days = Math.max(0, Math.ceil((due - now) / 86400000));
+                document.getElementById('days-remaining').textContent = days + '天';
+                document.getElementById('due-date-text').textContent = due.toLocaleDateString('zh-CN');
+            }
+
+            // 商品列表
+            const itemsList = document.getElementById('order-items-list');
+            itemsList.innerHTML = (orderData.items || []).map(item => `
+                <div class="flex gap-3">
+                    <div class="w-16 h-16 bg-gray-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                        ${item.image ? `<img src="${item.image}" class="w-full h-full object-cover rounded-lg">` : '<i class="fa fa-diamond text-xl text-gray-300"></i>'}
+                    </div>
+                    <div class="flex-1">
+                        <h4 class="font-medium text-sm">${item.name}</h4>
+                        <p class="text-xs text-gray-400">¥${(item.dailyRate || 0).toFixed(2)}/天 x ${item.rentalDays}天</p>
+                        <div class="flex justify-between mt-1">
+                            <span class="text-xs text-gray-400">押金¥${(item.depositAmount || 0).toFixed(2)}</span>
+                            <span class="text-sm font-medium">¥${(item.subtotal || 0).toFixed(2)}</span>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+
+            // 时间线
+            renderTimeline();
+
+            // 配送信息
+            if (orderData.delivery?.courier?.provider || orderData.delivery?.address) {
+                document.getElementById('delivery-section').classList.remove('hidden');
+                document.getElementById('delivery-info').innerHTML = `
+                    <p>配送方式: ${orderData.delivery.type === 'courier' ? '跑腿配送' : '到店自取'}</p>
+                    <p>收货人: ${orderData.delivery.contactName || '--'} ${orderData.delivery.contactPhone || ''}</p>
+                    <p>地址: ${orderData.delivery.address || '--'}</p>
+                    ${orderData.delivery.courier?.provider ? `<p>配送商: ${orderData.delivery.courier.provider}</p>` : ''}
+                    ${orderData.delivery.courier?.trackingNo ? `<p>运单号: ${orderData.delivery.courier.trackingNo}</p>` : ''}
+                `;
+            }
+
+            // 归还配送
+            if (orderData.returnDelivery?.address) {
+                document.getElementById('return-section').classList.remove('hidden');
+                document.getElementById('return-info').innerHTML = `
+                    <p>归还方式: ${orderData.returnDelivery.type === 'courier' ? '跑腿配送' : '自行送回'}</p>
+                    <p>取件地址: ${orderData.returnDelivery.address || '--'}</p>
+                    ${orderData.returnDelivery.courier?.provider ? `<p>配送商: ${orderData.returnDelivery.courier.provider}</p>` : ''}
+                `;
+            }
+
+            // 费用
+            document.getElementById('fee-rental').textContent = '¥' + (orderData.amounts?.subtotal || 0).toFixed(2);
+            document.getElementById('fee-deposit').textContent = '¥' + (orderData.amounts?.deposit || 0).toFixed(2);
+            document.getElementById('fee-total').textContent = '¥' + (orderData.amounts?.total || 0).toFixed(2);
+            if (orderData.amounts?.overdueFee > 0) {
+                document.getElementById('fee-overdue-row').classList.remove('hidden');
+                document.getElementById('fee-overdue').textContent = '¥' + orderData.amounts.overdueFee.toFixed(2);
+            }
+
+            // 押金状态
+            renderDepositStatus();
+
+            // 订单信息
+            document.getElementById('info-order-no').textContent = orderData.orderNo;
+            document.getElementById('info-create-time').textContent = new Date(orderData.createdAt || orderData.reservedAt).toLocaleString('zh-CN');
+            document.getElementById('info-rental-days').textContent = orderData.rentalDays + '天';
+            document.getElementById('info-deposit-mode').textContent = DEPOSIT_MODE_LABELS[orderData.depositMode] || '--';
+
+            // 底部操作
+            renderActions();
+        }
+
+        function renderTimeline() {
+            const container = document.getElementById('order-timeline');
+            const history = orderData.statusHistory || [];
+            
+            container.innerHTML = history.map((h, i) => {
+                const isLast = i === history.length - 1;
+                const dotClass = isLast ? 'timeline-dot active' : 'timeline-dot';
+                const lineClass = isLast ? 'timeline-line' : 'timeline-line active';
+                return `
+                    <div class="flex gap-3">
+                        <div class="flex flex-col items-center">
+                            <div class="${dotClass}"></div>
+                            ${!isLast ? `<div class="${lineClass} flex-1"></div>` : ''}
+                        </div>
+                        <div class="pb-4">
+                            <div class="font-medium text-sm text-gray-800">${h.status}</div>
+                            <div class="text-xs text-gray-400">${new Date(h.time).toLocaleString('zh-CN')}</div>
+                            ${h.note ? `<div class="text-xs text-gray-500 mt-0.5">${h.note}</div>` : ''}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function renderDepositStatus() {
+            const container = document.getElementById('deposit-status');
+            if (orderData.amounts?.deposit <= 0) {
+                container.innerHTML = '<p class="text-gray-400">本单免押金</p>';
+                return;
+            }
+
+            if (orderData.depositRefunded) {
+                container.innerHTML = `
+                    <div class="flex items-center gap-2 text-green-600">
+                        <i class="fa fa-check-circle"></i>
+                        <span>押金已退还 ¥${(orderData.amounts.deposit || 0).toFixed(2)}</span>
+                    </div>`;
+            } else if (orderData.depositPaid) {
+                container.innerHTML = `
+                    <div class="flex items-center gap-2 text-blue-600">
+                        <i class="fa fa-lock"></i>
+                        <span>押金已缴纳 ¥${(orderData.amounts.deposit || 0).toFixed(2)}</span>
+                    </div>
+                    <p class="text-xs text-gray-400 mt-1">归还并质检通过后将自动退还</p>`;
+            } else {
+                container.innerHTML = `
+                    <div class="flex items-center gap-2 text-orange-600">
+                        <i class="fa fa-clock"></i>
+                        <span>待缴纳押金 ¥${(orderData.amounts.deposit || 0).toFixed(2)}</span>
+                    </div>`;
+            }
+        }
+
+        function renderActions() {
+            const actions = document.getElementById('bottom-actions');
+            const status = orderData.status;
+            let buttons = [];
+
+            if (status === 'reserved') {
+                buttons.push({ text: '取消订单', class: 'border border-gray-300 text-gray-600', action: 'cancelOrder()' });
+                buttons.push({ text: '去支付', class: 'bg-purple-600 text-white', action: 'payOrder()' });
+            } else if (status === 'shipped') {
+                buttons.push({ text: '确认收货', class: 'bg-purple-600 text-white flex-1', action: 'confirmReceive()' });
+            } else if (['using', 'due', 'overdue'].includes(status)) {
+                buttons.push({ text: '发起归还', class: 'bg-green-600 text-white flex-1', action: 'openReturnModal()' });
+            }
+
+            if (buttons.length > 0) {
+                actions.style.display = 'flex';
+                actions.innerHTML = buttons.map(b => 
+                    `<button onclick="${b.action}" class="${b.class} px-6 py-3 rounded-xl font-medium flex-1">${b.text}</button>`
+                ).join('');
+            }
+        }
+
+        async function confirmReceive() {
+            if (!confirm('确认已收到物品？')) return;
+            try {
+                const resp = await fetch(`${API_BASE}/orders/${orderNo}/confirm-receive`, { method: 'POST' });
+                const data = await resp.json();
+                if (data.success) {
+                    alert('已确认收货，开始使用吧！');
+                    loadOrder();
+                } else {
+                    alert(data.error);
+                }
+            } catch(e) { alert('操作失败'); }
+        }
+
+        function openReturnModal() {
+            // 预填地址
+            const addr = JSON.parse(localStorage.getItem('rental_delivery_address') || '{}');
+            document.getElementById('return-address').value = addr.address || '';
+            document.getElementById('return-phone').value = addr.phone || '';
+            document.getElementById('return-modal').classList.remove('hidden');
+        }
+
+        function closeReturnModal() {
+            document.getElementById('return-modal').classList.add('hidden');
+        }
+
+        async function submitReturn() {
+            const address = document.getElementById('return-address').value.trim();
+            const phone = document.getElementById('return-phone').value.trim();
+            const deliveryType = document.getElementById('return-delivery-type').value;
+
+            if (!address) return alert('请填写取件地址');
+
+            try {
+                const resp = await fetch(`${API_BASE}/orders/${orderNo}/return`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ deliveryMethod: deliveryType, address, contactPhone: phone })
+                });
+                const data = await resp.json();
+                if (data.success) {
+                    if (data.isOverdue) {
+                        alert('归还已发起（逾期），跑腿小哥将上门取件');
+                    } else {
+                        alert('归还已发起，跑腿小哥将上门取件');
+                    }
+                    closeReturnModal();
+                    loadOrder();
+                } else {
+                    alert(data.error);
+                }
+            } catch(e) { alert('操作失败'); }
+        }
+
+        async function cancelOrder() {
+            if (!confirm('确定取消订单？')) return;
+            try {
+                const resp = await fetch(`${API_BASE}/orders/${orderNo}/cancel`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ reason: '用户取消' })
+                });
+                const data = await resp.json();
+                if (data.success) {
+                    alert('订单已取消');
+                    loadOrder();
+                } else {
+                    alert(data.error);
+                }
+            } catch(e) { alert('操作失败'); }
+        }
+
+        function payOrder() {
+            alert('跳转到支付页面（待集成）');
+        }
+
+        // 初始化
+        loadOrder();
+    </script>
+</body>
+</html>

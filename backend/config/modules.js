@@ -101,7 +101,13 @@ module.exports = {
     // 配送
     delivery: {
       enabled: true,
-      providers: ['meituan', 'dada', 'shunfeng']
+      providers: ['meituan', 'dada', 'shunfeng'],
+      rental: {
+        // 租赁双程配送
+        outboundType: 'rental_outbound',   // 第一程：门店→用户
+        returnType: 'rental_return',       // 第二程：用户→门店
+        autoCreateReturn: true             // 归还时自动创建第二程配送单
+      }
     },
     
     // 会员体系
@@ -121,10 +127,12 @@ module.exports = {
       enabled: true
     },
     
-    // 押金功能（为租赁准备）
+    // 押金功能（租赁核心功能）
     deposit: {
-      enabled: false,  // V2再开启
-      minDeposit: 100
+      enabled: true,
+      minDeposit: 100,
+      modes: ['deposit', 'credit_free', 'both'],  // 纯押金/信用免押/商家自选
+      creditThreshold: 600  // 免押最低信用分
     },
     
     // 信用评估（为租赁准备）

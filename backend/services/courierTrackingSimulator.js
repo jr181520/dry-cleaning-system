@@ -16,6 +16,8 @@ const deliveryProviders = require('./deliveryProviders');
 
 // 活跃跟踪任务
 const activeTasks = new Map();
+// 上次通知的状态（用于去重，仅状态变更时发布事件）
+const lastNotifiedStatus = new Map();
 
 // 配置
 const CONFIG = {
@@ -109,6 +111,7 @@ function startRealTracking(order, provider) {
   };
   publishCourierStatus(orderId, initialData);
   updateCourierInDB(orderId, initialData);
+  notifyCourierStatusChange(order, initialData);  // 通知M端初始状态
 
   // 定时轮询
   const timer = setInterval(async () => {
@@ -147,23 +150,28 @@ function startRealTracking(order, provider) {
 
       publishCourierStatus(orderId, courierData);
       updateCourierInDB(orderId, courierData);
+      notifyCourierStatusChange(order, courierData);  // 通知M端跑腿进度
 
       if (mapping.courierStatus === 'delivered' || mapping.courierStatus === 'cancelled') {
         console.log(`[跟踪-REAL] 订单 ${orderId} 配送结束: ${mapping.label}`);
         clearInterval(timer);
         activeTasks.delete(orderId);
+        lastNotifiedStatus.delete(orderId);
 
         if (mapping.courierStatus === 'delivered') {
           try {
             const orderEventService = require('./orderEventService');
             orderEventService.publishOrderEvent('courier_delivered', {
               _id: orderId, orderId, orderNo: order.orderNo,
-              storeId: order.storeId, status: order.status || 'delivering_back',
+              storeId: order.storeId, categoryId: order.categoryId || 'cleaning',
+              status: order.status || 'delivering_back',
               courier: courierData
             }, { source: 'courier-real' });
           } catch (e) {
             console.warn('[跟踪-REAL] 发布配送完成事件失败:', e.message);
           }
+          // 第一程送达后自动将订单状态从 paid → received
+          autoUpdateOrderOnDelivery(orderId, order);
         }
       }
     } catch (error) {
@@ -201,6 +209,7 @@ function startMockTracking(order) {
 
   publishCourierStatus(orderId, initialState);
   updateCourierInDB(orderId, initialState);
+  notifyCourierStatusChange(order, initialState);  // 通知M端初始状态
 
   const timer = setInterval(async () => {
     const elapsed = Date.now() - startTime;
@@ -248,22 +257,27 @@ function startMockTracking(order) {
 
     publishCourierStatus(orderId, courierData);
     updateCourierInDB(orderId, courierData);
+    notifyCourierStatusChange(order, courierData);  // 通知M端跑腿进度
 
     if (status === 'delivered') {
       console.log(`[跟踪-MOCK] 订单 ${orderId} 模拟配送完成`);
       clearInterval(timer);
       activeTasks.delete(orderId);
+      lastNotifiedStatus.delete(orderId);
 
       try {
         const orderEventService = require('./orderEventService');
         orderEventService.publishOrderEvent('courier_delivered', {
           _id: orderId, orderId, orderNo: order.orderNo,
-          storeId: order.storeId, status: order.status || 'delivering_back',
+          storeId: order.storeId, categoryId: order.categoryId || 'cleaning',
+          status: order.status || 'delivering_back',
           courier: courierData
         }, { source: 'courier-mock' });
       } catch (e) {
         console.warn('[跟踪-MOCK] 发布配送完成事件失败:', e.message);
       }
+      // 第一程送达后自动将订单状态从 paid → received
+      autoUpdateOrderOnDelivery(orderId, order);
     }
   }, CONFIG.MOCK_UPDATE_INTERVAL);
 
@@ -275,11 +289,65 @@ function startMockTracking(order) {
 
 // ─── 公共方法 ───
 
+/**
+ * 配送完成时自动更新订单状态
+ * - 第一程送达（客户→门店）: paid → received
+ * - 第二程送达（门店→客户）: 不自动变更，等待客户确认收货
+ */
+async function autoUpdateOrderOnDelivery(orderId, order) {
+  try {
+    const mongoose = require('mongoose');
+    const Order = mongoose.model('Order');
+    if (!Order) return;
+
+    const currentOrder = await Order.findById(orderId);
+    if (!currentOrder) return;
+
+    const currentStatus = currentOrder.status;
+    
+    // 第一程：订单还在 paid/delivering 状态，跑腿送达后自动变为 awaiting_store_confirm（待确认入库）
+    if (currentStatus === 'paid' || currentStatus === 'delivering') {
+      await Order.findByIdAndUpdate(orderId, {
+        $set: {
+          status: 'awaiting_store_confirm',
+          deliveryStatus: 'delivered'
+        },
+        $push: {
+          statusHistory: {
+            status: 'awaiting_store_confirm',
+            time: new Date(),
+            actorId: 'courier_system',
+            note: '第一程跑腿已送达，等待门店确认入库'
+          }
+        }
+      });
+      
+      console.log(`[跟踪] 第一程送达，订单 ${orderId} 自动更新: ${currentStatus} → awaiting_store_confirm`);
+      
+      // 发布状态变更事件，通知M端刷新
+      try {
+        const orderEventService = require('./orderEventService');
+        const updatedOrder = await Order.findById(orderId);
+        orderEventService.publishOrderEvent('order_status_changed', {
+          ...updatedOrder.toObject(),
+          _oldStatus: currentStatus
+        });
+      } catch (e) {
+        console.warn('[跟踪] 发布状态变更事件失败:', e.message);
+      }
+    }
+    // 第二程（delivering_back）: 不自动变更，等待客户确认收货
+  } catch (e) {
+    console.error(`[跟踪] 自动更新订单状态失败 (${orderId}):`, e.message);
+  }
+}
+
 function stopSimulation(orderId) {
   const task = activeTasks.get(orderId);
   if (task) {
     clearInterval(task.timer);
     activeTasks.delete(orderId);
+    lastNotifiedStatus.delete(orderId);
     console.log(`[跟踪] 停止订单 ${orderId} 跟踪 (mode: ${task.mode})`);
   }
 }
@@ -320,23 +388,58 @@ function publishCourierStatus(orderId, courierData) {
   }
 }
 
+/**
+ * 通知M端（门店管理页）跑腿状态变更 — 通过 orderEventService 发布到门店MQTT主题
+ * 仅在状态实际变更时发布，避免每8/15秒刷屏事件
+ */
+function notifyCourierStatusChange(order, courierData) {
+  try {
+    const orderId = order._id?.toString() || order.orderId;
+    const lastStatus = lastNotifiedStatus.get(orderId);
+    // 仅在状态实际变更时才发布（距离/ETA等进度更新不触发事件）
+    if (lastStatus === courierData.status) return;
+    lastNotifiedStatus.set(orderId, courierData.status);
+
+    const orderEventService = require('./orderEventService');
+    orderEventService.publishOrderEvent('courier_status_changed', {
+      _id: orderId, orderId, orderNo: order.orderNo,
+      storeId: order.storeId, categoryId: order.categoryId || 'cleaning',
+      status: order.status || 'delivering',
+      courier: {
+        status: courierData.status,
+        progress: courierData.progress,
+        distance: courierData.distance,
+        eta: courierData.eta,
+        name: courierData.courierName,
+        phone: courierData.courierPhone
+      }
+    }, { source: `courier-${courierData._mode || 'unknown'}` });
+  } catch (e) {
+    // 发布失败不影响主流程
+  }
+}
+
 async function updateCourierInDB(orderId, courierData) {
   try {
     const mongoose = require('mongoose');
     const Order = mongoose.model('Order');
     if (!Order) return;
 
-    await Order.findByIdAndUpdate(orderId, {
-      $set: {
-        'courier.status': courierData.status,
-        'courier.progress': courierData.progress,
-        'courier.distance': courierData.distance,
-        'courier.eta': courierData.eta,
-        'courier.name': courierData.courierName,
-        'courier.phone': courierData.courierPhone,
-        'courier.assignedAt': courierData.assignedAt || new Date()
-      }
-    }, { new: true });
+    const updateFields = {
+      'courier.status': courierData.status,
+      'courier.progress': courierData.progress,
+      'courier.distance': courierData.distance,
+      'courier.eta': courierData.eta,
+      'courier.name': courierData.courierName,
+      'courier.phone': courierData.courierPhone,
+      'courier.assignedAt': courierData.assignedAt || new Date()
+    };
+    // 同步更新 deliveryStatus，确保M端按钮条件正确
+    if (courierData.status && courierData.status !== 'exception') {
+      updateFields['deliveryStatus'] = courierData.status;
+    }
+
+    await Order.findByIdAndUpdate(orderId, { $set: updateFields }, { new: true });
   } catch (e) {
     console.error(`[跟踪] 更新DB失败 (${orderId}):`, e.message);
   }

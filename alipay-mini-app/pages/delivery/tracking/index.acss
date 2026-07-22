@@ -1,0 +1,21 @@
+.container { padding: 20rpx; }
+.map-placeholder { height: 300rpx; background: #f0f0f0; border-radius: 12rpx; display: flex; align-items: center; justify-content: center; margin-bottom: 20rpx; }
+.map-text { font-size: 28rpx; color: #999; }
+.status-card { background: #fff; border-radius: 12rpx; padding: 30rpx; margin-bottom: 20rpx; box-shadow: 0 2rpx 10rpx rgba(0,0,0,0.05); }
+.status-steps { display: flex; flex-direction: column; }
+.step { display: flex; padding-bottom: 40rpx; position: relative; }
+.step:last-child { padding-bottom: 0; }
+.step-dot { width: 24rpx; height: 24rpx; border-radius: 50%; background: #e8e8e8; margin-right: 20rpx; margin-top: 8rpx; position: relative; z-index: 1; }
+.step.completed .step-dot { background: #52c41a; }
+.step:not(:last-child)::after { content: ''; position: absolute; left: 12rpx; top: 32rpx; bottom: 0; width: 2rpx; background: #e8e8e8; }
+.step.completed:not(:last-child)::after { background: #52c41a; }
+.step-content { flex: 1; }
+.step-title { display: block; font-size: 30rpx; margin-bottom: 10rpx; }
+.step-time { display: block; font-size: 24rpx; color: #999; }
+.courier-card { background: #fff; border-radius: 12rpx; padding: 30rpx; box-shadow: 0 2rpx 10rpx rgba(0,0,0,0.05); }
+.courier-info { display: flex; align-items: center; margin-bottom: 30rpx; }
+.courier-avatar { width: 100rpx; height: 100rpx; border-radius: 50%; margin-right: 20rpx; }
+.courier-text { flex: 1; }
+.courier-name { display: block; font-size: 32rpx; font-weight: bold; margin-bottom: 10rpx; }
+.courier-phone { display: block; font-size: 26rpx; color: #999; }
+.call-btn { width: 100%; height: 80rpx; background: #1677ff; color: #fff; border-radius: 40rpx; font-size: 30rpx; font-weight: bold; border: none; box-shadow: 0 8rpx 30rpx rgba(22,119,255,0.3); }

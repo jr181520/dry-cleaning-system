@@ -1,0 +1,20 @@
+.container { padding: 20rpx; padding-bottom: 180rpx; }
+.store-card { background: #fff; border-radius: 12rpx; padding: 30rpx; margin-bottom: 20rpx; box-shadow: 0 2rpx 10rpx rgba(0,0,0,0.05); }
+.store-name { display: block; font-size: 32rpx; font-weight: bold; margin-bottom: 10rpx; }
+.store-address { display: block; font-size: 26rpx; color: #999; }
+.services-section { background: #fff; border-radius: 12rpx; padding: 30rpx; box-shadow: 0 2rpx 10rpx rgba(0,0,0,0.05); }
+.section-title { display: block; font-size: 32rpx; font-weight: bold; margin-bottom: 30rpx; }
+.service-list { display: flex; flex-direction: column; }
+.service-item { display: flex; justify-content: space-between; align-items: center; padding: 30rpx 0; border-bottom: 1rpx solid #f0f0f0; }
+.service-item:last-child { border-bottom: none; }
+.service-info { flex: 1; }
+.service-name { display: block; font-size: 30rpx; margin-bottom: 10rpx; }
+.service-price { display: block; font-size: 28rpx; color: #1677ff; font-weight: bold; }
+.quantity-control { display: flex; align-items: center; }
+.qty-btn { width: 60rpx; height: 60rpx; border-radius: 50%; background: #f0f0f0; display: flex; align-items: center; justify-content: center; font-size: 40rpx; color: #333; }
+.qty-num { padding: 0 30rpx; font-size: 32rpx; font-weight: bold; }
+.bottom-bar { position: fixed; bottom: 0; left: 0; right: 0; background: #fff; padding: 30rpx 40rpx; box-shadow: 0 -4rpx 20rpx rgba(0,0,0,0.1); display: flex; align-items: center; }
+.total-section { flex: 1; }
+.total-label { font-size: 28rpx; color: #666; }
+.total-amount { font-size: 40rpx; font-weight: bold; color: #1677ff; }
+.submit-btn { width: 300rpx; height: 80rpx; background: #1677ff; color: #fff; border-radius: 40rpx; font-size: 32rpx; font-weight: bold; border: none; }

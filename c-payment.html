@@ -210,6 +210,8 @@
             z-index: 99;
         }
     </style>
+    <!-- 用户数据隔离模块 -->
+    <script src="js/user-data-isolation.js"></script>
 </head>
 <body class="bg-gray-100 min-h-screen pb-56">
     <!-- 页面头部 -->
@@ -575,7 +577,22 @@
 
         // 加载订单数据
         function loadOrder() {
-            const orderData = localStorage.getItem('currentOrder');
+            let orderData = localStorage.getItem('currentOrder');
+            
+            // 回退：从 orders 数组中查找
+            if (!orderData) {
+                const _loadParams = new URLSearchParams(window.location.search);
+                const _loadOrderId = _loadParams.get('orderId') || _loadParams.get('id') || '';
+                if (_loadOrderId) {
+                    const allOrders = getUserOrders();
+                    const found = allOrders.find(o => (o.orderId || o.id || o._id || o.orderNo) === _loadOrderId);
+                    if (found) {
+                        orderData = JSON.stringify(found);
+                        localStorage.setItem('currentOrder', orderData);
+                    }
+                }
+            }
+            
             if (!orderData) {
                 alert('订单信息不存在');
                 window.location.href = 'c-index.html';
@@ -586,7 +603,10 @@
             
             // ===== 配送费单独支付模式 =====
             if (isDeliveryOnly) {
-                document.title = '配送费支付 - 干洗服务';
+                // 品类化标题
+                const _payCatNames = { cleaning:'干洗服务', shoe_care:'鞋类洗护', luxury_care:'奢侈品护理', pet_grooming:'宠物服务', electronics_repair:'维修服务' };
+                const _payCatId = new URLSearchParams(window.location.search).get('categoryId') || order.categoryId || 'cleaning';
+                document.title = '配送费支付 - ' + (_payCatNames[_payCatId] || '服务');
                 document.querySelector('.page-header .text-xl').textContent = '配送费支付';
                 
                 // 修改取消按钮
@@ -1306,12 +1326,12 @@
             
             // ===== 正常订单支付模式 =====
             // 更新C端订单
-            const orders = JSON.parse(localStorage.getItem('orders') || '[]');
+            const orders = getUserOrders();
             const orderIndex = orders.findIndex(o => o.orderId === order.orderId);
             if (orderIndex > -1) {
                 orders[orderIndex] = order;
             }
-            localStorage.setItem('orders', JSON.stringify(orders));
+            setUserOrders(orders);
             localStorage.setItem('currentOrder', JSON.stringify(order));
             
             // 同时同步到门店端订单（确保门店能看到新订单）
@@ -1354,14 +1374,14 @@
         function updateOrderInLocalStorage(updatedOrder) {
             try {
                 // 更新orders列表
-                const orders = JSON.parse(localStorage.getItem('orders') || '[]');
+                const orders = getUserOrders();
                 const orderId = updatedOrder.orderId || updatedOrder.orderNo || updatedOrder.id;
                 const idx = orders.findIndex(o => 
                     o.orderId === orderId || o.id === orderId || o.orderNo === orderId
                 );
                 if (idx > -1) {
                     orders[idx] = { ...orders[idx], ...updatedOrder };
-                    localStorage.setItem('orders', JSON.stringify(orders));
+                    setUserOrders(orders);
                 }
                 
                 // 更新currentOrder
@@ -1397,9 +1417,9 @@
                 clearInterval(countdownTimer);
                 
                 // 从订单列表中移除
-                const orders = JSON.parse(localStorage.getItem('orders') || '[]');
+                const orders = getUserOrders();
                 const filteredOrders = orders.filter(o => o.orderId !== order.orderId);
-                localStorage.setItem('orders', JSON.stringify(filteredOrders));
+                setUserOrders(filteredOrders);
                 localStorage.removeItem('currentOrder');
                 
                 window.location.href = 'c-index.html';

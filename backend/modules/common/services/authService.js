@@ -12,6 +12,7 @@ const userSchema = new mongoose.Schema({
   phone: { type: String, sparse: true, index: true }, // 移除unique约束，允许为空
   password: String,
   openid: { type: String, sparse: true, index: true }, // 微信openid，用于跨平台用户识别
+  alipayUserId: { type: String, sparse: true, index: true }, // 支付宝userId，用于支付宝小程序用户识别
   name: String,
   avatar: String,
   gender: { type: String, enum: ['male', 'female', 'unknown'], default: 'unknown' },
@@ -49,6 +50,7 @@ userSchema.index({ roles: 1 });
 userSchema.index({ storeId: 1 });
 userSchema.index({ status: 1 });
 userSchema.index({ openid: 1 }); // 微信openid索引
+userSchema.index({ alipayUserId: 1 }); // 支付宝userId索引
 
 // 密码中间件
 userSchema.pre('save', async function(next) {
@@ -195,6 +197,84 @@ class AuthService {
     console.log('[wechatLogin] 返回结果:', JSON.stringify(result).substring(0, 200));
     
     return result;
+  }
+
+  /**
+   * 支付宝小程序登录
+   */
+  async alipayLogin(alipayUserId, userData = {}) {
+    console.log('[alipayLogin] 开始执行, userId:', alipayUserId);
+
+    if (!alipayUserId) {
+      throw new Error('alipayUserId 不能为空');
+    }
+
+    // 通过 alipayUserId 查找用户
+    let user = await User.findOne({ alipayUserId: alipayUserId });
+
+    if (!user) {
+      // 新用户注册
+      const userNo = 'U' + Date.now() + String(Math.floor(Math.random() * 1000)).padStart(3, '0');
+      user = await User.create({
+        userNo,
+        phone: userData.phone || '',
+        alipayUserId: alipayUserId,
+        openid: 'alipay_' + alipayUserId, // 兼容字段
+        password: '',
+        name: userData.nickname || '支付宝用户',
+        avatar: userData.avatar || '',
+        roles: ['customer'],
+        createdFrom: 'alipay'
+      });
+      console.log('[alipayLogin] 新用户创建成功, userId:', user._id);
+    } else {
+      // 更新用户信息
+      if (userData.nickname) user.name = userData.nickname;
+      if (userData.avatar) user.avatar = userData.avatar;
+    }
+
+    user.lastLoginAt = new Date();
+    user.loginCount = (user.loginCount || 0) + 1;
+    await user.save();
+
+    const token = this.generateToken(user._id);
+
+    return {
+      user: this.sanitizeUser(user),
+      token,
+      alipayUserId
+    };
+  }
+
+  /**
+   * 手机号验证码登录
+   */
+  async phoneLogin(phone, userData = {}) {
+    console.log('[phoneLogin] 手机号:', phone);
+    if (!phone || phone.length !== 11) throw new Error('手机号不合法');
+
+    let user = await User.findOne({ phone: phone });
+
+    if (!user) {
+      const userNo = 'U' + Date.now() + String(Math.floor(Math.random() * 1000)).padStart(3, '0');
+      user = await User.create({
+        userNo,
+        phone: phone,
+        password: '',
+        name: userData.nickname || phone.substring(0, 3) + '****' + phone.substring(7),
+        avatar: '',
+        roles: ['customer'],
+        createdFrom: 'phone'
+      });
+      console.log('[phoneLogin] 新用户创建成功, userId:', user._id);
+    }
+
+    user.lastLoginAt = new Date();
+    user.loginCount = (user.loginCount || 0) + 1;
+    await user.save();
+
+    const token = this.generateToken(user._id);
+    return { user: this.sanitizeUser(user), token };
   }
 
   /**

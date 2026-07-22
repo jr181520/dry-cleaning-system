@@ -260,6 +260,7 @@ router.post('/callback', async (req, res) => {
         orderId: orderId,
         orderNo: order.orderNo,
         storeId: order.storeId,
+        categoryId: order.categoryId || 'cleaning',
         status: order.status,
         deliveryStatus: mapping.courierStatus,
         courier: order.courier,

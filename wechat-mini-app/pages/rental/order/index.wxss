@@ -1,0 +1,38 @@
+.container { background: #f8fafc; min-height: 100vh; }
+.section { background: #fff; padding: 30rpx; margin-bottom: 16rpx; }
+.section-header { display: flex; align-items: center; gap: 12rpx; margin-bottom: 16rpx; }
+.section-title { font-size: 30rpx; font-weight: 500; color: #1f2937; }
+.rental-icon { width: 40rpx; height: 40rpx; background: #7c3aed; color: #fff; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 20rpx; }
+
+.address-info { margin-bottom: 12rpx; }
+.address-row { display: flex; align-items: center; gap: 16rpx; }
+.addr-name { font-size: 30rpx; font-weight: 500; color: #1f2937; }
+.addr-phone { font-size: 28rpx; color: #6b7280; }
+.addr-detail { font-size: 26rpx; color: #6b7280; margin-top: 8rpx; display: block; }
+.edit-btn { background: #f3f4f6; color: #6b7280; font-size: 24rpx; }
+
+.order-item { display: flex; gap: 20rpx; }
+.item-img, .item-img-placeholder { width: 140rpx; height: 140rpx; border-radius: 12rpx; background: #f3f4f6; flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
+.item-img-placeholder text { font-size: 40rpx; color: #d1d5db; }
+.item-detail { flex: 1; }
+.item-name { font-size: 28rpx; font-weight: 500; color: #1f2937; display: block; }
+.item-spec { font-size: 24rpx; color: #9ca3af; display: block; margin-top: 4rpx; }
+.item-bottom { display: flex; justify-content: space-between; margin-top: 12rpx; }
+.item-price { font-size: 28rpx; font-weight: bold; color: #ef4444; }
+.item-days { font-size: 26rpx; color: #6b7280; }
+
+.fee-row { display: flex; justify-content: space-between; padding: 12rpx 0; font-size: 28rpx; }
+.fee-label { color: #6b7280; }
+.fee-value { color: #1f2937; }
+.total-row { border-top: 2rpx solid #f3f4f6; padding-top: 16rpx; margin-top: 8rpx; }
+.fee-total { color: #ef4444; font-weight: bold; font-size: 32rpx; }
+
+.pay-option { display: flex; align-items: center; gap: 16rpx; padding: 20rpx; border: 2rpx solid #e5e7eb; border-radius: 12rpx; margin-top: 12rpx; }
+.pay-option.active { border-color: #7c3aed; background: #f5f3ff; }
+.pay-icon { font-size: 32rpx; }
+
+.bottom-bar { position: fixed; bottom: 0; left: 0; right: 0; background: #fff; padding: 20rpx 30rpx; padding-bottom: calc(20rpx + env(safe-area-inset-bottom)); display: flex; align-items: center; box-shadow: 0 -4rpx 20rpx rgba(0,0,0,0.05); }
+.total-info { flex: 1; }
+.total-label { font-size: 24rpx; color: #6b7280; display: block; }
+.total-price { font-size: 40rpx; font-weight: bold; color: #ef4444; }
+.submit-btn { background: #7c3aed; color: #fff; border: none; border-radius: 16rpx; padding: 20rpx 60rpx; font-size: 30rpx; }

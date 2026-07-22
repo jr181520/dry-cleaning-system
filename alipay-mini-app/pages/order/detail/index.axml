@@ -1,0 +1,50 @@
+<view class="container" a:if="{{order}}">
+  <view class="status-banner status-{{order.status}}">
+    <text class="status-text">{{order.statusText}}</text>
+    <text class="status-desc">{{order.statusDesc}}</text>
+  </view>
+
+  <view class="timeline-card" a:if="{{order.timeline}}">
+    <text class="card-title">订单进度</text>
+    <view class="timeline">
+      <view class="timeline-item {{index === 0 ? 'active' : ''}}" a:for="{{order.timeline}}" key="index">
+        <view class="timeline-dot"></view>
+        <view class="timeline-content">
+          <text class="timeline-title">{{item.title}}</text>
+          <text class="timeline-time">{{item.time}}</text>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <view class="service-card">
+    <text class="card-title">服务信息</text>
+    <view class="service-item" a:for="{{order.items}}" key="id">
+      <view class="service-info">
+        <text class="service-name">{{item.name}}</text>
+        <text class="service-qty">x{{item.quantity}}</text>
+      </view>
+      <text class="service-price">¥{{item.price * item.quantity}}</text>
+    </view>
+    <view class="fee-summary">
+      <view class="fee-row">
+        <text class="fee-label">商品金额</text>
+        <text class="fee-value">¥{{order.total}}</text>
+      </view>
+      <view class="fee-row" a:if="{{order.deliveryFee}}">
+        <text class="fee-label">配送费</text>
+        <text class="fee-value">¥{{order.deliveryFee}}</text>
+      </view>
+      <view class="fee-row total">
+        <text class="fee-label">实付</text>
+        <text class="fee-value">¥{{order.totalAmount || order.total}}</text>
+      </view>
+    </view>
+  </view>
+
+  <view class="action-section">
+    <button a:if="{{order.status === 'pending'}}" class="action-btn primary" onTap="onPayTap">去支付</button>
+    <button a:if="{{order.status === 'pending'}}" class="action-btn" onTap="onCancelTap">取消订单</button>
+    <button a:if="{{order.status === 'delivering'}}" class="action-btn primary" onTap="onTrackingTap">查看配送</button>
+  </view>
+</view>

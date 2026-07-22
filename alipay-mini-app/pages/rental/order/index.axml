@@ -1,0 +1,107 @@
+<view class="page" a:if="{{!loading && item}}">
+  <!-- 收货地址 -->
+  <view class="address-card" onTap="onEditAddress">
+    <view a:if="{{address}}" class="address-info">
+      <view class="address-header">
+        <text class="address-name">{{address.name}}</text>
+        <text class="address-phone">{{address.phone}}</text>
+      </view>
+      <text class="address-detail">{{address.address}}</text>
+    </view>
+    <view a:else class="address-empty">
+      <text class="address-empty-text">请添加收货地址</text>
+    </view>
+    <text class="address-edit">编辑</text>
+  </view>
+
+  <!-- 租赁商品信息 -->
+  <view class="item-card">
+    <view class="item-row">
+      <image class="item-img" src="{{item.images[0] || '/assets/placeholder.png'}}" mode="aspectFill" />
+      <view class="item-meta">
+        <text class="item-name">{{item.name}}</text>
+        <text class="item-spec" a:if="{{item.size || item.color}}">{{item.size}} {{item.color}}</text>
+        <view class="item-price-row">
+          <text class="item-rate">¥{{item.dailyRate}}</text>
+          <text class="item-unit">/天 × {{rentalDays}}天</text>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 费用明细 -->
+  <view class="fee-section">
+    <text class="section-title">费用明细</text>
+    <view class="fee-row">
+      <text class="fee-label">租赁费用</text>
+      <text class="fee-value">¥{{rentalFee}}</text>
+    </view>
+    <view class="fee-row" a:if="{{depositFee > 0}}">
+      <text class="fee-label">押金（归还后退还）</text>
+      <text class="fee-value">¥{{depositFee}}</text>
+    </view>
+    <view class="fee-row" a:if="{{depositMode === 'credit_free'}}">
+      <text class="fee-label">押金（芝麻信用免押）</text>
+      <text class="fee-value fee-free">¥0</text>
+    </view>
+    <view class="fee-row" a:if="{{deliveryFee > 0}}">
+      <text class="fee-label">配送费</text>
+      <text class="fee-value">¥{{deliveryFee}}</text>
+    </view>
+    <view class="fee-row total-row">
+      <text class="fee-label">合计</text>
+      <text class="fee-value fee-total">¥{{totalPrice}}</text>
+    </view>
+  </view>
+
+  <!-- 芝麻信用免押徽章 -->
+  <view class="zhima-section" a:if="{{depositMode === 'credit_free'}}">
+    <view class="zhima-badge">
+      <text class="zhima-icon">🛡️</text>
+      <view class="zhima-info">
+        <text class="zhima-title">芝麻信用免押</text>
+        <text class="zhima-score" a:if="{{zhimaScore > 0}}">芝麻分{{zhimaScore}} · 已达标</text>
+      </view>
+      <text class="zhima-status">✓</text>
+    </view>
+  </view>
+
+  <!-- 支付方式 -->
+  <view class="pay-section">
+    <text class="section-title">支付方式</text>
+    <view class="pay-method">
+      <view class="pay-icon-wrap">
+        <text class="pay-icon">💳</text>
+        <text class="pay-name">支付宝支付</text>
+      </view>
+      <text class="pay-check">✓</text>
+    </view>
+    <view class="pay-method" a:if="{{showHuabei}}">
+      <view class="pay-icon-wrap">
+        <text class="pay-icon">🌸</text>
+        <text class="pay-name">花呗分期</text>
+        <text class="pay-hint">（大额订单可选）</text>
+      </view>
+      <text class="pay-arrow">›</text>
+    </view>
+  </view>
+
+  <!-- 底部占位 -->
+  <view class="bottom-placeholder"></view>
+
+  <!-- 底部操作栏 -->
+  <view class="bottom-bar">
+    <view class="bar-left">
+      <text class="bar-label">实付：</text>
+      <text class="bar-total">¥{{totalPrice}}</text>
+    </view>
+    <view class="bar-btn {{submitting ? 'disabled' : ''}}" onTap="onSubmit">
+      {{submitting ? '提交中...' : '提交订单'}}
+    </view>
+  </view>
+</view>
+
+<!-- 加载中 -->
+<view class="loading-wrap" a:if="{{loading}}">
+  <text class="text-gray">加载中...</text>
+</view>

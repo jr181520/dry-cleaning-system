@@ -406,6 +406,8 @@
         /* 隐藏类 */
         .hidden { display: none !important; }
     </style>
+    <!-- 用户数据隔离模块 -->
+    <script src="js/user-data-isolation.js"></script>
 </head>
 <body>
     <!-- 顶部导航 -->
@@ -620,7 +622,7 @@
         
         // 从 localStorage 加载（仅用于首屏快速展示，不做 stage 重置）
         function loadFromLocalStorage() {
-            const orders = JSON.parse(localStorage.getItem('orders') || '[]');
+            const orders = getUserOrders();
             const order = orders.find(o => o.orderId === orderId || o.id === orderId || o._id === orderId);
             if (order) {
                 currentOrder = order;
@@ -894,7 +896,7 @@
             window.addEventListener('storage', (e) => {
                 if (e.key === 'orders' || e.key === 'currentOrder') {
                     console.log('[配送跟踪] 跨标签页数据变更，同步 currentOrder 引用');
-                    const orders = JSON.parse(localStorage.getItem('orders') || '[]');
+                    const orders = getUserOrders();
                     const order = orders.find(o => o.orderId === orderId || o.id === orderId || o._id === orderId);
                     if (order) {
                         currentOrder = { ...currentOrder, ...order };
@@ -1030,7 +1032,7 @@
         
         // 更新本地订单状态
         function updateLocalOrderStatus(status, completedAt) {
-            const orders = JSON.parse(localStorage.getItem('orders') || '[]');
+            const orders = getUserOrders();
             const storeOrders = JSON.parse(localStorage.getItem('store_orders') || '[]');
             
             // 更新用户订单
@@ -1040,7 +1042,7 @@
                 orders[idx].completedAt = completedAt || new Date().toISOString();
                 orders[idx].courierStatus = 'completed';
                 orders[idx].deliveryStatus = 'completed';
-                localStorage.setItem('orders', JSON.stringify(orders));
+                setUserOrders(orders);
             }
             
             // 更新门店订单

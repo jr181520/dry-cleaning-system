@@ -177,6 +177,13 @@ const CrossSyncClient = {
         clean: true
       });
 
+      // 重连时刷新 clientId 避免 NanoMQ 会话冲突
+      this.config.mqttClient.on('reconnect', () => {
+        const newId = 'sync_' + this.config.type + '_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6);
+        this.config.mqttClient.options.clientId = newId;
+        console.log('[跨端同步] 重连中, 新clientId:', newId);
+      });
+
       this.config.mqttClient.on('connect', () => {
         this.config.isMqttConnected = true;
         console.log('[跨端同步] ✅ MQTT 已连接，订阅同步主题');

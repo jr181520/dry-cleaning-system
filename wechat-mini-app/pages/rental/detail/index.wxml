@@ -1,0 +1,103 @@
+<view class="container">
+  <!-- 图片轮播 -->
+  <swiper class="image-swiper" indicator-dots autoplay circular interval="3000">
+    <swiper-item wx:for="{{item.images}}" wx:key="*this">
+      <image src="{{item}}" mode="aspectFill" class="swiper-img"/>
+    </swiper-item>
+    <swiper-item wx:if="{{!item.images || item.images.length === 0}}">
+      <view class="swiper-placeholder"><text class="placeholder-text">◇</text></view>
+    </swiper-item>
+  </swiper>
+
+  <!-- 基本信息 -->
+  <view class="info-section">
+    <text class="item-name">{{item.name}}</text>
+    <view class="info-row">
+      <text class="item-brand">{{item.brand}}</text>
+      <text class="category-tag">{{categoryLabel}}</text>
+    </view>
+    <view class="price-row">
+      <text class="price">¥{{item.dailyRate}}</text>
+      <text class="unit">/天</text>
+    </view>
+    <view class="deposit-row">
+      <view class="deposit-badge deposit-{{item.depositMode}}">
+        {{item.depositMode === 'credit_free' ? '信用免押' : item.depositMode === 'both' ? '押金/免押可选' : '押金 ¥' + item.depositAmount}}
+      </view>
+      <text class="stock-info">库存{{item.availableStock}}</text>
+    </view>
+  </view>
+
+  <!-- 规格 -->
+  <view class="section">
+    <text class="section-title">规格信息</text>
+    <view class="spec-grid">
+      <view class="spec-item"><text class="spec-label">尺码:</text><text>{{item.size || '均码'}}</text></view>
+      <view class="spec-item"><text class="spec-label">颜色:</text><text>{{item.color || '--'}}</text></view>
+      <view class="spec-item"><text class="spec-label">品牌:</text><text>{{item.brand || '--'}}</text></view>
+      <view class="spec-item"><text class="spec-label">最短租期:</text><text>{{item.rentalPeriodMin}}天</text></view>
+    </view>
+  </view>
+
+  <!-- 租期选择 -->
+  <view class="section">
+    <text class="section-title">选择租期</text>
+    <view class="day-selector">
+      <view wx:for="{{dayPresets}}" wx:key="*this" 
+            class="day-btn {{selectedDays === item ? 'active' : ''}}"
+            bindtap="selectDay" data-days="{{item}}">
+        {{item}}天
+      </view>
+    </view>
+    <view class="custom-days">
+      <text class="custom-label">自定义:</text>
+      <input type="number" class="custom-input" value="{{selectedDays}}" bindinput="onCustomDays" min="{{item.rentalPeriodMin}}" max="{{item.rentalPeriodMax}}"/>
+      <text class="custom-unit">天</text>
+    </view>
+  </view>
+
+  <!-- 押金模式 -->
+  <view class="section" wx:if="{{item.depositMode === 'both'}}">
+    <text class="section-title">押金方式</text>
+    <view class="deposit-options">
+      <view class="deposit-option {{selectedDepositMode === 'deposit' ? 'active' : ''}}" bindtap="selectDepositMode" data-mode="deposit">
+        <text class="option-title">缴纳押金</text>
+        <text class="option-amount">¥{{item.depositAmount}}</text>
+      </view>
+      <view class="deposit-option {{selectedDepositMode === 'credit_free' ? 'active' : ''}}" bindtap="selectDepositMode" data-mode="credit_free">
+        <text class="option-title">信用免押</text>
+        <text class="option-amount">免押</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 商品描述 -->
+  <view class="section">
+    <text class="section-title">商品详情</text>
+    <text class="description">{{item.description || '暂无描述'}}</text>
+  </view>
+
+  <!-- 租赁须知 -->
+  <view class="section">
+    <text class="section-title">租赁须知</text>
+    <view class="notice-list">
+      <text class="notice-item">✓ 租期从签收次日开始计算</text>
+      <text class="notice-item">✓ 到期后请及时归还，逾期将收取逾期费</text>
+      <text class="notice-item">✓ 归还时如物品损坏，押金将部分或全部扣除</text>
+      <text class="notice-item">✓ 双程跑腿配送，归还时再叫一次跑腿即可</text>
+    </view>
+  </view>
+
+  <!-- 底部占位 -->
+  <view style="height: 120rpx;"></view>
+
+  <!-- 底部操作栏 -->
+  <view class="bottom-bar">
+    <view class="total-info">
+      <text class="total-label">合计</text>
+      <text class="total-price">¥{{totalPrice}}</text>
+      <text class="total-deposit">含押金¥{{depositAmount}}</text>
+    </view>
+    <button class="order-btn" bindtap="goOrder">立即租赁</button>
+  </view>
+</view>

@@ -1,0 +1,14 @@
+.container { padding-bottom: 180rpx; }
+.hero-image { width: 100%; height: 400rpx; }
+.info-card, .detail-card { background: #fff; padding: 30rpx; margin: 20rpx; border-radius: 12rpx; box-shadow: 0 2rpx 10rpx rgba(0,0,0,0.05); }
+.service-name { display: block; font-size: 40rpx; font-weight: bold; margin-bottom: 20rpx; }
+.service-price { display: block; font-size: 48rpx; font-weight: bold; color: #1677ff; margin-bottom: 20rpx; }
+.service-tags { display: flex; flex-wrap: wrap; gap: 15rpx; }
+.tag { background: #e6f7ff; color: #1677ff; padding: 10rpx 25rpx; border-radius: 20rpx; font-size: 24rpx; }
+.card-title { display: block; font-size: 32rpx; font-weight: bold; margin-bottom: 20rpx; }
+.service-desc { display: block; font-size: 28rpx; line-height: 1.8; color: #666; margin-bottom: 30rpx; }
+.service-features { display: flex; flex-direction: column; gap: 20rpx; }
+.feature { display: flex; align-items: center; }
+.feature-icon { color: #52c41a; font-size: 32rpx; margin-right: 15rpx; }
+.feature-text { font-size: 28rpx; color: #333; }
+.order-btn { position: fixed; bottom: 40rpx; left: 40rpx; right: 40rpx; height: 100rpx; background: #1677ff; color: #fff; border-radius: 50rpx; font-size: 32rpx; font-weight: bold; border: none; box-shadow: 0 8rpx 30rpx rgba(22,119,255,0.3); }

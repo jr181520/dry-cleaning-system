@@ -97,6 +97,8 @@
             50% { box-shadow: 0 0 30rpx rgba(251, 191, 36, 1); }
         }
     </style>
+    <!-- 用户数据隔离模块 -->
+    <script src="js/user-data-isolation.js"></script>
 </head>
 <body class="bg-gray-100 min-h-screen pb-32">
     <!-- 顶部导航 -->
@@ -345,7 +347,7 @@
         
         // 加载待取订单
         function loadPendingOrders() {
-            const orders = JSON.parse(localStorage.getItem('orders') || '[]');
+            const orders = getUserOrders();
             const storeOrders = JSON.parse(localStorage.getItem('store_orders') || '[]');
             
             // 合并订单并筛选待取件
@@ -580,13 +582,13 @@
         // 更新本地物品状态
         function updateLocalItemStatus(orderId, itemIndex, status) {
             // 更新C端订单
-            const orders = JSON.parse(localStorage.getItem('orders') || '[]');
+            const orders = getUserOrders();
             const orderIdx = orders.findIndex(o => (o.orderId || o.id || o._id) === orderId);
             if (orderIdx > -1) {
                 const items = orders[orderIdx].items || orders[orderIdx].services || [];
                 if (items[itemIndex]) {
                     items[itemIndex].status = status;
-                    localStorage.setItem('orders', JSON.stringify(orders));
+                    setUserOrders(orders);
                 }
             }
             

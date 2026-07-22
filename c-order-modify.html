@@ -45,6 +45,8 @@
             font-size: 24rpx;
         }
     </style>
+    <!-- 用户数据隔离模块 -->
+    <script src="js/user-data-isolation.js"></script>
 </head>
 <body class="bg-gray-100 min-h-screen pb-24">
     <!-- 顶部导航 -->
@@ -350,7 +352,7 @@
             }
             
             // 更新本地订单（支持多种ID格式匹配）
-            const orders = JSON.parse(localStorage.getItem('orders') || '[]');
+            const orders = getUserOrders();
             const idx = orders.findIndex(o => 
                 o.orderId === orderId || 
                 o.id === orderId || 
@@ -359,11 +361,11 @@
             );
             if (idx > -1) {
                 orders[idx] = modifiedOrder;
-                localStorage.setItem('orders', JSON.stringify(orders));
+                setUserOrders(orders);
             } else {
                 // 如果本地没有，添加修改后的订单
                 orders.push(modifiedOrder);
-                localStorage.setItem('orders', JSON.stringify(orders));
+                setUserOrders(orders);
             }
             localStorage.setItem('currentOrder', JSON.stringify(modifiedOrder));
             localStorage.removeItem('modifyingOrder');

@@ -1,0 +1,31 @@
+<view class="container">
+  <view class="store-card" a:if="{{store}}">
+    <text class="store-name">{{store.name}}</text>
+    <text class="store-address">{{store.address}}</text>
+  </view>
+
+  <view class="services-section">
+    <text class="section-title">选择服务</text>
+    <view class="service-list">
+      <view class="service-item" a:for="{{services}}" key="id">
+        <view class="service-info">
+          <text class="service-name">{{item.name}}</text>
+          <text class="service-price">¥{{item.price}}</text>
+        </view>
+        <view class="quantity-control">
+          <view class="qty-btn" onTap="onMinusItem" data-id="{{item.id}}">-</view>
+          <text class="qty-num">{{getItemQuantity(item.id) || 0}}</text>
+          <view class="qty-btn" onTap="onAddItem" data-id="{{item.id}}">+</view>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <view class="bottom-bar">
+    <view class="total-section">
+      <text class="total-label">合计：</text>
+      <text class="total-amount">¥{{total}}</text>
+    </view>
+    <button class="submit-btn" onTap="onSubmitTap">下一步</button>
+  </view>
+</view>

@@ -1,0 +1,116 @@
+<view class="page" a:if="{{!loading && item}}">
+  <!-- 图片轮播 -->
+  <swiper class="image-swiper" indicator-dots="{{true}}" current="{{currentImage}}" onChange="onSwiperChange">
+    <swiper-item a:for="{{item.images || ['/assets/placeholder.png']}}" a:for-item="img" key="{{img}}">
+      <image class="swiper-image" src="{{img}}" mode="aspectFill" />
+    </swiper-item>
+  </swiper>
+
+  <!-- 商品信息 -->
+  <view class="product-section">
+    <view class="product-header">
+      <text class="product-name">{{item.name}}</text>
+      <view class="tag-row">
+        <text class="brand-tag" a:if="{{item.brand}}">{{item.brand}}</text>
+        <text class="category-tag" a:if="{{item.category}}">{{item.category}}</text>
+      </view>
+    </view>
+
+    <view class="price-row">
+      <text class="daily-price">¥{{item.dailyRate}}</text>
+      <text class="price-unit">/天</text>
+      <view class="deposit-badge {{item.depositMode}}">
+        {{item.depositMode === 'credit_free' ? '信用免押' : item.depositMode === 'both' ? '免押可选' : '需押金'}}
+      </view>
+    </view>
+
+    <text class="stock-text">库存：{{item.stock || 0}}件可租</text>
+  </view>
+
+  <!-- 规格参数 -->
+  <view class="specs-section" a:if="{{item.size || item.color || item.brand || item.minRentalDays}}">
+    <text class="section-title">规格参数</text>
+    <view class="specs-grid">
+      <view class="spec-item" a:if="{{item.size}}">
+        <text class="spec-label">尺码</text>
+        <text class="spec-value">{{item.size}}</text>
+      </view>
+      <view class="spec-item" a:if="{{item.color}}">
+        <text class="spec-label">颜色</text>
+        <text class="spec-value">{{item.color}}</text>
+      </view>
+      <view class="spec-item" a:if="{{item.brand}}">
+        <text class="spec-label">品牌</text>
+        <text class="spec-value">{{item.brand}}</text>
+      </view>
+      <view class="spec-item" a:if="{{item.minRentalDays}}">
+        <text class="spec-label">最短租期</text>
+        <text class="spec-value">{{item.minRentalDays}}天</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 租期选择 -->
+  <view class="period-section">
+    <text class="section-title">租赁时长</text>
+    <view class="period-presets">
+      <view a:for="{{periodPresets}}" a:for-item="d" key="{{d}}"
+        class="period-btn {{selectedDays === d ? 'active' : ''}}"
+        onTap="onPeriodTap" data-days="{{d}}">
+        {{d}}天
+      </view>
+      <view class="period-custom">
+        <input class="custom-input" type="number" placeholder="自定义" value="{{customDays}}" onInput="onCustomDays" />
+        <text class="custom-unit">天</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 押金方式（仅both时显示） -->
+  <view class="deposit-section" a:if="{{item.depositMode === 'both'}}">
+    <text class="section-title">押金方式</text>
+    <view class="deposit-options">
+      <view class="deposit-card {{depositMode === 'credit_free' ? 'active' : ''}}" onTap="onDepositModeTap" data-mode="credit_free">
+        <text class="deposit-card-title">芝麻信用免押</text>
+        <text class="deposit-card-desc" a:if="{{zhimaScore > 0}}">芝麻分{{zhimaScore}} · {{zhimaEligible ? '已达标' : '未达标'}}</text>
+        <text class="deposit-card-desc" a:else>授权芝麻信用查询</text>
+        <text class="deposit-card-price">¥0 押金</text>
+      </view>
+      <view class="deposit-card {{depositMode === 'deposit' ? 'active' : ''}}" onTap="onDepositModeTap" data-mode="deposit">
+        <text class="deposit-card-title">缴纳押金</text>
+        <text class="deposit-card-desc">归还后退还</text>
+        <text class="deposit-card-price">¥{{item.depositAmount || 0}}</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 商品描述 -->
+  <view class="desc-section" a:if="{{item.description}}">
+    <text class="section-title">商品描述</text>
+    <text class="desc-text">{{item.description}}</text>
+  </view>
+
+  <!-- 租赁须知 -->
+  <view class="notes-section" a:if="{{item.rentalNotes}}">
+    <text class="section-title">租赁须知</text>
+    <text class="notes-text">{{item.rentalNotes}}</text>
+  </view>
+
+  <!-- 底部占位 -->
+  <view class="bottom-placeholder"></view>
+
+  <!-- 底部操作栏 -->
+  <view class="bottom-bar">
+    <view class="bar-price">
+      <text class="bar-label">合计：</text>
+      <text class="bar-total">¥{{totalPrice}}</text>
+      <text class="bar-deposit" a:if="{{depositAmount > 0}}">（含押金¥{{depositAmount}}）</text>
+    </view>
+    <view class="bar-btn" onTap="onOrderTap">立即租赁</view>
+  </view>
+</view>
+
+<!-- 加载中 -->
+<view class="loading-wrap" a:if="{{loading}}">
+  <text class="text-gray">加载中...</text>
+</view>

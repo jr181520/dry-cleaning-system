@@ -1,0 +1,19 @@
+<view class="container">
+  <view class="service-list">
+    <view class="service-card" a:for="{{services}}" key="id" onTap="onServiceTap" data-id="{{item.id}}">
+      <image class="service-image" src="{{item.image}}" mode="aspectFill" />
+      <view class="service-content">
+        <text class="service-name">{{item.name}}</text>
+        <text class="service-desc">{{item.description}}</text>
+        <view class="service-footer">
+          <text class="service-price">¥{{item.price}}</text>
+          <button class="order-btn" size="mini" onTap="onOrderTap" data-id="{{item.id}}">立即下单</button>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <view class="empty" a:if="{{services.length === 0}}">
+    <text>暂无服务</text>
+  </view>
+</view>

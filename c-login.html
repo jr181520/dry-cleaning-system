@@ -8,6 +8,8 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Font Awesome -->
     <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+    <!-- 用户数据隔离模块 -->
+    <script src="js/user-data-isolation.js"></script>
     
     <script>
         tailwind.config = {
@@ -169,6 +171,8 @@
                 
                 // 获取用户信息
                 fetchUserInfo(token).then(() => {
+                    // 【数据隔离】登录成功后迁移旧数据
+                    migrateLegacyOrdersOnLogin();
                     showToast('微信登录成功！', 'success');
                     setTimeout(() => window.location.href = 'c-index.html', 1000);
                 });
@@ -250,6 +254,9 @@
                     localStorage.setItem('userInfo', JSON.stringify(result.data.user));
                     localStorage.setItem('userPhone', result.data.user.phone || '');
                     
+                    // 【数据隔离】登录成功后迁移旧数据
+                    migrateLegacyOrdersOnLogin();
+                    
                     showToast('测试登录成功！', 'success');
                     setTimeout(() => window.location.href = 'c-index.html', 1000);
                 } else {
@@ -309,6 +316,12 @@
                     localStorage.setItem('userToken', result.data.token);
                     localStorage.setItem('userInfo', JSON.stringify(result.data.user));
                     localStorage.setItem('userPhone', phone);
+                    // 如果有 openid 也保存
+                    if (result.data.openid) localStorage.setItem('userOpenid', result.data.openid);
+                    
+                    // 【数据隔离】登录成功后迁移旧数据
+                    migrateLegacyOrdersOnLogin();
+                    
                     showToast('登录成功！');
                     setTimeout(() => window.location.href = 'c-index.html', 500);
                 } else {
@@ -345,11 +358,32 @@
                 localStorage.setItem('userToken', 'mock-token-' + phone);
                 localStorage.setItem('userInfo', JSON.stringify(user));
                 localStorage.setItem('userPhone', phone);
+                localStorage.setItem('userOpenid', user.id);
                 localStorage.setItem('isMockUser', 'true');
+                
+                // 【数据隔离】登录成功后迁移旧数据
+                migrateLegacyOrdersOnLogin();
+                
                 showToast(`模拟登录成功: ${user.name}`);
                 setTimeout(() => window.location.href = 'c-index.html', 500);
             }
         }
+        
+        // 登出函数
+        window.logout = function() {
+            if (confirm('确定要退出登录吗？')) {
+                // 【数据隔离】清理当前用户数据
+                clearUserDataOnLogout();
+                // 清理登录状态
+                localStorage.removeItem('userToken');
+                localStorage.removeItem('userInfo');
+                localStorage.removeItem('userPhone');
+                localStorage.removeItem('userOpenid');
+                localStorage.removeItem('isMockUser');
+                showToast('已退出登录', 'info');
+                setTimeout(() => window.location.href = 'c-login.html', 500);
+            }
+        };
         
         // 店员跳转门店端登录
         function quickLoginStaff() {

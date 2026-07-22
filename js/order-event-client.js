@@ -139,7 +139,9 @@ const OrderEventClient = {
         this.client.on('close', () => this.onClose());
         this.client.on('offline', () => this.onClose());
         this.client.on('reconnect', () => {
-          console.log('[订单事件] 正在重连...');
+          const newId = `m_store_${this.config.storeId}_${Date.now()}`;
+          this.client.options.clientId = newId;
+          console.log('[订单事件] 正在重连, 新clientId:', newId);
         });
       } else if (window.__mqttLoaded === undefined) {
         console.log('[订单事件] mqtt.js 正在加载，1秒后重试...');

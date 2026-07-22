@@ -1,0 +1,30 @@
+<view class="container" a:if="{{delivery}}">
+  <view class="map-placeholder">
+    <text class="map-text">地图加载中...</text>
+  </view>
+
+  <view class="status-card">
+    <view class="status-steps">
+      <view class="step {{item.completed ? 'completed' : ''}}" a:for="{{steps}}" key="index">
+        <view class="step-dot"></view>
+        <view class="step-content">
+          <text class="step-title">{{item.title}}</text>
+          <text class="step-time" a:if="{{item.time}}">{{item.time}}</text>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <view class="courier-card" a:if="{{courier}}">
+    <view class="courier-info">
+      <image class="courier-avatar" src="{{courier.avatar || '/images/default-avatar.png'}}" mode="aspectFill" />
+      <view class="courier-text">
+        <text class="courier-name">{{courier.name}}</text>
+        <text class="courier-phone">{{courier.phone}}</text>
+      </view>
+    </view>
+    <button class="call-btn" onTap="onCallCourierTap">
+      <text>📞 联系骑手</text>
+    </button>
+  </view>
+</view>

@@ -1093,11 +1093,13 @@ router.get('/stores', async (req, res) => {
 /**
  * 获取门店所有订单（M端使用，无需admin权限）
  * GET /api/cleaning/store/:storeId/orders
+ * storeId 支持逗号分隔多ID: /store/ST001,ST002/orders
+ * 可选查询参数: categoryId, status
  */
 router.get('/store/:storeId/orders', async (req, res) => {
   try {
     const { storeId } = req.params;
-    const { page = 1, pageSize = 50, status } = req.query;
+    const { page = 1, pageSize = 50, status, categoryId } = req.query;
 
     const mongoose = require('mongoose');
     const Order = mongoose.models.Order;
@@ -1105,8 +1107,32 @@ router.get('/store/:storeId/orders', async (req, res) => {
       return res.json({ success: true, data: { list: [], pagination: { page: 1, pageSize: 50, total: 0, totalPages: 0 } } });
     }
 
-    const filter = { storeId };
+    // 支持逗号分隔的多 storeId
+    const rawIds = storeId.split(',').map(s => s.trim()).filter(Boolean);
+    
+    // 解析ObjectId格式的storeId -> 对应的storeNo
+    const resolvedIds = new Set(rawIds);
+    const Store = mongoose.models.Store;
+    if (Store) {
+      for (const id of rawIds) {
+        if (mongoose.Types.ObjectId.isValid(id)) {
+          try {
+            const store = await Store.findById(id).select('storeNo').lean();
+            if (store && store.storeNo) {
+              resolvedIds.add(store.storeNo);
+            }
+          } catch(e) {}
+        }
+      }
+    }
+    
+    const storeIds = [...resolvedIds];
+    const filter = storeIds.length > 1
+      ? { storeId: { $in: storeIds } }
+      : { storeId: storeIds[0] };
+
     if (status) filter.status = status;
+    if (categoryId) filter.categoryId = categoryId;
 
     const [orders, total] = await Promise.all([
       Order.find(filter).sort({ createdAt: -1 }).skip((parseInt(page) - 1) * parseInt(pageSize)).limit(parseInt(pageSize)),
@@ -1123,6 +1149,69 @@ router.get('/store/:storeId/orders', async (req, res) => {
   } catch (error) {
     console.error('[门店订单] 获取失败:', error);
     res.status(500).json({ success: false, error: 'server_error', message: '获取门店订单失败' });
+  }
+});
+
+/**
+ * 获取商家关联的所有门店列表
+ * GET /api/cleaning/merchant/stores?storeId=ST002
+ * 根据门店的 ownerId 查找同一商家管理的所有门店
+ * 如果 ownerId 未设置，则回退返回所有活跃门店
+ */
+router.get('/merchant/stores', async (req, res) => {
+  try {
+    const { storeId } = req.query;
+    const Store = require('mongoose').models.Store;
+    if (!Store) {
+      return res.json({ success: true, data: [] });
+    }
+
+    let stores = [];
+
+    if (storeId) {
+      // 查找当前门店：先按 storeNo 查，再按 _id 查（兼容ObjectId格式的storeId）
+      let currentStore = await Store.findOne({ storeNo: storeId }).lean();
+      if (!currentStore) {
+        try {
+          const mongoose = require('mongoose');
+          if (mongoose.Types.ObjectId.isValid(storeId)) {
+            currentStore = await Store.findById(storeId).lean();
+          }
+        } catch(e) {}
+      }
+
+      if (currentStore && currentStore.ownerId) {
+        // 查找同一 owner 的所有门店
+        stores = await Store.find({
+          ownerId: currentStore.ownerId,
+          status: 'active'
+        }).select('storeNo name businessCategory address phone status').lean();
+      }
+
+      // 如果 ownerId 未设置或未匹配到多个门店，仅返回当前门店（数据隔离）
+      if (stores.length <= 1 && currentStore) {
+        stores = [currentStore];
+      }
+    } else {
+      // 无 storeId 参数时返回空数组（不应发生）
+      stores = [];
+    }
+
+    // 格式化返回数据（同时包含storeNo和_id，确保前端能匹配订单中的storeId）
+    const result = stores.map(s => ({
+      storeId: s.storeNo || s._id.toString(),
+      _id: s._id.toString(),
+      storeNo: s.storeNo,
+      name: s.name,
+      businessCategory: s.businessCategory || 'cleaning',
+      address: s.address,
+      phone: s.phone
+    }));
+
+    res.json({ success: true, data: result });
+  } catch (error) {
+    console.error('[商家门店] 获取失败:', error);
+    res.status(500).json({ success: false, error: 'server_error', message: '获取商家门店列表失败' });
   }
 });
 
@@ -1552,6 +1641,70 @@ router.get('/boarding/defaults', async (req, res) => {
       foodPerDay: 15
     }
   });
+});
+
+/**
+ * 历史订单品类修正（一次性工具接口）
+ * POST /api/cleaning/fix-category-data
+ * 根据 storeId 反查门店 businessCategory，修正错误的 categoryId
+ */
+router.post('/fix-category-data', async (req, res) => {
+  try {
+    const mongoose = require('mongoose');
+    const Order = mongoose.models.Order;
+    const Store = mongoose.models.Store;
+    if (!Order || !Store) {
+      return res.json({ success: false, message: '模型不可用' });
+    }
+
+    // 获取所有活跃门店的 storeNo -> businessCategory 映射
+    const stores = await Store.find({ status: 'active' }).select('storeNo businessCategory').lean();
+    const storeCategoryMap = {};
+    stores.forEach(s => {
+      storeCategoryMap[s.storeNo] = s.businessCategory || 'cleaning';
+    });
+
+    // 查找 categoryId 为 cleaning（默认值）的订单
+    const suspectOrders = await Order.find({
+      $or: [
+        { categoryId: 'cleaning' },
+        { categoryId: { $exists: false } }
+      ]
+    }).select('_id storeId categoryId').lean();
+
+    let fixedCount = 0;
+    const bulkOps = [];
+
+    suspectOrders.forEach(order => {
+      const actualCategory = storeCategoryMap[order.storeId];
+      if (actualCategory && actualCategory !== 'cleaning') {
+        bulkOps.push({
+          updateOne: {
+            filter: { _id: order._id },
+            update: { $set: { categoryId: actualCategory, orderType: 'service' } }
+          }
+        });
+        fixedCount++;
+      }
+    });
+
+    if (bulkOps.length > 0) {
+      await Order.bulkWrite(bulkOps);
+    }
+
+    console.log(`[品类修正] 扫描${suspectOrders.length}条订单，修正${fixedCount}条`);
+    res.json({
+      success: true,
+      data: {
+        scanned: suspectOrders.length,
+        fixed: fixedCount,
+        storeCategoryMap
+      }
+    });
+  } catch (error) {
+    console.error('[品类修正] 失败:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
 });
 
 module.exports = router;

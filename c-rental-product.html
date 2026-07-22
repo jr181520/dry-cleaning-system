@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>租赁商品详情</title>
+    <link rel="stylesheet" href="lib/font-awesome.min.css">
+    <style>
+        * { margin:0; padding:0; box-sizing:border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background:#f5f5f5; color:#111; max-width:480px; margin:0 auto; min-height:100vh; padding-bottom:80px; }
+        .gallery { position:relative; background:#f3f4f6; }
+        .gallery img { width:100%; height:300px; object-fit:cover; }
+        .gallery .thumbs { position:absolute; bottom:10px; left:50%; transform:translateX(-50%); display:flex; gap:4px; }
+        .gallery .thumbs img { width:44px; height:44px; object-fit:cover; border-radius:6px; border:2px solid white; cursor:pointer; }
+        .gallery .thumbs img.active { border-color:#8b5cf6; }
+        .gallery .count { position:absolute; top:10px; right:10px; background:rgba(0,0,0,0.5); color:white; font-size:10px; padding:2px 8px; border-radius:10px; }
+        .gallery .placeholder { height:220px; display:flex; align-items:center; justify-content:center; background:#faf5ff; font-size:64px; }
+        .info { background:white; padding:16px; margin-top:8px; border-radius:12px 12px 0 0; }
+        .tags { display:flex; gap:4px; margin-bottom:8px; flex-wrap:wrap; }
+        .tag { font-size:10px; color:white; padding:2px 8px; border-radius:10px; }
+        .title { font-size:20px; font-weight:800; }
+        .subtitle { font-size:12px; color:#9ca3af; margin-top:2px; }
+        .status { font-size:10px; padding:3px 8px; border-radius:4px; font-weight:600; }
+        .price-grid { display:flex; gap:8px; margin-top:14px; }
+        .price-card { flex:1; border-radius:8px; padding:10px; text-align:center; }
+        .price-card .label { font-size:10px; }
+        .price-card .amount { font-size:20px; font-weight:800; }
+        .price-card .unit { font-size:9px; color:#9ca3af; }
+        .deposit-section { margin-top:12px; background:#faf5ff; border-radius:8px; padding:12px; }
+        .deposit-title { font-size:13px; font-weight:600; color:#7c3aed; margin-bottom:8px; }
+        .deposit-badges { display:flex; gap:6px; flex-wrap:wrap; }
+        .deposit-badge { font-size:11px; padding:3px 8px; border-radius:4px; }
+        .calc-section { margin-top:12px; background:#f8fafc; border-radius:8px; padding:12px; }
+        .calc-title { font-size:13px; font-weight:600; margin-bottom:8px; }
+        .calc-row { display:flex; align-items:center; gap:8px; }
+        .calc-row input { width:70px; height:36px; text-align:center; border:1px solid #d1d5db; border-radius:8px; font-size:16px; font-weight:700; }
+        .calc-total { margin-left:auto; font-size:20px; font-weight:800; color:#dc2626; }
+        .calc-meta { font-size:10px; color:#9ca3af; margin-top:6px; }
+        .desc-section { margin-top:12px; }
+        .desc-title { font-size:13px; font-weight:600; margin-bottom:6px; }
+        .desc-text { font-size:13px; color:#6b7280; line-height:1.8; }
+        .bottom-bar { position:fixed; bottom:0; left:50%; transform:translateX(-50%); width:100%; max-width:480px; background:white; padding:10px 16px; border-top:1px solid #e5e7eb; display:flex; gap:10px; z-index:100; }
+        .btn-cart { flex:1; padding:14px; background:white; border:2px solid #8b5cf6; color:#8b5cf6; border-radius:12px; font-size:14px; font-weight:600; }
+        .btn-rent { flex:2; padding:14px; background:linear-gradient(135deg,#8b5cf6,#ec4899); color:white; border:none; border-radius:12px; font-size:15px; font-weight:700; }
+        .loading { text-align:center; padding:80px 20px; color:#9ca3af; }
+        .error { text-align:center; padding:80px 20px; }
+        .nav-bar { position:sticky; top:0; z-index:10; display:flex; justify-content:space-between; align-items:center; padding:10px 16px; background:white; border-bottom:1px solid #e5e7eb; }
+        .nav-bar button { background:none; border:none; font-size:14px; cursor:pointer; }
+    </style>
+</head>
+<body>
+    <div class="nav-bar">
+        <button onclick="history.back()" style="color:#374151;"><i class="fa fa-arrow-left"></i> 返回</button>
+        <span style="font-size:14px;font-weight:600;color:#374151;">租赁商品</span>
+        <button onclick="shareProduct()" style="color:#8b5cf6;"><i class="fa fa-share-alt"></i> 分享</button>
+    </div>
+    <div id="app">
+        <div class="loading"><i class="fa fa-spinner fa-spin fa-2x"></i><p style="margin-top:10px;">加载中...</p></div>
+    </div>
+
+    <script>
+    window.getApiBaseUrl = function() {
+        if (typeof API_CONFIG !== 'undefined' && API_CONFIG.baseUrl) return API_CONFIG.baseUrl;
+        return 'http://localhost:3000/api';
+    };
+    (function() {
+        var params = {};
+        window.location.search.substring(1).split('&').forEach(function(p) {
+            var kv = p.split('=');
+            if (kv.length === 2) params[decodeURIComponent(kv[0])] = decodeURIComponent(kv[1]);
+        });
+        var productId = params.id || '';
+        var storeId = params.store || '';
+
+        function getApiBase() {
+            try { return (typeof window.getApiBaseUrl === 'function') ? window.getApiBaseUrl() : 'http://localhost:3000/api'; }
+            catch(e) { return 'http://localhost:3000/api'; }
+        }
+
+        function loadProduct() {
+            if (!productId) { showError('缺少商品ID'); return; }
+            // Try loading from StoreConfig
+            try {
+                var cfgKey = storeId ? ('store_' + storeId + '_config') : null;
+                if (cfgKey) {
+                    var raw = localStorage.getItem(cfgKey);
+                    if (raw) {
+                        var cfg = JSON.parse(raw);
+                        var svc = (cfg.services || []).find(function(s) { return s.id === productId; });
+                        if (svc) { renderProduct(svc); return; }
+                    }
+                }
+            } catch(e) {}
+            // Try API
+            fetch(getApiBase() + '/rental/items/' + productId + (storeId ? '?storeId=' + storeId : ''))
+                .then(function(r) { return r.json(); })
+                .then(function(res) {
+                    var item = (res && res.data) || (res && res.item) || res;
+                    if (item && item.name) { renderProduct(item); }
+                    else { showError('商品不存在或已下架'); }
+                })
+                .catch(function() { showError('加载失败，请稍后重试'); });
+        }
+
+        function showError(msg) {
+            document.getElementById('app').innerHTML = '<div class="error"><div style="font-size:48px;margin-bottom:12px;">😕</div><p style="color:#6b7280;">' + msg + '</p></div>';
+        }
+
+        function renderProduct(svc) {
+            document.title = svc.name + ' - 租赁';
+            var html = '';
+            // Gallery
+            var imgs = svc.images || [];
+            if (imgs.length > 0) {
+                html += '<div class="gallery"><img id="main-img" src="' + imgs[0] + '" onerror="this.parentElement.innerHTML=\'<div class=placeholder>' + (svc.icon||'📦') + '</div>\'">';
+                if (imgs.length > 1) {
+                    html += '<div class="thumbs">';
+                    imgs.forEach(function(u, i) {
+                        html += '<img src="' + u + '" class="' + (i===0?'active':'') + '" onclick="switchImg(this,\'' + u + '\')" onerror="this.style.display=\'none\'">';
+                    });
+                    html += '</div>';
+                }
+                html += '<span class="count">' + imgs.length + '张</span></div>';
+            } else {
+                html += '<div class="gallery"><div class="placeholder">' + (svc.icon||'📦') + '</div></div>';
+            }
+            // Info
+            html += '<div class="info">';
+            if (svc.tags && svc.tags.length > 0) {
+                html += '<div class="tags">';
+                svc.tags.forEach(function(tag) {
+                    var c = tag==='新品'?'#ec4899':tag==='热门'?'#f97316':tag==='限时特惠'?'#ef4444':'#6b7280';
+                    html += '<span class="tag" style="background:'+c+'">'+tag+'</span>';
+                });
+                html += '</div>';
+            }
+            html += '<div style="display:flex;justify-content:space-between;align-items:start;">';
+            html += '<div><div class="title">' + svc.name + '</div>';
+            html += '<div class="subtitle">' + (svc.brand||'') + (svc.brand&&svc.size?' · ':'') + (svc.size||'') + (svc.size&&svc.color?' · ':'') + (svc.color||'') + '</div></div>';
+            var enabled = svc.enabled !== false;
+            html += '<span class="status" style="' + (enabled?'background:#dcfce7;color:#166534;':'background:#fee2e2;color:#991b1b;') + '">' + (enabled?'在售':'下架') + '</span>';
+            html += '</div>';
+            // Price grid
+            html += '<div class="price-grid">';
+            html += '<div class="price-card" style="background:#fef2f2;"><div class="label" style="color:#991b1b;">日租</div><div class="amount" style="color:#dc2626;">¥'+svc.price+'</div><div class="unit">/天</div></div>';
+            if (svc.weeklyRate) {
+                var wpd = Math.round(svc.weeklyRate/7*10)/10;
+                html += '<div class="price-card" style="background:#eff6ff;"><div class="label" style="color:#1e40af;">周租</div><div class="amount" style="color:#2563eb;">¥'+svc.weeklyRate+'</div><div class="unit">≈¥'+wpd+'/天</div></div>';
+            }
+            if (svc.monthlyRate) {
+                var mpd = Math.round(svc.monthlyRate/30*10)/10;
+                html += '<div class="price-card" style="background:#f0fdf4;"><div class="label" style="color:#166534;">月租</div><div class="amount" style="color:#16a34a;">¥'+svc.monthlyRate+'</div><div class="unit">≈¥'+mpd+'/天</div></div>';
+            }
+            html += '</div>';
+            // Deposit
+            html += '<div class="deposit-section"><div class="deposit-title">🛡️ 押金与信用</div><div class="deposit-badges">';
+            if (svc.deposit) html += '<span class="deposit-badge" style="background:#fef3c7;color:#92400e;">押金 ¥'+svc.deposit+'</span>';
+            if (svc.creditMode==='credit_free'||svc.creditMode==='both') html += '<span class="deposit-badge" style="background:#ede9fe;color:#5b21b6;">🛡️ 信用免押'+(svc.creditScoreThreshold?' ≥'+svc.creditScoreThreshold+'分':'')+'</span>';
+            if (svc.creditMode==='both') html += '<span class="deposit-badge" style="background:#e0f2fe;color:#0369a1;">用户可选模式</span>';
+            if (!svc.deposit && svc.creditMode!=='credit_free' && svc.creditMode!=='both') html += '<span class="deposit-badge" style="background:#f3f4f6;color:#6b7280;">纯押金模式</span>';
+            html += '</div></div>';
+            // Calculator
+            html += '<div class="calc-section"><div class="calc-title">📝 租金计算</div>';
+            html += '<div class="calc-row"><span style="font-size:12px;color:#6b7280;">租期</span>';
+            html += '<input type="number" id="rent-days" value="3" min="'+(svc.rentalPeriodMin||1)+'" max="'+(svc.rentalPeriodMax||365)+'" onchange="calcRent()">';
+            html += '<span style="font-size:12px;color:#6b7280;">天</span>';
+            html += '<span class="calc-total" id="rent-total">¥'+(svc.price*3)+'</span></div>';
+            html += '<div class="calc-meta">租期 '+(svc.rentalPeriodMin||1)+'-'+(svc.rentalPeriodMax||365)+'天 · 库存 '+(svc.totalStock||1)+'件</div></div>';
+            // Description
+            if (svc.desc) {
+                html += '<div class="desc-section"><div class="desc-title">商品详情</div><div class="desc-text">'+svc.desc+'</div></div>';
+            }
+            html += '</div>'; // close info
+            // Bottom bar
+            html += '<div class="bottom-bar">';
+            html += '<button class="btn-cart" onclick="addToCart()">加入租赁车</button>';
+            html += '<button class="btn-rent" onclick="rentNow()">立即租赁</button>';
+            html += '</div>';
+            document.getElementById('app').innerHTML = html;
+            // Store product data for calculator
+            window._product = svc;
+        }
+
+        window.switchImg = function(el, url) {
+            document.getElementById('main-img').src = url;
+            document.querySelectorAll('.thumbs img').forEach(function(t) { t.classList.remove('active'); });
+            el.classList.add('active');
+        };
+
+        window.calcRent = function() {
+            var svc = window._product;
+            if (!svc) return;
+            var days = parseInt(document.getElementById('rent-days').value) || 1;
+            var total = svc.price * days;
+            if (svc.weeklyRate && days >= 7) {
+                var w = Math.floor(days/7), r = days%7;
+                var wt = svc.weeklyRate*w + svc.price*r;
+                if (wt < total) total = wt;
+            }
+            if (svc.monthlyRate && days >= 30) {
+                var m = Math.floor(days/30), r2 = days%30;
+                var mt = svc.monthlyRate*m;
+                if (svc.weeklyRate && r2 >= 7) { mt += svc.weeklyRate*Math.floor(r2/7) + svc.price*(r2%7); }
+                else { mt += svc.price*r2; }
+                if (mt < total) total = mt;
+            }
+            document.getElementById('rent-total').textContent = '¥' + total;
+        };
+
+        window.addToCart = function() {
+            var days = parseInt(document.getElementById('rent-days').value) || 3;
+            var svc = window._product;
+            if (!svc) return;
+            try {
+                var cart = JSON.parse(localStorage.getItem('rental_cart') || '[]');
+                cart.push({ id:svc.id, name:svc.name, price:svc.price, days:days, storeId:storeId, addedAt:Date.now() });
+                localStorage.setItem('rental_cart', JSON.stringify(cart));
+                showToast('已加入租赁车');
+            } catch(e) { showToast('加入失败'); }
+        };
+
+        window.rentNow = function() {
+            var days = parseInt(document.getElementById('rent-days').value) || 3;
+            var svc = window._product;
+            if (!svc) return;
+            window.location.href = 'c-order.html?rental=' + encodeURIComponent(JSON.stringify({
+                itemId: svc.id, storeId: storeId, days: days
+            }));
+        };
+
+        window.shareProduct = function() {
+            var link = window.location.href;
+            if (navigator.share) {
+                navigator.share({ title: document.title, url: link }).catch(function(){});
+            } else if (navigator.clipboard) {
+                navigator.clipboard.writeText(link).then(function() { showToast('链接已复制'); });
+            } else {
+                prompt('复制链接:', link);
+            }
+        };
+
+        function showToast(msg) {
+            var t = document.createElement('div');
+            t.style.cssText = 'position:fixed;top:60px;left:50%;transform:translateX(-50%);background:#10b981;color:white;padding:10px 20px;border-radius:20px;z-index:9999;font-size:13px;font-weight:500;box-shadow:0 4px 12px rgba(0,0,0,0.2);';
+            t.textContent = msg;
+            document.body.appendChild(t);
+            setTimeout(function() { t.remove(); }, 2000);
+        }
+
+        loadProduct();
+    })();
+    </script>
+</body>
+</html>

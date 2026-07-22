@@ -53,6 +53,24 @@
             },
         };
     </script>
+    <style>
+        @keyframes bellRing {
+            0% { transform: rotate(0); }
+            15% { transform: rotate(14deg); }
+            30% { transform: rotate(-12deg); }
+            45% { transform: rotate(10deg); }
+            60% { transform: rotate(-8deg); }
+            75% { transform: rotate(4deg); }
+            100% { transform: rotate(0); }
+        }
+        #bell-badge:not(.hidden) {
+            animation: badgePulse 2s ease-in-out infinite;
+        }
+        @keyframes badgePulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.15); }
+        }
+    </style>
 </head>
 <body class="bg-gray-50 font-sans">
     <div class="flex h-screen overflow-hidden">
@@ -112,6 +130,7 @@
                                 <a href="#customer-service" class="nav-link flex items-center space-x-3 p-2 rounded-lg text-gray-600 hover:bg-blue-50 hover:text-primary transition-all duration-300 ease-in-out hover:translate-x-1">
                                     <i class="fa fa-headphones w-5 text-center"></i>
                                     <span>客服中心</span>
+                                    <span id="nav-badge-cs" class="ml-auto bg-red-500 text-white text-xs rounded-full h-5 min-w-[20px] flex items-center justify-center hidden">0</span>
                                 </a>
                             </li>
                             <li>
@@ -179,6 +198,7 @@
                                 <a href="#store-approval" class="nav-link flex items-center space-x-3 p-2 rounded-lg text-gray-600 hover:bg-blue-50 hover:text-primary transition-all duration-300 ease-in-out hover:translate-x-1">
                                     <i class="fa fa-check-square w-5 text-center"></i>
                                     <span>审批管理</span>
+                                    <span id="nav-badge-approval" class="ml-auto bg-orange-500 text-white text-xs rounded-full h-5 min-w-[20px] flex items-center justify-center hidden">0</span>
                                 </a>
                             </li>
                             <li>
@@ -243,6 +263,7 @@
                                 <a href="#messages" class="nav-link flex items-center space-x-3 p-2 rounded-lg text-gray-600 hover:bg-blue-50 hover:text-primary transition-all duration-300 ease-in-out hover:translate-x-1">
                                     <i class="fa fa-envelope w-5 text-center"></i>
                                     <span>消息中心</span>
+                                    <span id="nav-badge-messages" class="ml-auto bg-green-500 text-white text-xs rounded-full h-5 min-w-[20px] flex items-center justify-center hidden">0</span>
                                 </a>
                             </li>
                             <li>
@@ -338,10 +359,27 @@
                         <h1 class="text-xl font-semibold text-gray-800">总后台管理系统</h1>
                     </div>
                     <div class="flex items-center space-x-4">
-                        <button class="flex items-center space-x-1 text-gray-600 hover:text-primary transition-colors">
-                            <i class="fa fa-bell-o"></i>
-                            <span class="bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">3</span>
-                        </button>
+                        <div class="relative" id="notification-bell-wrapper">
+                            <button id="bell-btn" class="flex items-center space-x-1 text-gray-600 hover:text-primary transition-colors relative">
+                                <i class="fa fa-bell-o"></i>
+                                <span id="bell-badge" class="bg-red-500 text-white text-xs rounded-full h-5 min-w-[20px] flex items-center justify-center hidden">0</span>
+                            </button>
+                            <!-- 通知下拉面板 -->
+                            <div id="notification-dropdown" class="hidden absolute right-0 mt-2 w-80 bg-white rounded-lg shadow-lg border border-gray-200 z-50">
+                                <div class="px-4 py-3 border-b border-gray-100 flex justify-between items-center">
+                                    <span class="font-semibold text-gray-800">待办提醒</span>
+                                    <span id="bell-summary" class="text-xs text-gray-400"></span>
+                                </div>
+                                <div id="notification-items" class="max-h-80 overflow-y-auto">
+                                    <p class="text-center text-gray-400 py-6 text-sm">加载中...</p>
+                                </div>
+                                <div class="px-4 py-2 border-t border-gray-100 flex justify-between text-xs">
+                                    <a href="#store-approval" class="text-orange-600 hover:underline nav-jump"><i class="fa fa-file-text mr-1"></i>审批管理</a>
+                                    <a href="#customer-service" class="text-blue-600 hover:underline nav-jump"><i class="fa fa-headphones mr-1"></i>客服中心</a>
+                                    <a href="#messages" class="text-green-600 hover:underline nav-jump"><i class="fa fa-envelope mr-1"></i>消息中心</a>
+                                </div>
+                            </div>
+                        </div>
                         <div class="relative" id="user-menu-wrapper">
                             <button id="user-menu-btn" class="flex items-center space-x-2 text-gray-600 hover:text-primary transition-colors">
                                 <div class="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
@@ -6428,6 +6466,206 @@
                 container.innerHTML = `<p class="text-center text-red-400 p-4">加载失败: ${e.message}</p>`;
             }
         };
+
+        // ================================================================
+        // 铃铛通知系统 — 定时轮询 + 下拉面板 + 视觉提醒
+        // ================================================================
+        (function initBellNotification() {
+            let prevCounts = { pendingApplications: 0, openTickets: 0, urgentTickets: 0, unreadMessages: 0 };
+            let bellPollTimer = null;
+            const BELL_INTERVAL = 30000; // 30秒轮询
+
+            // 铃铛点击展开/收起下拉
+            const bellBtn = document.getElementById('bell-btn');
+            const dropdown = document.getElementById('notification-dropdown');
+            if (bellBtn && dropdown) {
+                bellBtn.addEventListener('click', function(e) {
+                    e.stopPropagation();
+                    dropdown.classList.toggle('hidden');
+                    if (!dropdown.classList.contains('hidden')) {
+                        fetchNotificationSummary();
+                    }
+                });
+                document.addEventListener('click', function(e) {
+                    if (!dropdown.contains(e.target) && !bellBtn.contains(e.target)) {
+                        dropdown.classList.add('hidden');
+                    }
+                });
+            }
+
+            // 下拉底部快捷导航
+            document.querySelectorAll('.nav-jump').forEach(function(link) {
+                link.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    dropdown.classList.add('hidden');
+                    var target = this.getAttribute('href').replace('#', '');
+                    var navLink = document.querySelector('.nav-link[href="#' + target + '"]');
+                    if (navLink) navLink.click();
+                });
+            });
+
+            // 更新铃铛徽章
+            function updateBellBadge(total) {
+                var badge = document.getElementById('bell-badge');
+                if (!badge) return;
+                if (total > 0) {
+                    badge.textContent = total > 99 ? '99+' : total;
+                    badge.classList.remove('hidden');
+                    bellBtn.style.animation = 'bellRing 0.6s ease';
+                    setTimeout(function() { bellBtn.style.animation = ''; }, 700);
+                } else {
+                    badge.classList.add('hidden');
+                }
+            }
+
+            // 更新侧边栏徽章
+            function updateNavBadges(data) {
+                var csBadge = document.getElementById('nav-badge-cs');
+                var approvalBadge = document.getElementById('nav-badge-approval');
+                var msgBadge = document.getElementById('nav-badge-messages');
+                var csTotal = (data.openTickets || 0) + (data.urgentTickets || 0);
+                if (csBadge) {
+                    if (csTotal > 0) { csBadge.textContent = csTotal; csBadge.classList.remove('hidden'); }
+                    else { csBadge.classList.add('hidden'); }
+                }
+                if (approvalBadge) {
+                    if (data.pendingApplications > 0) { approvalBadge.textContent = data.pendingApplications; approvalBadge.classList.remove('hidden'); }
+                    else { approvalBadge.classList.add('hidden'); }
+                }
+                if (msgBadge) {
+                    if (data.unreadMessages > 0) { msgBadge.textContent = data.unreadMessages; msgBadge.classList.remove('hidden'); }
+                    else { msgBadge.classList.add('hidden'); }
+                }
+            }
+
+            // 渲染下拉通知列表
+            function renderNotificationItems(data) {
+                var container = document.getElementById('notification-items');
+                if (!container) return;
+                var items = [];
+                var summary = document.getElementById('bell-summary');
+                if (summary) {
+                    var parts = [];
+                    if (data.pendingApplications > 0) parts.push(data.pendingApplications + ' 待审批');
+                    if (data.openTickets > 0) parts.push(data.openTickets + ' 待处理工单');
+                    if (data.urgentTickets > 0) parts.push(data.urgentTickets + ' 紧急');
+                    if (data.unreadMessages > 0) parts.push(data.unreadMessages + ' 未读消息');
+                    summary.textContent = parts.length ? parts.join(' | ') : '全部已处理';
+                }
+                if (data.pendingApplications > 0) {
+                    items.push('<div class="px-4 py-3 border-b border-orange-100 bg-orange-50 cursor-pointer hover:bg-orange-100 nav-jump-item" data-target="store-approval">' +
+                        '<div class="flex items-center"><i class="fa fa-file-text text-orange-500 mr-2"></i>' +
+                        '<span class="font-semibold text-orange-700">' + data.pendingApplications + ' 个门店入驻申请待审批</span>' +
+                        '<span class="ml-auto text-xs text-orange-400">立即处理 →</span></div></div>');
+                }
+                if (data.urgentTickets > 0) {
+                    items.push('<div class="px-4 py-3 border-b border-red-100 bg-red-50 cursor-pointer hover:bg-red-100 nav-jump-item" data-target="customer-service">' +
+                        '<div class="flex items-center"><i class="fa fa-exclamation-triangle text-red-500 mr-2"></i>' +
+                        '<span class="font-semibold text-red-700">' + data.urgentTickets + ' 个紧急工单需要处理</span>' +
+                        '<span class="ml-auto text-xs text-red-400">立即处理 →</span></div></div>');
+                }
+                if (data.openTickets > 0) {
+                    items.push('<div class="px-4 py-3 border-b border-blue-100 bg-blue-50 cursor-pointer hover:bg-blue-100 nav-jump-item" data-target="customer-service">' +
+                        '<div class="flex items-center"><i class="fa fa-headphones text-blue-500 mr-2"></i>' +
+                        '<span class="text-blue-700">' + data.openTickets + ' 个工单待处理</span>' +
+                        '<span class="ml-auto text-xs text-blue-400">查看 →</span></div></div>');
+                }
+                if (data.unreadMessages > 0) {
+                    items.push('<div class="px-4 py-3 border-b border-green-100 bg-green-50 cursor-pointer hover:bg-green-100 nav-jump-item" data-target="messages">' +
+                        '<div class="flex items-center"><i class="fa fa-envelope text-green-500 mr-2"></i>' +
+                        '<span class="text-green-700">' + data.unreadMessages + ' 条未读消息</span>' +
+                        '<span class="ml-auto text-xs text-green-400">查看 →</span></div></div>');
+                }
+                if (data.recentNotifications && data.recentNotifications.length > 0) {
+                    data.recentNotifications.slice(0, 5).forEach(function(n) {
+                        var prioClass = n.priority === 'high' ? 'text-red-500' : 'text-gray-400';
+                        var timeStr = formatTimeAgo(n.time);
+                        items.push('<div class="px-4 py-2 border-b border-gray-50 hover:bg-gray-50">' +
+                            '<div class="flex items-start"><i class="fa fa-bell ' + prioClass + ' mr-2 mt-0.5"></i>' +
+                            '<div class="flex-1 min-w-0"><p class="text-sm text-gray-700 truncate">' + (n.title || '系统通知') + '</p>' +
+                            '<p class="text-xs text-gray-400">' + timeStr + (n.orderNo ? ' · ' + n.orderNo : '') + '</p></div></div></div>');
+                    });
+                }
+                if (items.length === 0) {
+                    items.push('<p class="text-center text-gray-400 py-6 text-sm"><i class="fa fa-check-circle mr-1 text-green-400"></i>暂无待办事项</p>');
+                }
+                container.innerHTML = items.join('');
+                container.querySelectorAll('.nav-jump-item').forEach(function(el) {
+                    el.addEventListener('click', function() {
+                        dropdown.classList.add('hidden');
+                        var target = this.getAttribute('data-target');
+                        var navLink = document.querySelector('.nav-link[href="#' + target + '"]');
+                        if (navLink) navLink.click();
+                    });
+                });
+            }
+
+            function formatTimeAgo(ts) {
+                if (!ts) return '';
+                var diff = Date.now() - new Date(ts).getTime();
+                var mins = Math.floor(diff / 60000);
+                if (mins < 1) return '刚刚';
+                if (mins < 60) return mins + '分钟前';
+                var hours = Math.floor(mins / 60);
+                if (hours < 24) return hours + '小时前';
+                return Math.floor(hours / 24) + '天前';
+            }
+
+            function showReminderToast(title, message, type) {
+                var colors = { approval: 'bg-orange-500', ticket: 'bg-red-500', message: 'bg-green-500', system: 'bg-blue-500' };
+                var icons = { approval: 'fa-file-text', ticket: 'fa-exclamation-triangle', message: 'fa-envelope', system: 'fa-bell' };
+                var toast = document.createElement('div');
+                toast.style.cssText = 'position:fixed;top:20px;right:20px;z-index:99999;max-width:360px;padding:14px 18px;border-radius:12px;color:white;box-shadow:0 8px 24px rgba(0,0,0,0.15);cursor:pointer;transition:opacity 0.3s,transform 0.3s;opacity:0;transform:translateX(40px);';
+                toast.className = (colors[type] || colors.system);
+                toast.innerHTML = '<div style="display:flex;align-items:center;"><i class="fa ' + (icons[type] || icons.system) + ' mr-2 text-lg"></i><div><div style="font-weight:700;font-size:14px;">' + title + '</div><div style="font-size:12px;opacity:0.9;margin-top:2px;">' + message + '</div></div></div>';
+                document.body.appendChild(toast);
+                setTimeout(function() { toast.style.opacity = '1'; toast.style.transform = 'translateX(0)'; }, 50);
+                toast.addEventListener('click', function() {
+                    toast.style.opacity = '0'; toast.style.transform = 'translateX(40px)';
+                    setTimeout(function() { if (toast.parentNode) toast.parentNode.removeChild(toast); }, 300);
+                });
+                setTimeout(function() {
+                    toast.style.opacity = '0'; toast.style.transform = 'translateX(40px)';
+                    setTimeout(function() { if (toast.parentNode) toast.parentNode.removeChild(toast); }, 300);
+                }, 6000);
+            }
+
+            async function fetchNotificationSummary() {
+                try {
+                    var token = localStorage.getItem('adminToken') || '';
+                    var resp = await fetch('http://localhost:3000/api/admin/notification-summary', {
+                        headers: { 'Authorization': 'Bearer ' + token }
+                    });
+                    var result = await resp.json();
+                    if (!result.success || !result.data) return;
+                    var data = result.data;
+                    updateBellBadge(data.totalUnread);
+                    updateNavBadges(data);
+                    renderNotificationItems(data);
+                    if (data.pendingApplications > prevCounts.pendingApplications && prevCounts.pendingApplications >= 0) {
+                        showReminderToast('新入驻申请', data.pendingApplications + ' 个门店申请待审批', 'approval');
+                    }
+                    if (data.urgentTickets > prevCounts.urgentTickets && prevCounts.urgentTickets >= 0) {
+                        showReminderToast('紧急工单', data.urgentTickets + ' 个紧急工单需要处理', 'ticket');
+                    }
+                    if (data.openTickets > prevCounts.openTickets && prevCounts.openTickets >= 0) {
+                        showReminderToast('新工单', data.openTickets + ' 个客服工单待处理', 'ticket');
+                    }
+                    if (data.unreadMessages > prevCounts.unreadMessages && prevCounts.unreadMessages >= 0) {
+                        showReminderToast('新消息', data.unreadMessages + ' 条未读消息', 'message');
+                    }
+                    prevCounts = { pendingApplications: data.pendingApplications, openTickets: data.openTickets, urgentTickets: data.urgentTickets, unreadMessages: data.unreadMessages };
+                } catch (e) {
+                    console.warn('[铃铛] 轮询失败:', e.message);
+                }
+            }
+
+            fetchNotificationSummary();
+            bellPollTimer = setInterval(fetchNotificationSummary, BELL_INTERVAL);
+            document.addEventListener('visibilitychange', function() {
+                if (!document.hidden) fetchNotificationSummary();
+            });
+        })();
 
         // ================================================================
         // 总仪表盘 (Dashboard) - 系统概览与快捷入口

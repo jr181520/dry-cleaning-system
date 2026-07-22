@@ -15,6 +15,8 @@
     <script src="js/order-sync.js"></script>
     <!-- 统一数据同步模块 -->
     <script src="js/unified-sync.js"></script>
+    <!-- 用户数据隔离模块 -->
+    <script src="js/user-data-isolation.js"></script>
     
     <script>
         tailwind.config = {
@@ -192,7 +194,7 @@
         
         /* 再次下单按钮增强效果 */
         .reorder-btn:hover {
-            background: linear-gradient-to-r from-blue-600 to-indigo-600) !important;
+            background: linear-gradient(to right, #2563eb, #4f46e5) !important;
             box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4) !important;
         }
         
@@ -285,10 +287,48 @@
         </div>
     </div>
 
+    <!-- 跑腿配送地址弹窗 -->
+    <div id="deliveryAddrModal" style="display:none; position:fixed; inset:0; z-index:100; background:rgba(0,0,0,0.5); align-items:center; justify-content:center;">
+        <div style="background:white; border-radius:16px; padding:24px; width:90%; max-width:400px; margin:auto; margin-top:20vh;">
+            <h3 style="font-size:16px; font-weight:600; margin-bottom:16px;">🚚 填写配送地址</h3>
+            <div style="margin-bottom:12px;">
+                <label style="font-size:13px; color:#666; display:block; margin-bottom:4px;">配送地址</label>
+                <input id="modalAddr" type="text" placeholder="如：XX小区X栋X单元" style="width:100%; padding:10px; border:1px solid #ddd; border-radius:8px; font-size:14px;">
+            </div>
+            <div style="margin-bottom:12px;">
+                <label style="font-size:13px; color:#666; display:block; margin-bottom:4px;">联系人</label>
+                <input id="modalContact" type="text" placeholder="收件人姓名" style="width:100%; padding:10px; border:1px solid #ddd; border-radius:8px; font-size:14px;">
+            </div>
+            <div style="margin-bottom:16px;">
+                <label style="font-size:13px; color:#666; display:block; margin-bottom:4px;">联系电话</label>
+                <input id="modalPhone" type="tel" placeholder="手机号码" style="width:100%; padding:10px; border:1px solid #ddd; border-radius:8px; font-size:14px;">
+            </div>
+            <div style="display:flex; gap:12px;">
+                <button onclick="closeDeliveryAddrModal()" style="flex:1; padding:12px; background:#f3f4f6; border:none; border-radius:10px; font-size:14px; cursor:pointer;">取消</button>
+                <button onclick="confirmDeliveryAddr()" style="flex:1; padding:12px; background:linear-gradient(135deg,#667eea,#764ba2); color:white; border:none; border-radius:10px; font-size:14px; font-weight:600; cursor:pointer;">确认并选择服务商</button>
+            </div>
+        </div>
+    </div>
+
     <script>
         // 当前标签
         let currentTab = 'all';
         
+        // 品类化状态标签映射
+        const CATEGORY_STATUS_LABELS = {
+            cleaning:           { paid:'待入库', received:'已入库', cleaning:'清洗中', cleaned:'清洗完成', ready:'待取件', processing:'清洗中' },
+            shoe_care:          { paid:'待入库', received:'已入库', cleaning:'清洗中', cleaned:'清洗完成', ready:'待取件', processing:'清洗中' },
+            luxury_care:        { paid:'待收件', received:'已收件', cleaning:'养护中', cleaned:'养护完成', ready:'待取件', processing:'养护中' },
+            pet_grooming:       { paid:'待接宠', received:'已接宠', cleaning:'洗护中', cleaned:'洗护完成', ready:'待接回', processing:'洗护中' },
+            electronics_repair: { paid:'待收件', received:'已收件', cleaning:'维修中', cleaned:'维修完成', ready:'待取件', processing:'维修中' }
+        };
+        
+        function getCategoryStatusText(status, categoryId) {
+            const catLabels = CATEGORY_STATUS_LABELS[categoryId];
+            if (catLabels && catLabels[status]) return catLabels[status];
+            return statusMap[status]?.text || status;
+        }
+
         // 状态映射（兼容后端状态值）
         const statusMap = {
             'pending': { text: '待支付', class: 'pending', icon: '⏳' },
@@ -365,7 +405,7 @@
                 }
             });
             
-            // 监听localStorage变化（M端和C端跨标签页通信）
+            // 监听localStorage变化（M端和C端跨标签页通信 + 跑腿状态同步）
             window.addEventListener('storage', (e) => {
                 if (e.key === 'c_pickup_update') {
                     console.log('[C端] 检测到localStorage变化，刷新订单列表...');
@@ -376,6 +416,11 @@
                             OrderSyncManager.sync();
                         }
                     }
+                }
+                // 跑腿轮询同步：当详情页更新orders或store_orders时，列表页自动刷新
+                if (e.key === 'orders' || e.key === 'store_orders') {
+                    console.log('[C端] 检测到订单数据变化（', e.key, '），自动刷新列表');
+                    loadOrders();
                 }
             });
             
@@ -529,9 +574,8 @@
                         } : {}
                     }));
                     
-                    // 同步到localStorage备份（用于本地文件打开时使用）
-                    localStorage.setItem('orders_backup', JSON.stringify(mappedOrders));
-                    localStorage.setItem('orders_backup_time', new Date().toISOString());
+                    // 【数据隔离】同步到用户隔离的备份
+                    setUserOrdersBackup(mappedOrders);
                     
                     return mappedOrders;
                 }
@@ -547,21 +591,21 @@
             const ordersList = document.getElementById('orders-list');
             const emptyState = document.getElementById('empty-state');
             
-            // 先从localStorage加载本地订单
-            let localOrders = JSON.parse(localStorage.getItem('orders') || '[]');
+            // 【数据隔离】从用户隔离的 key 加载
+            let localOrders = getUserOrders();
             
             // 尝试从API加载订单
             let apiOrders = await loadOrdersFromAPI();
             
             // 如果API失败，使用localStorage备份数据
             if (!apiOrders || apiOrders.length === 0) {
-                const backupOrders = JSON.parse(localStorage.getItem('orders_backup') || '[]');
+                const backupOrders = getUserOrdersBackup();
                 if (backupOrders.length > 0) {
                     console.log('API获取失败，使用localStorage备份数据，共', backupOrders.length, '条订单');
                     apiOrders = backupOrders;
                     
                     // 显示提示
-                    const backupTime = localStorage.getItem('orders_backup_time');
+                    const backupTime = getUserOrdersBackupTime();
                     if (backupTime) {
                         const backupDate = new Date(backupTime).toLocaleString();
                         console.log('数据备份时间:', backupDate);
@@ -682,6 +726,10 @@
                                       [];
                 
                 const status = statusMap[order.status] || statusMap['pending'];
+                // 品类化：覆盖状态文本
+                const _catId = order.categoryId || 'cleaning';
+                const categoryText = getCategoryStatusText(order.status, _catId);
+                if (categoryText) status.text = categoryText;
                 const servicesPreview = orderServices.slice(0, 3).map(s => s.icon || '📦').join('');
                 const moreCount = orderServices.length > 3 ? `+${orderServices.length - 3}` : '';
                 const firstService = orderServices[0] || { name: '服务', icon: '📦' };
@@ -820,7 +868,7 @@
         // 查看订单详情
         async function viewOrder(orderId) {
             // 先从localStorage查找
-            const orders = JSON.parse(localStorage.getItem('orders') || '[]');
+            const orders = getUserOrders();
             let order = orders.find(o => o.orderId === orderId);
             
             // 如果本地没有，尝试从API获取
@@ -852,7 +900,7 @@
         // 支付订单
         function payOrder(orderId) {
             console.log('[支付] 开始支付订单:', orderId);
-            const orders = JSON.parse(localStorage.getItem('orders') || '[]');
+            const orders = getUserOrders();
             
             // 灵活匹配订单ID
             const matchOrder = (o) => {
@@ -911,7 +959,7 @@
             }
             
             // 更新本地状态 - 增强ID匹配逻辑
-            const orders = JSON.parse(localStorage.getItem('orders') || '[]');
+            const orders = getUserOrders();
             
             // 灵活匹配订单ID
             const matchOrder = (o) => {
@@ -928,7 +976,7 @@
                 orders[orderIndex].status = 'cancelled';
                 orders[orderIndex].cancelledAt = new Date().toISOString();
                 orders[orderIndex].updatedAt = new Date().toISOString();
-                localStorage.setItem('orders', JSON.stringify(orders));
+                setUserOrders(orders);
                 
                 // 同步到门店订单（让M端能看到更新）
                 syncOrderToStore(orders[orderIndex]);
@@ -941,14 +989,14 @@
                 // 如果本地找不到，尝试强制同步后重试
                 if (typeof OrderSyncManager !== 'undefined') {
                     await OrderSyncManager.sync();
-                    const updatedOrders = JSON.parse(localStorage.getItem('orders') || '[]');
+                    const updatedOrders = getUserOrders();
                     const retryIndex = updatedOrders.findIndex(matchOrder);
                     
                     if (retryIndex > -1) {
                         updatedOrders[retryIndex].status = 'cancelled';
                         updatedOrders[retryIndex].cancelledAt = new Date().toISOString();
                         updatedOrders[retryIndex].updatedAt = new Date().toISOString();
-                        localStorage.setItem('orders', JSON.stringify(updatedOrders));
+                        setUserOrders(updatedOrders);
                         loadOrders();
                         showToast('订单已取消（已同步更新）', 'success');
                         console.log('[取消] 同步后取消成功:', orderId);
@@ -964,7 +1012,7 @@
 
         // 申请取消并退款（已支付订单）
         async function cancelOrderWithRefund(orderId) {
-            let orders = JSON.parse(localStorage.getItem('orders') || '[]');
+            let orders = getUserOrders();
             let order = orders.find(o => o.orderId === orderId);
             
             // 如果本地没有，尝试从API获取
@@ -1009,9 +1057,9 @@
                             } : {}
                         };
                         
-                        // 保存到本地
+                        // 【数据隔离】保存到用户隔离的 key
                         orders.push(order);
-                        localStorage.setItem('orders', JSON.stringify(orders));
+                        setUserOrders(orders);
                     }
                 } catch (error) {
                     console.error('从API获取订单失败:', error);
@@ -1058,7 +1106,7 @@
                 }
 
                 // 重新读取订单列表（确保获取最新数据）
-                orders = JSON.parse(localStorage.getItem('orders') || '[]');
+                orders = getUserOrders();
                 const orderIndex = orders.findIndex(o => o.orderId === orderId);
                 if (orderIndex > -1) {
                     orders[orderIndex].status = 'cancelled';
@@ -1067,7 +1115,7 @@
                     orders[orderIndex].refundAmount = orders[orderIndex].fees?.total || 0;
                     orders[orderIndex].cancelReason = reason || '用户主动取消';
                     orders[orderIndex].updatedAt = new Date().toISOString();
-                    localStorage.setItem('orders', JSON.stringify(orders));
+                    setUserOrders(orders);
                     
                     // 同步到门店订单（让M端能看到更新）
                     syncOrderToStore(orders[orderIndex]);
@@ -1081,7 +1129,7 @@
         // 修改订单
         async function modifyOrder(orderId) {
             // 先从localStorage查找
-            let orders = JSON.parse(localStorage.getItem('orders') || '[]');
+            let orders = getUserOrders();
             let order = orders.find(o => o.orderId === orderId);
             
             // 如果本地没有，尝试从API获取
@@ -1124,9 +1172,9 @@
                             } : {}
                         };
                         
-                        // 保存到本地
+                        // 【数据隔离】保存到用户隔离的 key
                         orders.push(order);
-                        localStorage.setItem('orders', JSON.stringify(orders));
+                        setUserOrders(orders);
                     }
                 } catch (error) {
                     console.error('从API获取订单失败:', error);
@@ -1147,25 +1195,66 @@
 
         // 选择取件方式
         function selectPickupMethod(orderId, method) {
-            const orders = JSON.parse(localStorage.getItem('orders') || '[]');
+            const orders = getUserOrders();
             const orderIndex = orders.findIndex(o => o.orderId === orderId);
             if (orderIndex > -1) {
                 orders[orderIndex].pickupMethod = method;
                 orders[orderIndex].pickupMethodSelectedAt = new Date().toISOString();
-                localStorage.setItem('orders', JSON.stringify(orders));
+                setUserOrders(orders);
                 
-                // 同步到后端
-                syncPickupMethodToServer(orderId, method);
+                // 到店自提：立即同步到后端（触发智能灯条）
+                // 跑腿配送：不同步后端，等用户在 c-courier-select.html 选择服务商并支付后再调用API
+                if (method === 'store_pickup') {
+                    syncPickupMethodToServer(orderId, method);
+                }
                 
                 // 根据取件方式跳转到不同的详情页
                 if (method === 'store_pickup') {
                     // 到店自提：跳转到简洁的自提详情页
                     window.location.href = 'c-pickup-store.html?id=' + encodeURIComponent(orderId);
                 } else if (method === 'home_delivery') {
-                    // 跑腿配送：跳转到跑腿配送详情页
-                    window.location.href = 'c-pickup-delivery.html?id=' + encodeURIComponent(orderId);
+                    // 跑腿配送：显示地址弹窗，然后跳转到服务商选择页（API报价+一对一/拼单）
+                    _pendingDeliveryOrderId = orderId;
+                    _pendingDeliveryCatId = orders[orderIndex].categoryId || 'cleaning';
+                    // 预填已保存的地址
+                    const savedInfo = JSON.parse(localStorage.getItem('userDeliveryInfo') || '{}');
+                    document.getElementById('modalAddr').value = savedInfo.deliveryAddress || '';
+                    document.getElementById('modalContact').value = savedInfo.deliveryContact || '';
+                    document.getElementById('modalPhone').value = savedInfo.deliveryPhone || '';
+                    document.getElementById('deliveryAddrModal').style.display = 'flex';
                 }
             }
+        }
+        
+        let _pendingDeliveryOrderId = null;
+        let _pendingDeliveryCatId = 'cleaning';
+        
+        function closeDeliveryAddrModal() {
+            document.getElementById('deliveryAddrModal').style.display = 'none';
+            _pendingDeliveryOrderId = null;
+        }
+        
+        function confirmDeliveryAddr() {
+            const addr = document.getElementById('modalAddr').value.trim();
+            const contact = document.getElementById('modalContact').value.trim();
+            const phone = document.getElementById('modalPhone').value.trim();
+            if (!addr || !contact || !phone) {
+                alert('请填写完整的配送地址、联系人和电话');
+                return;
+            }
+            // 保存用户配送信息到localStorage
+            localStorage.setItem('userDeliveryInfo', JSON.stringify({
+                deliveryAddress: addr, deliveryContact: contact, deliveryPhone: phone
+            }));
+            // 关闭弹窗
+            closeDeliveryAddrModal();
+            // 跳转到服务商选择页（API报价 + 一对一/拼单 + 支付）
+            const params = new URLSearchParams({
+                orderId: _pendingDeliveryOrderId,
+                address: addr, contact: contact, phone: phone,
+                categoryId: _pendingDeliveryCatId
+            });
+            window.location.href = 'c-courier-select.html?' + params.toString();
         }
         
         // 同步取件方式到后端
@@ -1241,7 +1330,7 @@
             console.log('[删除] 开始删除订单:', orderId);
             
             // 尝试从多个存储位置获取订单
-            const orders = JSON.parse(localStorage.getItem('orders') || '[]');
+            const orders = getUserOrders();
             const storeOrders = JSON.parse(localStorage.getItem('store_orders') || '[]');
             
             // 灵活匹配订单（支持orderId、orderNo、id等）
@@ -1287,7 +1376,7 @@
                 const updatedStoreOrders = storeOrders.filter(o => 
                     o.orderId !== orderId && o.orderNo !== orderId && o.id !== orderId && o._id !== orderId
                 );
-                localStorage.setItem('orders', JSON.stringify(updatedOrders));
+                setUserOrders(updatedOrders);
                 localStorage.setItem('store_orders', JSON.stringify(updatedStoreOrders));
                 loadOrders();
                 showToast('订单记录已删除', 'success');
@@ -1332,7 +1421,7 @@
                 const updatedStoreOrders = storeOrders.filter(o => 
                     o.orderId !== orderId && o.orderNo !== orderId && o.id !== orderId && o._id !== orderId
                 );
-                localStorage.setItem('orders', JSON.stringify(updatedOrders));
+                setUserOrders(updatedOrders);
                 localStorage.setItem('store_orders', JSON.stringify(updatedStoreOrders));
                 
                 // 3. 将删除的订单ID记录到本地（兜底，防止同步模块重新拉回）
@@ -1355,7 +1444,7 @@
 
         // 再来一单
         async function reorder(orderId) {
-            const orders = JSON.parse(localStorage.getItem('orders') || '[]');
+            const orders = getUserOrders();
             const order = orders.find(o => o.orderId === orderId);
             
             if (!order) {
@@ -1385,7 +1474,7 @@
 
         // 确认取件
         async function pickupOrder(orderId) {
-            const orders = JSON.parse(localStorage.getItem('orders') || '[]');
+            const orders = getUserOrders();
             const orderIndex = orders.findIndex(o => o.orderId === orderId);
             if (orderIndex === -1) return;
             
@@ -1422,7 +1511,7 @@
                 // 更新本地状态
                 orders[orderIndex].status = 'completed';
                 orders[orderIndex].completedAt = new Date().toISOString();
-                localStorage.setItem('orders', JSON.stringify(orders));
+                setUserOrders(orders);
                 loadOrders();
                 
                 // 显示成功提示

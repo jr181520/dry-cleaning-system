@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>租物 - 万物皆可租</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f8fafc; }
+        .category-tab { transition: all 0.2s; }
+        .category-tab.active { background: #7c3aed; color: white; }
+        .item-card { transition: transform 0.2s; }
+        .item-card:active { transform: scale(0.98); }
+        .deposit-badge { font-size: 10px; padding: 2px 6px; border-radius: 4px; }
+        .deposit-mode-deposit { background: #fef3c7; color: #d97706; }
+        .deposit-mode-credit_free { background: #dbeafe; color: #2563eb; }
+        .deposit-mode-both { background: #ede9fe; color: #7c3aed; }
+    </style>
+</head>
+<body>
+    <!-- 顶部导航 -->
+    <header class="fixed top-0 left-0 right-0 bg-white shadow-sm z-50">
+        <div class="flex items-center justify-between px-4 py-3">
+            <a href="c-index.html" class="text-gray-600">
+                <i class="fa fa-arrow-left text-lg"></i>
+            </a>
+            <h1 class="font-bold text-lg">租物</h1>
+            <div class="w-6"></div>
+        </div>
+        <!-- 搜索栏 -->
+        <div class="px-4 pb-3">
+            <div class="relative">
+                <input type="text" id="search-input" placeholder="搜索你想租的物品..." 
+                    class="w-full pl-9 pr-4 py-2 bg-gray-100 rounded-full text-sm focus:outline-none focus:ring-2 focus:ring-purple-300">
+                <i class="fa fa-search absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm"></i>
+            </div>
+        </div>
+    </header>
+
+    <!-- 主内容 -->
+    <main class="pt-28 pb-20">
+        <!-- 品类筛选 -->
+        <div class="px-4 mb-4">
+            <div class="flex gap-2 overflow-x-auto pb-2 scrollbar-hide" id="category-tabs">
+                <button class="category-tab active flex-shrink-0 px-4 py-1.5 rounded-full text-sm bg-gray-100 text-gray-600" data-category="all">全部</button>
+                <button class="category-tab flex-shrink-0 px-4 py-1.5 rounded-full text-sm bg-gray-100 text-gray-600" data-category="clothing">服饰</button>
+                <button class="category-tab flex-shrink-0 px-4 py-1.5 rounded-full text-sm bg-gray-100 text-gray-600" data-category="digital">数码</button>
+                <button class="category-tab flex-shrink-0 px-4 py-1.5 rounded-full text-sm bg-gray-100 text-gray-600" data-category="outdoor">户外</button>
+                <button class="category-tab flex-shrink-0 px-4 py-1.5 rounded-full text-sm bg-gray-100 text-gray-600" data-category="electronics">电子</button>
+                <button class="category-tab flex-shrink-0 px-4 py-1.5 rounded-full text-sm bg-gray-100 text-gray-600" data-category="luxury">轻奢</button>
+                <button class="category-tab flex-shrink-0 px-4 py-1.5 rounded-full text-sm bg-gray-100 text-gray-600" data-category="baby">母婴</button>
+                <button class="category-tab flex-shrink-0 px-4 py-1.5 rounded-full text-sm bg-gray-100 text-gray-600" data-category="sports">运动</button>
+            </div>
+        </div>
+
+        <!-- 商品列表 -->
+        <div id="items-grid" class="px-4 grid grid-cols-2 gap-3">
+            <!-- 动态加载 -->
+        </div>
+
+        <!-- 空状态 -->
+        <div id="empty-state" class="hidden text-center py-20">
+            <i class="fa fa-diamond text-5xl text-gray-300 mb-4 block"></i>
+            <p class="text-gray-400">暂无可租物品</p>
+            <p class="text-gray-300 text-sm mt-2">商家正在上架中，请稍后再来</p>
+        </div>
+
+        <!-- 加载更多 -->
+        <div id="load-more" class="hidden text-center py-4">
+            <button onclick="loadMore()" class="text-purple-600 text-sm">加载更多</button>
+        </div>
+    </main>
+
+    <!-- 底部导航 -->
+    <nav class="fixed bottom-0 left-0 right-0 bg-white shadow-md border-t z-40" style="padding-bottom: env(safe-area-inset-bottom, 0px);">
+        <div class="flex items-center justify-around py-2">
+            <a href="c-index.html" class="flex flex-col items-center px-3 py-1 text-gray-500">
+                <i class="fa fa-home text-lg"></i>
+                <span class="text-xs mt-0.5">首页</span>
+            </a>
+            <a href="c-orders.html" class="flex flex-col items-center px-3 py-1 text-gray-500">
+                <i class="fa fa-clipboard text-lg"></i>
+                <span class="text-xs mt-0.5">订单</span>
+            </a>
+            <a href="c-rental.html" class="flex flex-col items-center px-3 py-1 text-purple-600">
+                <i class="fa fa-diamond text-lg"></i>
+                <span class="text-xs mt-0.5">租物</span>
+            </a>
+            <a href="c-profile.html" class="flex flex-col items-center px-3 py-1 text-gray-500">
+                <i class="fa fa-user text-lg"></i>
+                <span class="text-xs mt-0.5">我的</span>
+            </a>
+        </div>
+    </nav>
+
+    <script>
+        const API_BASE = '/api/rental';
+        const CATEGORY_LABELS = {
+            clothing: '服饰', digital: '数码', outdoor: '户外', electronics: '电子',
+            luxury: '轻奢', baby: '母婴', sports: '运动', tools: '工具', other: '其他'
+        };
+        const DEPOSIT_LABELS = { deposit: '押金', credit_free: '免押', both: '押金/免押' };
+
+        let currentCategory = 'all';
+        let currentPage = 1;
+        let allItems = [];
+        let searchTimer = null;
+
+        // 品类切换
+        document.getElementById('category-tabs').addEventListener('click', (e) => {
+            const btn = e.target.closest('.category-tab');
+            if (!btn) return;
+            document.querySelectorAll('.category-tab').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            currentCategory = btn.dataset.category;
+            currentPage = 1;
+            allItems = [];
+            loadItems();
+        });
+
+        // 搜索
+        document.getElementById('search-input').addEventListener('input', (e) => {
+            clearTimeout(searchTimer);
+            searchTimer = setTimeout(() => {
+                currentPage = 1;
+                allItems = [];
+                loadItems();
+            }, 300);
+        });
+
+        // 加载商品
+        async function loadItems() {
+            const keyword = document.getElementById('search-input').value.trim();
+            let url = `${API_BASE}/items?page=${currentPage}&limit=20`;
+            if (currentCategory !== 'all') url += `&category=${currentCategory}`;
+            if (keyword) url += `&keyword=${encodeURIComponent(keyword)}`;
+
+            try {
+                const resp = await fetch(url);
+                const data = await resp.json();
+                if (data.success) {
+                    if (currentPage === 1) {
+                        allItems = data.items || [];
+                    } else {
+                        allItems = allItems.concat(data.items || []);
+                    }
+                    renderItems();
+                    document.getElementById('load-more').classList.toggle('hidden', allItems.length >= data.total);
+                }
+            } catch(e) {
+                console.error('加载失败:', e);
+            }
+        }
+
+        function loadMore() {
+            currentPage++;
+            loadItems();
+        }
+
+        function renderItems() {
+            const grid = document.getElementById('items-grid');
+            const empty = document.getElementById('empty-state');
+
+            if (allItems.length === 0) {
+                grid.innerHTML = '';
+                empty.classList.remove('hidden');
+                return;
+            }
+            empty.classList.add('hidden');
+
+            grid.innerHTML = allItems.map(item => {
+                const img = item.images?.[0] || '';
+                const depositClass = `deposit-mode-${item.depositMode}`;
+                return `
+                <a href="c-rental-detail.html?id=${item._id}" class="item-card block bg-white rounded-xl overflow-hidden shadow-sm">
+                    <div class="aspect-square bg-gray-100 relative">
+                        ${img ? `<img src="${img}" class="w-full h-full object-cover" onerror="this.style.display='none'">` : ''}
+                        <div class="absolute inset-0 flex items-center justify-center" style="${img ? 'display:none' : ''}">
+                            <i class="fa fa-diamond text-3xl text-gray-300"></i>
+                        </div>
+                        ${item.tags?.length > 0 ? `<span class="absolute top-2 left-2 bg-red-500 text-white text-xs px-2 py-0.5 rounded">${item.tags[0]}</span>` : ''}
+                    </div>
+                    <div class="p-2.5">
+                        <h3 class="text-sm font-medium text-gray-800 truncate">${item.name}</h3>
+                        <p class="text-xs text-gray-400 mt-0.5">${item.brand || CATEGORY_LABELS[item.category] || ''}</p>
+                        <div class="flex items-center justify-between mt-2">
+                            <div>
+                                <span class="text-red-500 font-bold text-base">¥${(item.dailyRate || 0).toFixed(2)}</span>
+                                <span class="text-xs text-gray-400">/天</span>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-1 mt-1">
+                            <span class="deposit-badge ${depositClass}">${DEPOSIT_LABELS[item.depositMode] || '押金'}</span>
+                            <span class="text-xs text-gray-400">押金¥${(item.depositAmount || 0).toFixed(0)}</span>
+                        </div>
+                    </div>
+                </a>`;
+            }).join('');
+        }
+
+        // 初始加载
+        loadItems();
+    </script>
+</body>
+</html>

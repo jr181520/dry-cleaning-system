@@ -41,7 +41,15 @@ class LightService {
           reconnectPeriod: MQTT_CONFIG.reconnectPeriod,
           connectTimeout: MQTT_CONFIG.connectTimeout,
           username: 'admin',
-          password: 'admin123'
+          password: 'admin123',
+          clean: true
+        });
+
+        // 重连时刷新 clientId 避免 NanoMQ 会话冲突
+        mqttClient.on('reconnect', () => {
+          const newId = MQTT_CONFIG.clientPrefix + 'backend_' + Date.now();
+          mqttClient.options.clientId = newId;
+          console.log('[MQTT] 重连中, 新clientId:', newId);
         });
 
         let resolved = false;

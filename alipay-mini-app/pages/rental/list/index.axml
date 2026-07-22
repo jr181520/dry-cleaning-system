@@ -1,0 +1,50 @@
+<view class="page">
+  <!-- 搜索栏 -->
+  <view class="search-bar">
+    <input class="search-input" placeholder="搜索租赁商品" value="{{keyword}}" onInput="onSearch" />
+  </view>
+
+  <!-- 品类筛选 -->
+  <scroll-view scroll-x class="category-scroll">
+    <view class="category-tabs">
+      <view a:for="{{categories}}" a:for-item="cat" key="{{cat.value}}"
+        class="tab-item {{activeCategory === cat.value ? 'active' : ''}}"
+        onTap="onCategoryTap" data-category="{{cat.value}}">
+        {{cat.label}}
+      </view>
+    </view>
+  </scroll-view>
+
+  <!-- 商品双列网格 -->
+  <view class="item-grid">
+    <view a:for="{{items}}" a:for-item="item" key="{{item._id}}" class="item-card" onTap="onItemTap" data-id="{{item._id}}">
+      <image class="item-image" src="{{item.images[0] || '/assets/placeholder.png'}}" mode="aspectFill" />
+      <view class="item-info">
+        <text class="item-name">{{item.name}}</text>
+        <text class="item-brand" a:if="{{item.brand}}">{{item.brand}}</text>
+        <view class="item-bottom">
+          <text class="item-price">¥{{item.dailyRate}}<text class="price-unit">/天</text></text>
+          <view class="deposit-tag {{item.depositMode}}">
+            {{item.depositMode === 'credit_free' ? '信用免押' : item.depositMode === 'both' ? '免押可选' : '押金'}}
+          </view>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 空状态 -->
+  <view a:if="{{!loading && items.length === 0}}" class="empty-state">
+    <text class="empty-state-icon">📦</text>
+    <text class="empty-state-text">暂无租赁商品</text>
+  </view>
+
+  <!-- 加载中 -->
+  <view a:if="{{loading}}" class="loading">
+    <text class="text-gray">加载中...</text>
+  </view>
+
+  <!-- 没有更多 -->
+  <view a:if="{{!hasMore && items.length > 0}}" class="no-more">
+    <text class="text-gray">没有更多了</text>
+  </view>
+</view>

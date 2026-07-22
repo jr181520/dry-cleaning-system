@@ -1,0 +1,129 @@
+.page {
+  min-height: 100vh;
+  background: #f5f5f5;
+  padding-bottom: env(safe-area-inset-bottom);
+}
+.loading-wrap { display: flex; justify-content: center; padding: 200rpx 0; }
+.text-gray { font-size: 28rpx; color: #9ca3af; }
+
+.section-title {
+  font-size: 28rpx;
+  font-weight: 600;
+  color: #1f2937;
+  margin-bottom: 16rpx;
+  display: block;
+}
+
+/* 状态横幅 */
+.status-banner {
+  padding: 40rpx 32rpx;
+  color: #fff;
+  display: flex;
+  flex-direction: column;
+  gap: 10rpx;
+}
+.status-label { font-size: 40rpx; font-weight: 700; }
+.status-order { font-size: 24rpx; opacity: 0.85; }
+
+.status-reserved  { background: linear-gradient(135deg, #6b7280, #3b82f6); }
+.status-paid      { background: linear-gradient(135deg, #3b82f6, #6366f1); }
+.status-shipped   { background: linear-gradient(135deg, #6366f1, #8b5cf6); }
+.status-using     { background: linear-gradient(135deg, #8b5cf6, #ec4899); }
+.status-due       { background: linear-gradient(135deg, #f59e0b, #f97316); }
+.status-overdue   { background: linear-gradient(135deg, #ef4444, #b91c1c); }
+.status-returning { background: linear-gradient(135deg, #14b8a6, #06b6d4); }
+.status-returned  { background: linear-gradient(135deg, #22c55e, #10b981); }
+.status-completed { background: linear-gradient(135deg, #6b7280, #374151); }
+.status-cancelled { background: linear-gradient(135deg, #9ca3af, #6b7280); }
+
+/* 倒计时 */
+.countdown-section { margin: 16rpx; }
+.countdown-card {
+  background: #fff;
+  border-radius: 16rpx;
+  padding: 24rpx 28rpx;
+  border: 2rpx solid #ede9fe;
+}
+.countdown-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10rpx 0;
+}
+.countdown-label { font-size: 26rpx; color: #6b7280; }
+.countdown-num {
+  font-size: 40rpx;
+  font-weight: 700;
+  color: #7c3aed;
+}
+.countdown-num.overdue { color: #ef4444; }
+.countdown-date { font-size: 26rpx; color: #374151; }
+
+/* 通用 section */
+.section {
+  background: #fff;
+  margin: 16rpx;
+  padding: 24rpx 28rpx;
+  border-radius: 16rpx;
+}
+
+/* 租赁商品 */
+.rental-item { display: flex; gap: 20rpx; padding: 14rpx 0; }
+.rental-item + .rental-item { border-top: 1rpx solid #f0f0f0; }
+.rental-img { width: 120rpx; height: 120rpx; border-radius: 12rpx; flex-shrink: 0; }
+.rental-meta { flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 6rpx; }
+.rental-name { font-size: 28rpx; font-weight: 500; color: #1f2937; }
+.rental-spec { font-size: 22rpx; color: #9ca3af; }
+.rental-qty { font-size: 24rpx; color: #6b7280; }
+
+/* 费用明细 */
+.fee-row { display: flex; justify-content: space-between; padding: 12rpx 0; }
+.fee-label { font-size: 26rpx; color: #4b5563; }
+.fee-value { font-size: 26rpx; color: #1f2937; font-weight: 500; }
+.fee-free { color: #059669; }
+.fee-warn { color: #ef4444; }
+.total-row { border-top: 1rpx solid #f0f0f0; padding-top: 16rpx; margin-top: 8rpx; }
+.fee-total { font-size: 36rpx; font-weight: 700; color: #7c3aed; }
+
+/* 订单信息 */
+.info-row { display: flex; justify-content: space-between; padding: 10rpx 0; }
+.info-label { font-size: 26rpx; color: #6b7280; }
+.info-value { font-size: 26rpx; color: #1f2937; }
+
+/* 芝麻信用 */
+.zhima-card {
+  background: linear-gradient(135deg, #ecfdf5, #d1fae5);
+  border-radius: 12rpx;
+  padding: 20rpx 24rpx;
+  border: 1rpx solid #a7f3d0;
+}
+.zhima-row { display: flex; align-items: center; gap: 16rpx; }
+.zhima-icon { font-size: 44rpx; }
+.zhima-title { font-size: 28rpx; font-weight: 600; color: #059669; display: block; }
+.zhima-desc { font-size: 22rpx; color: #047857; display: block; margin-top: 4rpx; }
+
+/* 底部 */
+.bottom-placeholder { height: 140rpx; }
+.action-bar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: #fff;
+  display: flex;
+  gap: 20rpx;
+  padding: 20rpx 28rpx;
+  padding-bottom: calc(20rpx + env(safe-area-inset-bottom));
+  box-shadow: 0 -4rpx 20rpx rgba(0,0,0,0.06);
+}
+.action-btn {
+  flex: 1;
+  text-align: center;
+  font-size: 30rpx;
+  font-weight: 600;
+  padding: 22rpx 0;
+  border-radius: 44rpx;
+}
+.btn-primary { background: #7c3aed; color: #fff; }
+.btn-green { background: #22c55e; color: #fff; }
+.btn-cancel { background: #f3f4f6; color: #374151; }

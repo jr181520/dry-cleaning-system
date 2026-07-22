@@ -1,0 +1,62 @@
+<view class="container">
+  <!-- 状态横幅 -->
+  <view class="status-banner status-{{order.status}}">
+    <text class="status-icon">{{statusIcon}}</text>
+    <view>
+      <text class="status-text">{{statusText}}</text>
+      <text class="status-desc">{{statusDesc}}</text>
+    </view>
+  </view>
+
+  <!-- 倒计时 -->
+  <view wx:if="{{showCountdown}}" class="countdown-bar">
+    <view class="countdown-row">
+      <text class="countdown-label">剩余使用天数</text>
+      <text class="countdown-value">{{daysRemaining}}天</text>
+    </view>
+    <text class="countdown-due">到期日: {{dueDateText}}</text>
+  </view>
+
+  <!-- 商品信息 -->
+  <view class="section">
+    <text class="section-title">租赁商品</text>
+    <view wx:for="{{order.items}}" wx:key="itemId" class="order-item">
+      <view class="item-placeholder"><text>◇</text></view>
+      <view class="item-detail">
+        <text class="item-name">{{item.name}}</text>
+        <text class="item-spec">¥{{item.dailyRate}}/天 x {{item.rentalDays}}天</text>
+        <view class="item-bottom">
+          <text class="item-deposit">押金¥{{item.depositAmount}}</text>
+          <text class="item-subtotal">¥{{item.subtotal}}</text>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 费用 -->
+  <view class="section">
+    <text class="section-title">费用明细</text>
+    <view class="fee-row"><text>租金</text><text>¥{{order.amounts.subtotal}}</text></view>
+    <view class="fee-row"><text>押金</text><text>¥{{order.amounts.deposit}}</text></view>
+    <view wx:if="{{order.amounts.overdueFee > 0}}" class="fee-row"><text class="text-red">逾期费</text><text class="text-red">¥{{order.amounts.overdueFee}}</text></view>
+    <view class="fee-row total"><text>合计</text><text class="text-red">¥{{order.amounts.total}}</text></view>
+  </view>
+
+  <!-- 订单信息 -->
+  <view class="section">
+    <text class="section-title">订单信息</text>
+    <view class="info-row"><text class="info-label">订单号</text><text>{{order.orderNo}}</text></view>
+    <view class="info-row"><text class="info-label">下单时间</text><text>{{createdAtText}}</text></view>
+    <view class="info-row"><text class="info-label">租期</text><text>{{order.rentalDays}}天</text></view>
+    <view class="info-row"><text class="info-label">押金模式</text><text>{{depositModeText}}</text></view>
+  </view>
+
+  <view style="height: 120rpx;"></view>
+
+  <!-- 底部操作 -->
+  <view wx:if="{{showActions}}" class="bottom-bar">
+    <button wx:if="{{order.status === 'shipped'}}" class="action-btn primary" bindtap="confirmReceive">确认收货</button>
+    <button wx:if="{{order.status === 'using' || order.status === 'due' || order.status === 'overdue'}}" class="action-btn green" bindtap="openReturn">发起归还</button>
+    <button wx:if="{{order.status === 'reserved'}}" class="action-btn" bindtap="cancelOrder">取消订单</button>
+  </view>
+</view>

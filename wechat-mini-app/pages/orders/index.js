@@ -96,10 +96,11 @@ Page({
           id: order._id || order.orderId || order.id,
           orderId: order._id || order.orderId || order.id,
           orderNo: order.orderNo || order.orderId || order.id,
-          storeName: order.storeName || order.store?.name || order.storeId || '干洗店',
+          storeName: order.storeName || order.store?.name || order.storeId || this.getCategoryStoreName(order.categoryId),
           storeId: order.storeId || order.store?.storeId || '',
+          categoryId: order.categoryId || 'cleaning',
           status: order.status || 'pending',
-          statusText: this.getStatusText(order.status),
+          statusText: this.getStatusText(order.status, order.categoryId),
           items: order.items || [],
           totalCount: order.items ? order.items.reduce((sum, item) => sum + (item.quantity || 1), 0) : 0,
           totalPrice: order.amounts?.total || order.totalAmount || order.totalPrice || 0,
@@ -142,15 +143,37 @@ Page({
     this.setData({ loading: false });
   },
   
-  // 获取状态文本
-  getStatusText(status) {
+  // 品类化物品名称映射
+  getCategoryItemName(categoryId) {
+    const map = {
+      cleaning: '衣物', shoe_care: '鞋类', luxury_care: '物品',
+      pet_grooming: '宠物', electronics_repair: '设备',
+      rental: '服饰', rental_leisure: '物品'
+    };
+    return map[categoryId] || '物品';
+  },
+
+  // 品类化门店名称默认值
+  getCategoryStoreName(categoryId) {
+    const map = {
+      cleaning: '干洗店', shoe_care: '洗鞋店', luxury_care: '奢护门店',
+      pet_grooming: '宠物店', electronics_repair: '维修门店',
+      rental: '服饰租赁店', rental_leisure: '租赁门店'
+    };
+    return map[categoryId] || '服务门店';
+  },
+
+  // 获取状态文本（品类化）
+  getStatusText(status, categoryId) {
+    const catId = categoryId || 'cleaning';
+    const itemName = this.getCategoryItemName(catId);
     const statusMap = {
       'pending': '待支付',
       'paid': '已支付',
       'delivering': '取件配送中',
       'received': '已入库',
-      'cleaning': '清洗中',
-      'cleaned': '清洗完成',
+      'cleaning': '处理中',
+      'cleaned': '处理完成',
       'processing': '处理中',
       'ready': '待取件',
       'delivering_back': '送回中',
@@ -233,11 +256,11 @@ Page({
     });
   },
 
-  // 跑腿配送 - 进入配送跟踪窗口
+  // 跑腿配送 - 进入订单详情页并自动打开跑腿服务商选择面板
   onCourierDelivery(e) {
     const orderId = e.currentTarget.dataset.id;
     wx.navigateTo({
-      url: `/pages/delivery/tracking/index?orderId=${orderId}`
+      url: `/pages/order/detail/index?id=${orderId}&action=courier`
     });
   },
 

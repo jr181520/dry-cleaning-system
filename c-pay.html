@@ -19,6 +19,8 @@
         .pulse { animation: pulse 1.5s infinite; }
         .order-card { box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
     </style>
+    <!-- 用户数据隔离模块 -->
+    <script src="js/user-data-isolation.js"></script>
 </head>
 <body class="bg-gray-100 min-h-screen">
     <!-- 顶部导航 -->
@@ -184,7 +186,7 @@
         function loadOrderData() {
             // 尝试从C端订单列表获取
             try {
-                const orders = JSON.parse(localStorage.getItem('orders') || '[]');
+                const orders = getUserOrders();
                 orderData = orders.find(o => 
                     o.orderId === orderId || 
                     o.id === orderId || 
@@ -327,7 +329,7 @@
                     
                     // 更新C端订单
                     try {
-                        const orders = JSON.parse(localStorage.getItem('orders') || '[]');
+                        const orders = getUserOrders();
                         const idx = orders.findIndex(o => 
                             (o.orderId || o.id || o.orderNo) === (orderData.orderId || orderData.id || orderData.orderNo)
                         );
@@ -337,7 +339,7 @@
                             orders[idx].paidAmount = paidAmount;
                             orders[idx].paidAt = paidAt;
                             orders[idx].paymentMethod = method;
-                            localStorage.setItem('orders', JSON.stringify(orders));
+                            setUserOrders(orders);
                         }
                     } catch (e) {}
                     

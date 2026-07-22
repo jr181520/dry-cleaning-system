@@ -65,6 +65,8 @@
             50% { transform: scale(1.05); }
         }
     </style>
+    <!-- 用户数据隔离模块 -->
+    <script src="js/user-data-isolation.js"></script>
 </head>
 <body class="bg-gray-100 min-h-screen pb-24">
     <!-- 顶部导航 -->
@@ -175,7 +177,7 @@
         // 加载订单数据
         async function loadOrderData() {
             // 先从localStorage查找
-            const orders = JSON.parse(localStorage.getItem('orders') || '[]');
+            const orders = getUserOrders();
             orderData = orders.find(o => o.orderId === orderId || o.id === orderId || o._id === orderId);
             
             // 如果orders中没有，尝试从store_orders查找（代客下单门店自提订单）
@@ -656,13 +658,13 @@
                 const result = await response.json();
                 
                 // 更新本地数据
-                const orders = JSON.parse(localStorage.getItem('orders') || '[]');
+                const orders = getUserOrders();
                 const idx = orders.findIndex(o => o.orderId === orderId || o.id === orderId || o._id === orderId);
                 if (idx > -1) {
                     orders[idx].status = 'completed';
                     orders[idx].pickupConfirmed = true;
                     orders[idx].completedAt = new Date().toISOString();
-                    localStorage.setItem('orders', JSON.stringify(orders));
+                    setUserOrders(orders);
                 }
 
                 // 点亮灯条

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>跑腿配送 - 干洗服务</title>
+    <title>跑腿配送</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
     
@@ -115,6 +115,8 @@
             transform: translateX(44rpx);
         }
     </style>
+    <!-- 用户数据隔离模块 -->
+    <script src="js/user-data-isolation.js"></script>
 </head>
 <body class="bg-gray-100 min-h-screen pb-32">
     <!-- 顶部导航 -->
@@ -299,7 +301,7 @@
         <div class="mb-3">
             <div class="flex items-center justify-between">
                 <span class="text-sm text-gray-500">跑腿配送费</span>
-                <span class="text-xs text-gray-400">清洗费用已支付</span>
+                <span class="text-xs text-gray-400" id="serviceFeeLabel">服务费用已支付</span>
             </div>
             <div class="flex items-center justify-between mt-1">
                 <div class="text-red-500 font-bold text-2xl">¥<span id="deliveryFee">0</span></div>
@@ -316,8 +318,24 @@
     </div>
 
     <script>
+        // ===== 品类化配置 =====
+        const CATEGORY_NAMES = {
+            cleaning:           { full: '衣物干洗', short: '干洗', item: '衣物', itemUnit: '件' },
+            shoe_care:          { full: '鞋类洗护', short: '洗鞋', item: '鞋类', itemUnit: '双' },
+            luxury_care:        { full: '奢侈品护理', short: '奢护', item: '物品', itemUnit: '件' },
+            pet_grooming:       { full: '宠物清洗', short: '宠物', item: '宠物', itemUnit: '只' },
+            electronics_repair: { full: '电子产品维修', short: '维修', item: '设备', itemUnit: '台' },
+            rental:             { full: '服饰租赁', short: '租衣', item: '服饰', itemUnit: '件' },
+            rental_leisure:     { full: '小件商品租赁', short: '租物', item: '物品', itemUnit: '件' }
+        };
+
+        function getCategoryInfo(categoryId) {
+            return CATEGORY_NAMES[categoryId] || CATEGORY_NAMES['cleaning'];
+        }
+
         let orderId = null;
         let orderData = null;
+        let categoryId = 'cleaning';
         let selectedProvider = null;
         let deliveryFee = 0;
         let contactEnabled = false;
@@ -334,6 +352,7 @@
         document.addEventListener('DOMContentLoaded', async function() {
             const urlParams = new URLSearchParams(window.location.search);
             orderId = urlParams.get('id');
+            categoryId = urlParams.get('categoryId') || 'cleaning';
             
             if (!orderId) {
                 alert('订单ID不能为空');
@@ -346,7 +365,7 @@
 
         // 加载订单数据
         async function loadOrderData() {
-            const orders = JSON.parse(localStorage.getItem('orders') || '[]');
+            const orders = getUserOrders();
             orderData = orders.find(o => o.orderId === orderId || o.id === orderId || o._id === orderId);
             
             if (!orderData) {
@@ -371,6 +390,11 @@
                 window.location.href = 'c-orders.html';
                 return;
             }
+
+            // 品类化：更新标题和文案
+            const catInfo = getCategoryInfo(categoryId);
+            document.title = '跑腿配送 - ' + catInfo.full;
+            document.querySelector('.header .title-text, header span:nth-child(2)').textContent = '跑腿配送';
 
             renderPage();
         }
@@ -418,6 +442,11 @@
 
             // 只显示配送费，订单金额已在下单时支付
             document.getElementById('deliveryFee').textContent = deliveryFee;
+
+            // 品类化：从订单数据获取品类
+            if (orderData.categoryId) {
+                categoryId = orderData.categoryId;
+            }
 
             // 检查是否已支付/完成
             if (orderData.status === 'completed' || orderData.deliveryPaid) {
@@ -489,7 +518,7 @@
                 const result = await response.json();
 
                 // 更新本地数据
-                const orders = JSON.parse(localStorage.getItem('orders') || '[]');
+                const orders = getUserOrders();
                 const idx = orders.findIndex(o => o.orderId === orderId || o.id === orderId || o._id === orderId);
                 if (idx > -1) {
                     orders[idx].deliveryProvider = selectedProvider;
@@ -497,7 +526,7 @@
                     orders[idx].deliveryPaid = true;
                     orders[idx].contactMerchant = contactEnabled;
                     orders[idx].deliveryStatus = 'dispatched';
-                    localStorage.setItem('orders', JSON.stringify(orders));
+                    setUserOrders(orders);
                 }
 
                 showPaidState();
@@ -506,14 +535,14 @@
             } catch (error) {
                 console.warn('API调用失败:', error);
                 // 本地更新
-                const orders = JSON.parse(localStorage.getItem('orders') || '[]');
+                const orders = getUserOrders();
                 const idx = orders.findIndex(o => o.orderId === orderId || o.id === orderId || o._id === orderId);
                 if (idx > -1) {
                     orders[idx].deliveryProvider = selectedProvider;
                     orders[idx].deliveryFee = deliveryFee;
                     orders[idx].deliveryPaid = true;
                     orders[idx].deliveryStatus = 'dispatched';
-                    localStorage.setItem('orders', JSON.stringify(orders));
+                    setUserOrders(orders);
                 }
                 showPaidState();
                 showToast('支付成功！跑腿服务已下单', 'success');

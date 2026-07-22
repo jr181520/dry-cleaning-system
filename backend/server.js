@@ -271,6 +271,75 @@ app.post('/api/admin/notifications/:storeId/mark-read', (req, res) => {
   }
 });
 
+/**
+ * 通知摘要 — Admin铃铛轮询用
+ * GET /api/admin/notification-summary
+ * 返回: { pendingApplications, openTickets, urgentTickets, unreadMessages, recentNotifications }
+ */
+app.get('/api/admin/notification-summary', async (req, res) => {
+  try {
+    // 1. 待审批门店申请数
+    let pendingApplications = 0;
+    try {
+      const apps = await adminService.getStoreApplications({ status: 'pending' });
+      if (apps && apps.success && apps.data) {
+        pendingApplications = Array.isArray(apps.data) ? apps.data.length : 0;
+      }
+    } catch (e) { /* ignore */ }
+
+    // 2. 客服工单统计
+    let openTickets = 0, urgentTickets = 0;
+    try {
+      const ticketStats = await adminService.getTicketStats();
+      if (ticketStats && ticketStats.success && ticketStats.data) {
+        openTickets = ticketStats.data.open || 0;
+        urgentTickets = ticketStats.data.urgentCount || 0;
+      }
+    } catch (e) { /* ignore */ }
+
+    // 3. 未读消息数
+    let unreadMessages = 0;
+    try {
+      const msgs = messageService.getMessages({ storeId: 'ALL', limit: 200 });
+      unreadMessages = msgs.unreadCount || 0;
+    } catch (e) { /* ignore */ }
+
+    // 4. 最近通知（NotificationHub）
+    let recentNotifications = [];
+    try {
+      const hubData = notificationHubService.getNotifications('ALL', 10, 0);
+      recentNotifications = (hubData || []).slice(0, 8).map(n => ({
+        id: n.id,
+        type: n.type || n.event || 'system',
+        title: n.title || n.event || '系统通知',
+        message: n.message || '',
+        priority: n.priority || 'normal',
+        time: n.createdAt || n.time || Date.now(),
+        read: n.read || false,
+        orderNo: n.orderNo || null,
+        storeId: n.storeId || null
+      }));
+    } catch (e) { /* ignore */ }
+
+    const totalUnread = pendingApplications + openTickets + urgentTickets + unreadMessages;
+
+    res.json({
+      success: true,
+      data: {
+        pendingApplications,
+        openTickets,
+        urgentTickets,
+        unreadMessages,
+        totalUnread,
+        recentNotifications
+      }
+    });
+  } catch (error) {
+    console.error('[通知摘要] 查询失败:', error);
+    res.json({ success: true, data: { pendingApplications: 0, openTickets: 0, urgentTickets: 0, unreadMessages: 0, totalUnread: 0, recentNotifications: [] } });
+  }
+});
+
 // ============================================
 // 跨系统数据同步API（index ↔ m-index 双向同步）
 // ============================================
@@ -731,6 +800,11 @@ ${Object.entries(require('./config/modules').modules)
     // 优雅关闭
     const shutdown = async (signal) => {
       console.log(`\n[${signal}] 正在关闭服务...`);
+      // 停止租赁逾期检查定时任务
+      try {
+        const rentalCron = require('./modules/rental/services/rentalCronService');
+        rentalCron.stopOverdueCheck();
+      } catch(e) { /* 忽略 */ }
       server.close(async () => {
         await closeDatabase();
         console.log('[关闭] 服务已关闭');
@@ -754,6 +828,14 @@ ${Object.entries(require('./config/modules').modules)
       console.error('[进程] 未处理的Promise拒绝:', reason?.message || reason);
       // 不退出进程，只记录日志，保持服务运行
     });
+
+    // 启动租赁逾期检查定时任务
+    try {
+      const rentalCron = require('./modules/rental/services/rentalCronService');
+      rentalCron.startOverdueCheck();
+    } catch(e) {
+      console.log('[租赁] 逾期检查服务未启动:', e.message);
+    }
     
   } catch (error) {
     console.error('[启动] 服务启动失败:', error);

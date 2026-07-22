@@ -1,0 +1,36 @@
+<view class="container">
+  <view class="method-list">
+    <view class="method-card {{deliveryMethod === 'pickup' ? 'selected' : ''}}" onTap="onMethodTap" data-method="pickup">
+      <view class="method-info">
+        <text class="method-icon">🏪</text>
+        <view class="method-text">
+          <text class="method-name">到店自取</text>
+          <text class="method-desc">到店取件，免配送费</text>
+        </view>
+      </view>
+      <view class="check-icon {{deliveryMethod === 'pickup' ? 'checked' : ''}}">✓</view>
+    </view>
+
+    <view class="method-card {{deliveryMethod === 'courier' ? 'selected' : ''}}" onTap="onMethodTap" data-method="courier">
+      <view class="method-info">
+        <text class="method-icon">🚚</text>
+        <view class="method-text">
+          <text class="method-name">跑腿配送</text>
+          <text class="method-desc">专人取送，方便快捷</text>
+        </view>
+      </view>
+      <view class="check-icon {{deliveryMethod === 'courier' ? 'checked' : ''}}">✓</view>
+    </view>
+  </view>
+
+  <view class="address-section" a:if="{{deliveryMethod === 'courier'}}">
+    <text class="section-title">收货地址</text>
+    <view class="address-form">
+      <input class="input" placeholder="收货人姓名" value="{{address.name}}" onInput="onNameInput" />
+      <input class="input" type="number" placeholder="手机号码" value="{{address.phone}}" onInput="onPhoneInput" />
+      <input class="input" placeholder="详细地址" value="{{address.detail}}" onInput="onDetailInput" />
+    </view>
+  </view>
+
+  <button class="submit-btn" onTap="onSubmitTap">下一步</button>
+</view>

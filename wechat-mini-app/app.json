@@ -14,7 +14,11 @@
     "pages/order/payment/index",
     "pages/order/success/index",
     "pages/services/list/index",
-    "pages/services/detail/index"
+    "pages/services/detail/index",
+    "pages/rental/list/index",
+    "pages/rental/detail/index",
+    "pages/rental/order/index",
+    "pages/rental/order-detail/index"
   ],
   "window": {
     "backgroundTextStyle": "light",

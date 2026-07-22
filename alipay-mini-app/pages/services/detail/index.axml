@@ -1,0 +1,24 @@
+<view class="container" a:if="{{service}}">
+  <image class="hero-image" src="{{service.image}}" mode="aspectFill" />
+
+  <view class="info-card">
+    <text class="service-name">{{service.name}}</text>
+    <text class="service-price">¥{{service.price}}</text>
+    <view class="service-tags" a:if="{{service.tags}}">
+      <text class="tag" a:for="{{service.tags}}" key="index">{{item}}</text>
+    </view>
+  </view>
+
+  <view class="detail-card">
+    <text class="card-title">服务详情</text>
+    <text class="service-desc">{{service.description}}</text>
+    <view class="service-features" a:if="{{service.features}}">
+      <view class="feature" a:for="{{service.features}}" key="index">
+        <text class="feature-icon">✓</text>
+        <text class="feature-text">{{item}}</text>
+      </view>
+    </view>
+  </view>
+
+  <button class="order-btn" onTap="onOrderTap">立即下单</button>
+</view>

@@ -1,0 +1,47 @@
+<view class="container" a:if="{{order}}">
+  <view class="order-card">
+    <text class="card-title">订单信息</text>
+    <view class="order-item" a:for="{{order.items}}" key="id">
+      <text class="item-name">{{item.name}}</text>
+      <view class="item-right">
+        <text class="item-qty">x{{item.quantity}}</text>
+        <text class="item-price">¥{{item.price * item.quantity}}</text>
+      </view>
+    </view>
+  </view>
+
+  <view class="fee-card">
+    <view class="fee-item">
+      <text class="fee-label">商品金额</text>
+      <text class="fee-value">¥{{order.total}}</text>
+    </view>
+    <view class="fee-item">
+      <text class="fee-label">配送费</text>
+      <text class="fee-value">{{order.deliveryMethod === 'courier' ? '¥10' : '免费'}}</text>
+    </view>
+    <view class="fee-item total">
+      <text class="fee-label">实付金额</text>
+      <text class="fee-value">¥{{order.deliveryMethod === 'courier' ? order.total + 10 : order.total}}</text>
+    </view>
+  </view>
+
+  <view class="payment-card">
+    <text class="card-title">支付方式</text>
+    <view class="payment-option {{paymentMethod === 'alipay' ? 'selected' : ''}}" onTap="onMethodTap" data-method="alipay">
+      <view class="payment-info">
+        <text class="payment-icon">💳</text>
+        <text class="payment-name">支付宝</text>
+      </view>
+      <view class="check-icon {{paymentMethod === 'alipay' ? 'checked' : ''}}">✓</view>
+    </view>
+    <view class="payment-option {{paymentMethod === 'huabei' ? 'selected' : ''}}" onTap="onMethodTap" data-method="huabei">
+      <view class="payment-info">
+        <text class="payment-icon">🌸</text>
+        <text class="payment-name">花呗分期</text>
+      </view>
+      <view class="check-icon {{paymentMethod === 'huabei' ? 'checked' : ''}}">✓</view>
+    </view>
+  </view>
+
+  <button class="pay-btn" onTap="onPayTap">确认支付</button>
+</view>

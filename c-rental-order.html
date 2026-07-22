@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>确认订单 - 租物</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f8fafc; }
+    </style>
+</head>
+<body>
+    <!-- 顶部导航 -->
+    <header class="fixed top-0 left-0 right-0 bg-white shadow-sm z-50">
+        <div class="flex items-center justify-between px-4 py-3">
+            <a href="javascript:history.back()" class="text-gray-600">
+                <i class="fa fa-arrow-left text-lg"></i>
+            </a>
+            <h1 class="font-bold text-lg">确认订单</h1>
+            <div class="w-6"></div>
+        </div>
+    </header>
+
+    <!-- 主内容 -->
+    <main class="pt-14 pb-28">
+        <!-- 配送地址 -->
+        <div class="bg-white px-4 py-4 mb-2">
+            <div class="flex items-start gap-3">
+                <div class="w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center flex-shrink-0">
+                    <i class="fa fa-map-marker-alt text-purple-600"></i>
+                </div>
+                <div class="flex-1">
+                    <div class="flex items-center gap-2">
+                        <span id="contact-name" class="font-medium text-gray-800">收货人</span>
+                        <span id="contact-phone" class="text-gray-500 text-sm">请填写手机号</span>
+                    </div>
+                    <p id="delivery-address" class="text-sm text-gray-500 mt-1">请填写收货地址</p>
+                </div>
+                <button onclick="editAddress()" class="text-purple-600 text-sm">
+                    <i class="fa fa-edit"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- 商品信息 -->
+        <div class="bg-white px-4 py-4 mb-2">
+            <div class="flex items-center gap-3 mb-3">
+                <div class="w-8 h-8 bg-purple-600 rounded-full flex items-center justify-center">
+                    <i class="fa fa-diamond text-white text-sm"></i>
+                </div>
+                <span class="font-medium text-gray-800">租赁商品</span>
+            </div>
+            <div id="order-item-info" class="flex gap-3">
+                <div class="w-20 h-20 bg-gray-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                    <i class="fa fa-diamond text-2xl text-gray-300"></i>
+                </div>
+                <div class="flex-1">
+                    <h4 id="order-item-name" class="font-medium text-sm text-gray-800">加载中...</h4>
+                    <p id="order-item-spec" class="text-xs text-gray-400 mt-1"></p>
+                    <div class="flex items-center justify-between mt-2">
+                        <span class="text-red-500 font-bold">¥<span id="order-item-price">0.00</span>/天</span>
+                        <span class="text-sm text-gray-500">x<span id="order-rental-days">1</span>天</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 租期与费用明细 -->
+        <div class="bg-white px-4 py-4 mb-2">
+            <h3 class="font-medium text-gray-800 mb-3">费用明细</h3>
+            <div class="space-y-2 text-sm">
+                <div class="flex justify-between">
+                    <span class="text-gray-500">租金（¥<span id="detail-daily-rate">0</span>/天 x <span id="detail-days">1</span>天）</span>
+                    <span class="text-gray-700">¥<span id="detail-rental">0.00</span></span>
+                </div>
+                <div class="flex justify-between">
+                    <span class="text-gray-500">押金</span>
+                    <span class="text-gray-700">¥<span id="detail-deposit">0.00</span></span>
+                </div>
+                <div class="flex justify-between">
+                    <span class="text-gray-500">配送费</span>
+                    <span class="text-gray-700">¥<span id="detail-delivery-fee">0.00</span></span>
+                </div>
+                <div class="border-t pt-2 flex justify-between font-medium">
+                    <span class="text-gray-800">合计</span>
+                    <span class="text-red-500 text-lg">¥<span id="detail-total">0.00</span></span>
+                </div>
+            </div>
+        </div>
+
+        <!-- 配送方式 -->
+        <div class="bg-white px-4 py-4 mb-2">
+            <h3 class="font-medium text-gray-800 mb-3">配送方式</h3>
+            <div class="space-y-2">
+                <label class="flex items-center justify-between p-3 border rounded-lg cursor-pointer border-purple-300 bg-purple-50">
+                    <div class="flex items-center gap-3">
+                        <input type="radio" name="delivery-type" value="courier" checked>
+                        <div>
+                            <div class="text-sm font-medium">跑腿配送</div>
+                            <div class="text-xs text-gray-400">双程跑腿：送达 + 归还</div>
+                        </div>
+                    </div>
+                    <span class="text-sm text-gray-500">上门取送</span>
+                </label>
+                <label class="flex items-center justify-between p-3 border rounded-lg cursor-pointer hover:bg-gray-50">
+                    <div class="flex items-center gap-3">
+                        <input type="radio" name="delivery-type" value="store_pickup">
+                        <div>
+                            <div class="text-sm font-medium">到店自取</div>
+                            <div class="text-xs text-gray-400">到门店取货，归还也需到店</div>
+                        </div>
+                    </div>
+                    <span class="text-sm text-gray-500">免费</span>
+                </label>
+            </div>
+        </div>
+
+        <!-- 支付方式 -->
+        <div class="bg-white px-4 py-4 mb-2">
+            <h3 class="font-medium text-gray-800 mb-3">支付方式</h3>
+            <div class="space-y-2">
+                <label class="flex items-center justify-between p-3 border rounded-lg cursor-pointer border-purple-300 bg-purple-50">
+                    <div class="flex items-center gap-3">
+                        <input type="radio" name="payment-method" value="wechat" checked>
+                        <i class="fa fa-weixin text-green-500 text-xl"></i>
+                        <span class="text-sm">微信支付</span>
+                    </div>
+                </label>
+                <label class="flex items-center justify-between p-3 border rounded-lg cursor-pointer hover:bg-gray-50">
+                    <div class="flex items-center gap-3">
+                        <input type="radio" name="payment-method" value="alipay">
+                        <i class="fa fa-alipay text-blue-500 text-xl"></i>
+                        <span class="text-sm">支付宝</span>
+                    </div>
+                </label>
+                <label class="flex items-center justify-between p-3 border rounded-lg cursor-pointer hover:bg-gray-50">
+                    <div class="flex items-center gap-3">
+                        <input type="radio" name="payment-method" value="balance">
+                        <i class="fa fa-wallet text-yellow-500 text-xl"></i>
+                        <span class="text-sm">余额支付</span>
+                    </div>
+                    <span class="text-xs text-gray-400">余额: ¥0.00</span>
+                </label>
+            </div>
+        </div>
+
+        <!-- 租赁须知 -->
+        <div class="bg-white px-4 py-4 mb-4">
+            <h3 class="font-medium text-gray-800 mb-3">租赁须知</h3>
+            <ul class="text-xs text-gray-400 space-y-1">
+                <li>• 租金从签收次日开始计算，到期请归还</li>
+                <li>• 押金在归还并质检通过后退还</li>
+                <li>• 逾期将按日收取逾期费</li>
+                <li>• 物品损坏将从押金中扣除相应费用</li>
+            </ul>
+        </div>
+    </main>
+
+    <!-- 底部支付栏 -->
+    <div class="fixed bottom-0 left-0 right-0 bg-white shadow-lg border-t z-40 px-4 py-3 flex items-center" style="padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 12px);">
+        <div class="flex-1">
+            <div class="text-xs text-gray-400">合计</div>
+            <div class="text-xl font-bold text-red-500">¥<span id="pay-total">0.00</span></div>
+        </div>
+        <button onclick="submitOrder()" id="submit-btn" class="bg-purple-600 text-white px-8 py-3 rounded-xl font-medium hover:bg-purple-700 transition-colors">
+            提交订单
+        </button>
+    </div>
+
+    <!-- 地址编辑弹窗 -->
+    <div id="address-modal" class="fixed inset-0 z-50 hidden" style="background:rgba(0,0,0,0.5);">
+        <div class="absolute inset-0 flex items-end">
+            <div class="bg-white w-full rounded-t-2xl p-4 pb-8">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="font-bold text-lg">配送地址</h3>
+                    <button onclick="closeAddressModal()" class="text-gray-400 text-xl">&times;</button>
+                </div>
+                <div class="space-y-3">
+                    <div>
+                        <label class="block text-sm text-gray-600 mb-1">收货人</label>
+                        <input type="text" id="addr-name" placeholder="姓名" class="w-full border rounded-lg px-3 py-2 text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-sm text-gray-600 mb-1">手机号</label>
+                        <input type="tel" id="addr-phone" placeholder="手机号" class="w-full border rounded-lg px-3 py-2 text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-sm text-gray-600 mb-1">详细地址</label>
+                        <textarea id="addr-detail" rows="2" placeholder="省市区+详细地址" class="w-full border rounded-lg px-3 py-2 text-sm"></textarea>
+                    </div>
+                </div>
+                <button onclick="saveAddress()" class="w-full mt-4 bg-purple-600 text-white py-3 rounded-xl font-medium">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = '/api/rental';
+        let itemData = null;
+        let rentalDays = 1;
+        let depositMode = 'deposit';
+
+        // 从URL获取参数
+        const urlParams = new URLSearchParams(window.location.search);
+        const itemId = urlParams.get('itemId');
+        const storeId = urlParams.get('storeId');
+        rentalDays = parseInt(urlParams.get('days')) || 1;
+        depositMode = urlParams.get('depositMode') || 'deposit';
+
+        // 加载商品信息
+        async function loadItem() {
+            if (!itemId) return alert('商品不存在');
+            try {
+                const resp = await fetch(`${API_BASE}/items/${itemId}`);
+                const data = await resp.json();
+                if (!data.success) return alert('商品不存在');
+                itemData = data.item;
+                renderOrder();
+            } catch(e) {
+                alert('加载失败');
+            }
+        }
+
+        function renderOrder() {
+            if (!itemData) return;
+
+            // 商品信息
+            document.getElementById('order-item-name').textContent = itemData.name;
+            document.getElementById('order-item-spec').textContent = 
+                [itemData.brand, itemData.size, itemData.color].filter(Boolean).join(' / ') || '';
+            document.getElementById('order-item-price').textContent = (itemData.dailyRate || 0).toFixed(2);
+            document.getElementById('order-rental-days').textContent = rentalDays;
+
+            // 图片
+            const img = itemData.images?.[0];
+            if (img) {
+                document.querySelector('#order-item-info img, #order-item-info .fa-diamond')?.closest('div')
+                    .innerHTML = `<img src="${img}" class="w-20 h-20 object-cover rounded-lg">`;
+            }
+
+            // 费用明细
+            const rentalCost = (itemData.dailyRate || 0) * rentalDays;
+            const deposit = depositMode === 'credit_free' ? 0 : (itemData.depositAmount || 0);
+            const deliveryFee = 0; // 配送费暂免
+            const total = rentalCost + deposit + deliveryFee;
+
+            document.getElementById('detail-daily-rate').textContent = (itemData.dailyRate || 0).toFixed(2);
+            document.getElementById('detail-days').textContent = rentalDays;
+            document.getElementById('detail-rental').textContent = rentalCost.toFixed(2);
+            document.getElementById('detail-deposit').textContent = deposit.toFixed(2);
+            document.getElementById('detail-delivery-fee').textContent = deliveryFee.toFixed(2);
+            document.getElementById('detail-total').textContent = total.toFixed(2);
+            document.getElementById('pay-total').textContent = total.toFixed(2);
+
+            // 加载保存的地址
+            loadSavedAddress();
+        }
+
+        function loadSavedAddress() {
+            try {
+                const addr = JSON.parse(localStorage.getItem('rental_delivery_address') || 'null');
+                if (addr) {
+                    document.getElementById('contact-name').textContent = addr.name;
+                    document.getElementById('contact-phone').textContent = addr.phone;
+                    document.getElementById('delivery-address').textContent = addr.address;
+                }
+            } catch(e) {}
+        }
+
+        function editAddress() {
+            // 预填
+            const name = document.getElementById('contact-name').textContent;
+            const phone = document.getElementById('contact-phone').textContent;
+            const addr = document.getElementById('delivery-address').textContent;
+            if (name !== '收货人') document.getElementById('addr-name').value = name;
+            if (phone !== '请填写手机号') document.getElementById('addr-phone').value = phone;
+            if (addr !== '请填写收货地址') document.getElementById('addr-detail').value = addr;
+            document.getElementById('address-modal').classList.remove('hidden');
+        }
+
+        function closeAddressModal() {
+            document.getElementById('address-modal').classList.add('hidden');
+        }
+
+        function saveAddress() {
+            const name = document.getElementById('addr-name').value.trim();
+            const phone = document.getElementById('addr-phone').value.trim();
+            const address = document.getElementById('addr-detail').value.trim();
+            if (!name || !phone || !address) return alert('请填写完整信息');
+
+            document.getElementById('contact-name').textContent = name;
+            document.getElementById('contact-phone').textContent = phone;
+            document.getElementById('delivery-address').textContent = address;
+
+            localStorage.setItem('rental_delivery_address', JSON.stringify({ name, phone, address }));
+            closeAddressModal();
+        }
+
+        async function submitOrder() {
+            const btn = document.getElementById('submit-btn');
+            btn.disabled = true;
+            btn.textContent = '提交中...';
+
+            const name = document.getElementById('contact-name').textContent;
+            const phone = document.getElementById('contact-phone').textContent;
+            const address = document.getElementById('delivery-address').textContent;
+            const deliveryType = document.querySelector('input[name="delivery-type"]:checked')?.value || 'courier';
+            const paymentMethod = document.querySelector('input[name="payment-method"]:checked')?.value || 'wechat';
+
+            if (deliveryType === 'courier' && (name === '收货人' || !address || address === '请填写收货地址')) {
+                alert('请填写配送地址');
+                btn.disabled = false;
+                btn.textContent = '提交订单';
+                return;
+            }
+
+            // 获取用户信息
+            let userId = 'anonymous';
+            try {
+                const user = JSON.parse(localStorage.getItem('currentUser') || '{}');
+                userId = user.id || user.userId || user.openId || 'anonymous';
+            } catch(e) {}
+
+            const orderData = {
+                userId,
+                storeId: itemData.storeId || storeId,
+                items: [{
+                    itemId: itemData._id,
+                    name: itemData.name,
+                    quantity: 1
+                }],
+                rentalDays,
+                depositMode,
+                deliveryMethod: deliveryType,
+                deliveryAddress: {
+                    contactName: name,
+                    contactPhone: phone,
+                    address
+                },
+                paymentMethod
+            };
+
+            try {
+                const resp = await fetch(`${API_BASE}/orders`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(orderData)
+                });
+                const data = await resp.json();
+
+                if (data.success) {
+                    const order = data.order;
+                    // 跳转到支付页或成功页
+                    alert(`订单创建成功！\n订单号: ${order.orderNo}\n合计: ¥${order.amounts.total.toFixed(2)}\n\n请在订单中查看进度`);
+                    window.location.href = 'c-orders.html';
+                } else {
+                    alert('下单失败: ' + (data.error || '未知错误'));
+                    btn.disabled = false;
+                    btn.textContent = '提交订单';
+                }
+            } catch(e) {
+                alert('下单异常: ' + e.message);
+                btn.disabled = false;
+                btn.textContent = '提交订单';
+            }
+        }
+
+        // 初始化
+        loadItem();
+    </script>
+</body>
+</html>

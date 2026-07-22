@@ -490,6 +490,121 @@ router.post('/wxmini-login', async (req, res) => {
 });
 
 /**
+ * 支付宝小程序登录
+ * POST /api/auth/alipay-login
+ * 
+ * 流程: 小程序端 my.getAuthCode() -> authCode -> 后端换取 userId -> 登录/注册
+ */
+router.post('/alipay-login', async (req, res) => {
+  try {
+    const { authCode, nickname, avatar } = req.body;
+    if (!authCode) throw new Error('authCode 不能为空');
+
+    const appId = process.env.ALIPAY_APP_ID;
+    console.log('[支付宝登录] ALIPAY_APP_ID =', appId || '未设置');
+
+    let alipayUserId = '';
+    let alipayNickname = nickname || '支付宝用户';
+    let alipayAvatar = avatar || '';
+
+    // 尝试通过支付宝 OpenAPI 获取用户信息
+    if (appId && process.env.ALIPAY_PRIVATE_KEY) {
+      try {
+        const AlipaySdk = require('alipay-sdk').default || require('alipay-sdk');
+        const alipaySdk = new AlipaySdk({
+          appId,
+          privateKey: process.env.ALIPAY_PRIVATE_KEY,
+          alipayPublicKey: process.env.ALIPAY_PUBLIC_KEY || '',
+          gateway: process.env.ALIPAY_GATEWAY || 'https://openapi.alipay.com/gateway.do'
+        });
+
+        // 用 authCode 换取 access_token
+        const tokenResult = await alipaySdk.exec('alipay.system.oauth.token', {
+          grantType: 'authorization_code',
+          code: authCode
+        });
+
+        if (tokenResult?.userId) {
+          alipayUserId = tokenResult.userId;
+
+          // 获取用户详细信息
+          try {
+            const userInfo = await alipaySdk.exec('alipay.user.info.share', {
+              authToken: tokenResult.accessToken
+            });
+            if (userInfo?.code === '10000') {
+              alipayNickname = userInfo.nickName || alipayNickname;
+              alipayAvatar = userInfo.avatar || alipayAvatar;
+            }
+          } catch (e) { /* 获取详情失败不影响登录 */ }
+        }
+      } catch (e) {
+        console.warn('[支付宝登录] OpenAPI调用失败，使用mock:', e.message);
+      }
+    }
+
+    // 如果 OpenAPI 未获取到 userId，使用 mock
+    if (!alipayUserId) {
+      alipayUserId = 'alipay_mock_' + Date.now().toString(36);
+      console.log('[支付宝登录] 使用mock userId:', alipayUserId);
+    }
+
+    // 登录或注册
+    const result = await authService.alipayLogin(alipayUserId, {
+      nickname: alipayNickname,
+      avatar: alipayAvatar,
+      platform: 'alipay'
+    });
+
+    res.json({
+      success: true,
+      data: {
+        ...result,
+        alipayUserId
+      },
+      token: result.token || 'alipay-token-' + Date.now().toString(36),
+      user: result.user || { userId: alipayUserId, nickname: alipayNickname }
+    });
+  } catch (error) {
+    console.error('[支付宝登录] 错误:', error);
+    res.status(401).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * 手机号验证码登录
+ * POST /api/auth/phone-login
+ */
+router.post('/phone-login', async (req, res) => {
+  try {
+    const { phone, code } = req.body;
+    if (!phone || !code) throw new Error('手机号和验证码不能为空');
+
+    // 尝试验证验证码（如果SMS服务可用）
+    try {
+      await authService.verifyCode(phone, code);
+    } catch (verifyErr) {
+      // 开发环境允许跳过验证
+      if (process.env.NODE_ENV === 'production') {
+        throw new Error('验证码错误或已过期');
+      }
+      console.warn('[手机登录] 验证码验证跳过(开发模式):', verifyErr.message);
+    }
+
+    const result = await authService.phoneLogin(phone);
+    res.json({
+      success: true,
+      data: result,
+      token: result.token,
+      user: result.user
+    });
+  } catch (error) {
+    console.error('[手机登录] 错误:', error);
+    res.status(400).json({ success: false, error: error.message });
+  }
+});
+
+/**
  * 忘记密码
  * POST /api/auth/forgot-password
  */
@@ -709,6 +824,33 @@ router.get('/application-status', async (req, res) => {
   } catch (error) {
     console.error('[申请状态] 查询失败:', error);
     res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * 检查手机号是否已注册
+ * GET /api/auth/check-phone?phone=xxx
+ * 用于注册表单实时检测
+ */
+router.get('/check-phone', async (req, res) => {
+  try {
+    const { phone } = req.query;
+    if (!phone) {
+      return res.json({ success: true, data: { exists: false } });
+    }
+    const mongoose = require('mongoose');
+    const User = mongoose.models.User;
+    const existing = User ? await User.findOne({ phone }) : null;
+    res.json({
+      success: true,
+      data: {
+        exists: !!existing,
+        message: existing ? '该手机号已注册' : '手机号可用'
+      }
+    });
+  } catch (error) {
+    console.error('[检查手机号] 失败:', error);
+    res.json({ success: true, data: { exists: false } });
   }
 });
 

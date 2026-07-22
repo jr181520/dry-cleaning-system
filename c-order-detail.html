@@ -615,6 +615,8 @@
       color: white;
     }
   </style>
+  <!-- 用户数据隔离模块 -->
+  <script src="js/user-data-isolation.js"></script>
 </head>
 <body>
   <div class="order-detail-page">
@@ -830,6 +832,30 @@
   
   <script src="frontend/order-tracker.js"></script>
   <script>
+    // 品类化状态标签映射
+    const CATEGORY_STATUS_LABELS = {
+      cleaning:           { paid:'待入库', received:'已入库', cleaning:'清洗中', cleaned:'清洗完成', ready:'待取件', processing:'清洗中' },
+      shoe_care:          { paid:'待入库', received:'已入库', cleaning:'清洗中', cleaned:'清洗完成', ready:'待取件', processing:'清洗中' },
+      luxury_care:        { paid:'待收件', received:'已收件', cleaning:'养护中', cleaned:'养护完成', ready:'待取件', processing:'养护中' },
+      pet_grooming:       { paid:'待接宠', received:'已接宠', cleaning:'洗护中', cleaned:'洗护完成', ready:'待接回', processing:'洗护中' },
+      electronics_repair: { paid:'待收件', received:'已收件', cleaning:'维修中', cleaned:'维修完成', ready:'待取件', processing:'维修中' }
+    };
+
+    // 品类化进度步骤标签
+    const CATEGORY_STEP_LABELS = {
+      cleaning:           { paid:'已支付', received:'已入库', processing:'处理中', cleaning:'清洗中', cleaned:'清洗完成', ready:'待取件' },
+      shoe_care:          { paid:'已支付', received:'已入库', processing:'处理中', cleaning:'清洗中', cleaned:'清洗完成', ready:'待取件' },
+      luxury_care:        { paid:'已支付', received:'已收件', processing:'处理中', cleaning:'养护中', cleaned:'养护完成', ready:'待取件' },
+      pet_grooming:       { paid:'已支付', received:'已接宠', processing:'处理中', cleaning:'洗护中', cleaned:'洗护完成', ready:'待接回' },
+      electronics_repair: { paid:'已支付', received:'已收件', processing:'处理中', cleaning:'维修中', cleaned:'维修完成', ready:'待取件' }
+    };
+
+    function getCategoryStatusText(status, categoryId) {
+      const catLabels = CATEGORY_STATUS_LABELS[categoryId];
+      if (catLabels && catLabels[status]) return catLabels[status];
+      return STATUS_CONFIG[status]?.text || status || '未知状态';
+    }
+
     // 订单状态配置（兼容后端状态值）
     const STATUS_CONFIG = {
       pending: { text: '待支付', icon: 'fa-clock', color: '#ff9800', gradient: 'linear-gradient(135deg, #ff9800, #ff5722)' },
@@ -958,7 +984,7 @@
             console.warn('[超时] 页面加载超时，强制显示');
             isPageLoading = false;
             // 再次尝试加载
-            const ordersStr = localStorage.getItem('orders');
+            const ordersStr = localStorage.getItem(getUserOrdersKey());
             const currentOrderStr = localStorage.getItem('currentOrder');
             if (ordersStr || currentOrderStr) {
               loadFromLocalStorageSync();
@@ -1220,7 +1246,7 @@
           // 如果items没有价格信息，尝试从本地存储获取
           if (!apiOrder.items || !apiOrder.items.some(i => i.price > 0)) {
             console.log('[API] API返回的items缺少价格，尝试从本地存储获取...');
-            const localOrders = JSON.parse(localStorage.getItem('orders') || '[]');
+            const localOrders = getUserOrders();
             const localOrder = localOrders.find(o => 
               o.orderId === orderId || 
               o.id === orderId || 
@@ -1248,7 +1274,7 @@
         console.log('[本地] 开始从localStorage加载订单, 目标orderId:', orderId);
         
         // 尝试从orders列表获取（支持多种ID格式匹配）
-        const ordersStr = localStorage.getItem('orders');
+        const ordersStr = localStorage.getItem(getUserOrdersKey());
         if (ordersStr) {
           const orders = JSON.parse(ordersStr);
           console.log('[本地] orders列表中有', orders.length, '个订单');
@@ -1399,6 +1425,13 @@
           courierMqttClient.on('error', (err) => {
             console.warn('[跑腿MQTT] 连接错误:', err.message);
           });
+
+          // 重连时刷新 clientId 避免 NanoMQ 会话冲突
+          courierMqttClient.on('reconnect', () => {
+            const newId = `c_courier_${orderId}_${Date.now()}`;
+            courierMqttClient.options.clientId = newId;
+            console.log('[跑腿MQTT] 重连中, 新clientId:', newId);
+          });
           
           courierMqttClient.on('close', () => {
             console.log('[跑腿MQTT] 连接断开，切换到轮询模式');
@@ -1465,7 +1498,7 @@
       
       try {
         // 更新 C 端 orders
-        const cOrders = JSON.parse(localStorage.getItem('orders') || '[]');
+        const cOrders = getUserOrders();
         const cIdx = cOrders.findIndex(o => 
           o.orderId === oid || o.id === oid || o._id === oid || o.orderNo === oid
         );
@@ -1477,7 +1510,7 @@
           } else {
             cOrders[cIdx] = { ...cOrders[cIdx], ...orderData };
           }
-          localStorage.setItem('orders', JSON.stringify(cOrders));
+          setUserOrders(cOrders);
         }
         
         // 更新 M 端 store_orders
@@ -1520,7 +1553,7 @@
       
       // 更新localStorage
       try {
-        const orders = JSON.parse(localStorage.getItem('orders') || '[]');
+        const orders = getUserOrders();
         const idx = orders.findIndex(o => 
           o.orderId === currentOrder.orderId || 
           o.id === currentOrder.orderId || 
@@ -1528,7 +1561,7 @@
         );
         if (idx > -1) {
           orders[idx].courier = currentOrder.courier;
-          localStorage.setItem('orders', JSON.stringify(orders));
+          setUserOrders(orders);
         }
       } catch (e) {}
       
@@ -1588,10 +1621,13 @@
       document.getElementById('liveIndicator').style.display = 'none';
       
       // 5. 3秒后自动返回订单列表
-      setTimeout(() => {
-        console.log('[跑腿跟踪] 自动返回订单列表');
-        returnToOrders();
-      }, 3000);
+      if (!sessionStorage.getItem('_completedAutoNav_' + orderId)) {
+        sessionStorage.setItem('_completedAutoNav_' + orderId, '1');
+        setTimeout(() => {
+          console.log('[跑腿跟踪] 配送已送达，自动返回订单列表');
+          returnToOrders();
+        }, 3000);
+      }
     }
     
     // 页面销毁时清理MQTT/轮询
@@ -1610,10 +1646,29 @@
     function updateOrderUI(order) {
       // 更新状态卡片
       const config = STATUS_CONFIG[order.status] || STATUS_CONFIG.pending;
+      const _catId = order.categoryId || 'cleaning';
       document.getElementById('statusCard').style.background = config.gradient;
       document.getElementById('statusIcon').innerHTML = `<i class="fas ${config.icon}"></i>`;
-      document.getElementById('statusText').textContent = config.text;
+      document.getElementById('statusText').textContent = getCategoryStatusText(order.status, _catId);
       document.getElementById('statusDesc').textContent = order.statusDescription || '';
+      
+      // 非待支付订单隐藏扫码支付横幅
+      if (order.status !== 'pending') {
+        const payBanner = document.getElementById('scanPayBanner');
+        if (payBanner) payBanner.classList.remove('show');
+      }
+      
+      // 品类化：更新进度步骤标签
+      const stepLabels = CATEGORY_STEP_LABELS[_catId];
+      if (stepLabels) {
+        document.querySelectorAll('.progress-step').forEach(step => {
+          const stepKey = step.dataset.step;
+          if (stepLabels[stepKey]) {
+            const label = step.querySelector('.step-label');
+            if (label) label.textContent = stepLabels[stepKey];
+          }
+        });
+      }
       
       // 更新进度条（根据配送方式选择流程）
       const isDeliveryOrder = order.deliveryMethod === 'home_delivery';
@@ -1783,27 +1838,33 @@
       
       // 恢复之前选择的取件方式（必须在updateBottomActions之前执行）
       if (order.status === 'ready' || order.status === 'store_outbound') {
-        document.getElementById('pickupMethodSection').style.display = 'block';
-        
-        // 根据订单的deliveryMethod恢复选择状态
-        if (order.deliveryMethod === 'courier') {
-          selectedPickupMethod = 'home_delivery';
-          document.querySelectorAll('.pickup-method-option').forEach(option => {
-            option.classList.remove('selected');
-            if (option.dataset.method === 'home_delivery') {
-              option.classList.add('selected');
-            }
-          });
-          document.getElementById('deliveryForm').classList.add('show');
+        // 如果配送费已支付，隐藏取件方式选择区域（第二程已启动，不需要再次选择）
+        if (order.deliveryFeePaid === true || order.deliveryStatus === 'awaiting_store_outbound') {
+          document.getElementById('pickupMethodSection').style.display = 'none';
+          selectedPickupMethod = 'home_delivery'; // 保持内部状态一致
         } else {
-          selectedPickupMethod = 'store_pickup';
-          document.querySelectorAll('.pickup-method-option').forEach(option => {
-            option.classList.remove('selected');
-            if (option.dataset.method === 'store_pickup') {
-              option.classList.add('selected');
-            }
-          });
-          document.getElementById('deliveryForm').classList.remove('show');
+          document.getElementById('pickupMethodSection').style.display = 'block';
+          
+          // 根据订单的deliveryMethod恢复选择状态
+          if (order.deliveryMethod === 'courier') {
+            selectedPickupMethod = 'home_delivery';
+            document.querySelectorAll('.pickup-method-option').forEach(option => {
+              option.classList.remove('selected');
+              if (option.dataset.method === 'home_delivery') {
+                option.classList.add('selected');
+              }
+            });
+            document.getElementById('deliveryForm').classList.add('show');
+          } else {
+            selectedPickupMethod = 'store_pickup';
+            document.querySelectorAll('.pickup-method-option').forEach(option => {
+              option.classList.remove('selected');
+              if (option.dataset.method === 'store_pickup') {
+                option.classList.add('selected');
+              }
+            });
+            document.getElementById('deliveryForm').classList.remove('show');
+          }
         }
       } else {
         document.getElementById('pickupMethodSection').style.display = 'none';
@@ -1875,13 +1936,81 @@
       const section = document.getElementById('courierTrackSection');
       const isCourier = (deliveryMethod === 'courier') || !!order.courier?.provider;
       
-      // 只要确认是跑腿订单就显示跟踪栏，数据可以在courier字段中或使用默认值
+      // 非跑腿订单不显示跟踪栏
       if (!isCourier) {
         if (section) section.style.display = 'none';
         return;
       }
       
-      if (section) section.style.display = 'block';
+      // === 第一程/第二程显隐控制 ===
+      const orderStatus = order.status || 'pending';
+      const courierStatus = (order.courier && order.courier.status) || 'awaiting_store_outbound';
+      const pickupMethod = order.pickupMethod || null;
+      
+      // 第一程已完成：门店已确认入库（received 及之后状态）
+      const firstLegComplete = ['received','cleaning','cleaned','ready','delivering_back','out','checked_out','completed','customer_received','awaiting_store_outbound'].includes(orderStatus) && orderStatus !== 'awaiting_store_confirm';
+      
+      // 第二程进行中：门店已出库 + 用户选择了跑腿送回
+      // 包含：配送费已支付但订单状态仍为 ready 的过渡期
+      const secondLegFeePaid = order.deliveryFeePaid === true || order.deliveryStatus === 'awaiting_store_outbound';
+      const secondLegActive = (['delivering_back','out','checked_out','courier_waiting','courier_picked_up','courier_delivering'].includes(orderStatus) && pickupMethod === 'home_delivery') || (secondLegFeePaid && orderStatus === 'ready');
+      
+      // 订单已完成或已取消：彻底隐藏跟踪栏
+      if (orderStatus === 'completed' || orderStatus === 'cancelled' || orderStatus === 'customer_received') {
+        console.log('[跑腿跟踪] 订单已结束，隐藏跟踪栏并停止轮询');
+        if (section) {
+          section.style.transition = 'all 0.5s ease';
+          section.style.opacity = '0';
+          setTimeout(() => { section.style.display = 'none'; }, 600);
+        }
+        if (courierPollTimer) { clearInterval(courierPollTimer); courierPollTimer = null; }
+        if (courierMqttClient) { courierMqttClient.end(true); courierMqttClient = null; }
+        return;
+      }
+      
+      // 第一程完成后隐藏跟踪栏（第二程尚未启动时）
+      if (firstLegComplete && !secondLegActive) {
+        console.log('[跑腿跟踪] 第一程已完成，隐藏跟踪栏并停止轮询');
+        if (section) {
+          section.style.transition = 'all 0.5s ease';
+          section.style.opacity = '0';
+          section.style.maxHeight = section.offsetHeight + 'px';
+          requestAnimationFrame(() => {
+            section.style.maxHeight = '0';
+            section.style.padding = '0';
+            section.style.margin = '0';
+            section.style.overflow = 'hidden';
+          });
+          setTimeout(() => { section.style.display = 'none'; }, 600);
+        }
+        // 停止第一程轮询和MQTT订阅
+        if (courierPollTimer) {
+          clearInterval(courierPollTimer);
+          courierPollTimer = null;
+        }
+        if (courierMqttClient) {
+          courierMqttClient.end(true);
+          courierMqttClient = null;
+        }
+        return;
+      }
+      
+      // 显示跟踪栏（第一程进行中 或 第二程进行中）
+      if (section) {
+        section.style.display = 'block';
+        section.style.opacity = '1';
+        section.style.maxHeight = '';
+        section.style.padding = '';
+        section.style.margin = '';
+        section.style.overflow = '';
+      }
+      
+      // 第二程启动时，如果轮询已停止则重新启动
+      if (secondLegActive && !courierPollTimer && !courierMqttClient) {
+        console.log('[跑腿跟踪] 第二程启动，重新订阅跑腿状态');
+        deliveryDeliveredHandled = false; // 重置送达标记，允许第二程送达时触发处理
+        startCourierMqttSubscription();
+      }
       
       // 安全读取courier字段，缺失时使用默认值（兼容老订单）
       const courier = order.courier || {};
@@ -2179,11 +2308,11 @@
       }
       
       // 更新localStorage
-      const orders = JSON.parse(localStorage.getItem('orders') || '[]');
+      const orders = getUserOrders();
       const idx = orders.findIndex(o => o.orderId === orderId || o.id === orderId);
       if (idx > -1) {
         orders[idx] = currentOrder;
-        localStorage.setItem('orders', JSON.stringify(orders));
+        setUserOrders(orders);
       }
       localStorage.setItem('currentOrder', JSON.stringify(currentOrder));
       
@@ -2240,12 +2369,12 @@
             currentOrder.deliveryFee = 0;
             
             // 更新localStorage
-            const orders = JSON.parse(localStorage.getItem('orders') || '[]');
+            const orders = getUserOrders();
             const idx = orders.findIndex(o => o.orderId === orderId || o.id === orderId);
             if (idx > -1) {
               orders[idx].deliveryMethod = 'courier';
               orders[idx].deliveryFee = 0;
-              localStorage.setItem('orders', JSON.stringify(orders));
+              setUserOrders(orders);
             }
             localStorage.setItem('currentOrder', JSON.stringify(currentOrder));
             
@@ -2279,6 +2408,12 @@
       const mainBtn = document.getElementById('mainAction');
       const secondaryBtn = document.getElementById('secondaryAction');
       
+      // 重置按钮可见性（防止上一个状态的 display:none 残留）
+      if (mainBtn) {
+        mainBtn.style.display = '';
+        mainBtn.disabled = false;
+      }
+      
       // 默认左侧按钮为"联系门店"
       if (secondaryBtn) {
         secondaryBtn.textContent = '联系门店';
@@ -2310,7 +2445,17 @@
           break;
         case 'ready':
           // 待取件状态，根据取件方式显示不同按钮
-          if (selectedPickupMethod === 'store_pickup') {
+          // 第二程配送费已支付：显示等待门店出库状态
+          if (currentOrder?.deliveryFeePaid === true || currentOrder?.deliveryStatus === 'awaiting_store_outbound') {
+            mainBtn.textContent = '等待门店出库...';
+            mainBtn.className = 'btn-action btn-outline';
+            mainBtn.onclick = () => alert('配送费已支付，门店正在备货出库，骑手取件后将实时更新配送进度。');
+            mainBtn.disabled = true;
+            if (secondaryBtn) {
+              secondaryBtn.textContent = '联系门店';
+              secondaryBtn.onclick = viewStore;
+            }
+          } else if (selectedPickupMethod === 'store_pickup') {
             // 门店自取：显示"扫码取件"按钮
             mainBtn.textContent = '扫码取件';
             mainBtn.className = 'btn-action btn-success';
@@ -2337,7 +2482,8 @@
                 orderId: orderId,
                 address: addr,
                 contact: contact,
-                phone: phone
+                phone: phone,
+                categoryId: (currentOrder?.categoryId || 'cleaning')
               });
               window.location.href = `c-courier-select.html?${params.toString()}`;
             };
@@ -2458,11 +2604,11 @@
     // 更新订单到localStorage
     function updateOrderLocalStorage() {
       // 更新orders列表
-      const orders = JSON.parse(localStorage.getItem('orders') || '[]');
+      const orders = getUserOrders();
       const idx = orders.findIndex(o => o.orderId === orderId || o.id === orderId);
       if (idx > -1) {
         orders[idx] = { ...orders[idx], ...currentOrder };
-        localStorage.setItem('orders', JSON.stringify(orders));
+        setUserOrders(orders);
       }
       // 更新currentOrder
       localStorage.setItem('currentOrder', JSON.stringify(currentOrder));
@@ -2662,12 +2808,12 @@
           currentOrder.completedAt = new Date().toISOString();
           
           // 更新localStorage
-          const orders = JSON.parse(localStorage.getItem('orders') || '[]');
+          const orders = getUserOrders();
           const idx = orders.findIndex(o => o.orderId === orderId || o.id === orderId);
           if (idx > -1) {
             orders[idx].status = 'completed';
             orders[idx].completedAt = currentOrder.completedAt;
-            localStorage.setItem('orders', JSON.stringify(orders));
+            setUserOrders(orders);
           }
           localStorage.setItem('currentOrder', JSON.stringify(currentOrder));
           
@@ -2684,12 +2830,12 @@
         currentOrder.completedAt = new Date().toISOString();
         
         // 更新localStorage
-        const orders = JSON.parse(localStorage.getItem('orders') || '[]');
+        const orders = getUserOrders();
         const idx = orders.findIndex(o => o.orderId === orderId || o.id === orderId);
         if (idx > -1) {
           orders[idx].status = 'completed';
           orders[idx].completedAt = currentOrder.completedAt;
-          localStorage.setItem('orders', JSON.stringify(orders));
+          setUserOrders(orders);
         }
         localStorage.setItem('currentOrder', JSON.stringify(currentOrder));
         
@@ -2878,6 +3024,16 @@
       // 更新页面标题
       document.title = `订单详情 - ${getStatusText(order.status)}`;
       
+      // 订单完成 → 自动返回订单列表（配送流程走完后）
+      if (order.status === 'completed' && !sessionStorage.getItem('_completedAutoNav_' + orderId)) {
+        sessionStorage.setItem('_completedAutoNav_' + orderId, '1');
+        showToast('✅ 订单已完成，即将返回订单列表', 'success');
+        setTimeout(() => {
+          console.log('[状态轮询] 订单已完成，自动返回订单列表');
+          returnToOrders();
+        }, 3000);
+      }
+      
       // 防抖锁定 1 秒
       setTimeout(() => {
         updatePending = false;
@@ -2915,7 +3071,7 @@
         // 如果当前状态不是 pending，不接受从 API/localStorage 返回的 pending 状态
         if (lastKnownOrderStatus && lastKnownOrderStatus !== 'pending') {
           // 检查 localStorage
-          const ordersStr = localStorage.getItem('orders');
+          const ordersStr = localStorage.getItem(getUserOrdersKey());
           if (ordersStr) {
             const orders = JSON.parse(ordersStr);
             const order = orders.find(o => 
@@ -2929,7 +3085,7 @@
         }
         
         // 3. 首先检查localStorage是否有更新（M端会实时更新这里）
-        const ordersStr = localStorage.getItem('orders');
+        const ordersStr = localStorage.getItem(getUserOrdersKey());
         if (ordersStr) {
           const orders = JSON.parse(ordersStr);
           const order = orders.find(o => 

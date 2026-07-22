@@ -364,15 +364,27 @@ Page({
       console.log('[创建订单] 用户ID:', userId);
       console.log('[创建订单] 订单数据:', JSON.stringify(orderData, null, 2));
       
+      // 获取品类信息
+      const categoryId = app.globalData.orderCategory || 'cleaning';
+      // 品类类型映射（service/rental）
+      const categoryTypeMap = {
+        cleaning: 'service', shoe_care: 'service', luxury_care: 'service',
+        pet_grooming: 'service', electronics_repair: 'service',
+        rental: 'rental', rental_leisure: 'rental'
+      };
+      const categoryType = categoryTypeMap[categoryId] || 'service';
+      
       // 准备订单数据
       const orderPayload = {
         userId: userId,
         storeId: orderData.store?.storeId || orderData.store?.id || 'ST001',
+        categoryId: categoryId,
+        categoryType: categoryType,
         items: orderData.services.map(service => ({
           name: service.name,
           price: service.price,
           quantity: 1,
-          serviceType: 'dry_clean'
+          serviceType: categoryId
         })),
         deliveryMethod: orderData.deliveryMethod,
         selectedProvider: orderData.provider ? {

@@ -1,0 +1,145 @@
+.page {
+  min-height: 100vh;
+  background: #f5f5f5;
+  padding-bottom: env(safe-area-inset-bottom);
+}
+.loading-wrap {
+  display: flex;
+  justify-content: center;
+  padding: 200rpx 0;
+}
+.text-gray { font-size: 28rpx; color: #9ca3af; }
+
+/* 轮播 */
+.image-swiper { height: 750rpx; }
+.swiper-image { width: 100%; height: 750rpx; }
+
+/* 通用 section */
+.section-title {
+  font-size: 30rpx;
+  font-weight: 600;
+  color: #1f2937;
+  margin-bottom: 20rpx;
+  display: block;
+}
+
+/* 商品信息 */
+.product-section {
+  background: #fff;
+  padding: 28rpx 28rpx 24rpx;
+  margin-bottom: 16rpx;
+}
+.product-name {
+  font-size: 36rpx;
+  font-weight: 700;
+  color: #111827;
+  line-height: 1.4;
+  display: block;
+}
+.tag-row { display: flex; gap: 12rpx; margin-top: 14rpx; }
+.brand-tag, .category-tag {
+  font-size: 22rpx;
+  padding: 4rpx 14rpx;
+  border-radius: 6rpx;
+  background: #ede9fe;
+  color: #7c3aed;
+}
+.price-row {
+  display: flex;
+  align-items: baseline;
+  gap: 6rpx;
+  margin-top: 20rpx;
+}
+.daily-price { font-size: 48rpx; font-weight: 700; color: #7c3aed; }
+.price-unit { font-size: 24rpx; color: #9ca3af; }
+.deposit-badge {
+  margin-left: 16rpx;
+  font-size: 22rpx;
+  padding: 6rpx 16rpx;
+  border-radius: 8rpx;
+}
+.deposit-badge.deposit { background: #fef3c7; color: #92400e; }
+.deposit-badge.credit_free { background: #dbeafe; color: #1e40af; }
+.deposit-badge.both { background: #ede9fe; color: #7c3aed; }
+.stock-text { font-size: 24rpx; color: #9ca3af; margin-top: 10rpx; display: block; }
+
+/* 规格 */
+.specs-section { background: #fff; padding: 28rpx; margin-bottom: 16rpx; }
+.specs-grid { display: flex; flex-wrap: wrap; gap: 24rpx 40rpx; }
+.spec-label { font-size: 22rpx; color: #9ca3af; display: block; }
+.spec-value { font-size: 26rpx; color: #374151; margin-top: 4rpx; display: block; }
+
+/* 租期 */
+.period-section { background: #fff; padding: 28rpx; margin-bottom: 16rpx; }
+.period-presets { display: flex; flex-wrap: wrap; gap: 16rpx; }
+.period-btn {
+  padding: 16rpx 36rpx;
+  border-radius: 12rpx;
+  font-size: 26rpx;
+  background: #f3f4f6;
+  color: #374151;
+  border: 2rpx solid transparent;
+}
+.period-btn.active {
+  background: #ede9fe;
+  color: #7c3aed;
+  border-color: #7c3aed;
+}
+.period-custom {
+  display: flex;
+  align-items: center;
+  gap: 8rpx;
+  background: #f3f4f6;
+  border-radius: 12rpx;
+  padding: 0 20rpx;
+}
+.custom-input { width: 100rpx; font-size: 26rpx; height: 56rpx; }
+.custom-unit { font-size: 24rpx; color: #9ca3af; }
+
+/* 押金方式 */
+.deposit-section { background: #fff; padding: 28rpx; margin-bottom: 16rpx; }
+.deposit-options { display: flex; gap: 20rpx; }
+.deposit-card {
+  flex: 1;
+  border: 2rpx solid #e5e7eb;
+  border-radius: 16rpx;
+  padding: 24rpx;
+  display: flex;
+  flex-direction: column;
+  gap: 8rpx;
+}
+.deposit-card.active { border-color: #7c3aed; background: #faf5ff; }
+.deposit-card-title { font-size: 28rpx; font-weight: 600; color: #1f2937; }
+.deposit-card-desc { font-size: 22rpx; color: #6b7280; }
+.deposit-card-price { font-size: 32rpx; font-weight: 700; color: #7c3aed; margin-top: 8rpx; }
+
+/* 描述 & 须知 */
+.desc-section, .notes-section { background: #fff; padding: 28rpx; margin-bottom: 16rpx; }
+.desc-text, .notes-text { font-size: 26rpx; color: #4b5563; line-height: 1.7; white-space: pre-wrap; }
+
+/* 底部 */
+.bottom-placeholder { height: 140rpx; }
+.bottom-bar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20rpx 28rpx;
+  padding-bottom: calc(20rpx + env(safe-area-inset-bottom));
+  box-shadow: 0 -4rpx 20rpx rgba(0,0,0,0.06);
+}
+.bar-label { font-size: 24rpx; color: #6b7280; }
+.bar-total { font-size: 44rpx; font-weight: 700; color: #7c3aed; }
+.bar-deposit { font-size: 22rpx; color: #9ca3af; margin-left: 8rpx; }
+.bar-btn {
+  background: #7c3aed;
+  color: #fff;
+  font-size: 30rpx;
+  font-weight: 600;
+  padding: 22rpx 56rpx;
+  border-radius: 44rpx;
+}

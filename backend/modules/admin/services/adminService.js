@@ -65,12 +65,20 @@ class AdminService {
       items: [{
         itemId: String,
         name: String,
+        serviceName: String,
         itemType: String,
         serviceType: String,
         price: Number,
         quantity: Number,
         subtotal: Number,
-        status: String
+        barcode: String,
+        status: String,
+        itemStatus: String,
+        statusUpdatedAt: Date,
+        receivedAt: Date,
+        outboundTime: Date,
+        image: String,
+        category: String
       }],
       amounts: {
         subtotal: Number,

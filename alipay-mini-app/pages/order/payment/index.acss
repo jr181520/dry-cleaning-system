@@ -1,0 +1,23 @@
+.container { padding: 20rpx; }
+.order-card, .fee-card, .payment-card { background: #fff; border-radius: 12rpx; padding: 30rpx; margin-bottom: 20rpx; box-shadow: 0 2rpx 10rpx rgba(0,0,0,0.05); }
+.card-title { display: block; font-size: 32rpx; font-weight: bold; margin-bottom: 30rpx; }
+.order-item { display: flex; justify-content: space-between; align-items: center; padding: 20rpx 0; border-bottom: 1rpx solid #f0f0f0; }
+.order-item:last-child { border-bottom: none; }
+.item-name { font-size: 28rpx; flex: 1; }
+.item-right { display: flex; align-items: center; }
+.item-qty { font-size: 26rpx; color: #999; margin-right: 20rpx; }
+.item-price { font-size: 28rpx; font-weight: bold; }
+.fee-item { display: flex; justify-content: space-between; align-items: center; padding: 20rpx 0; }
+.fee-item.total { border-top: 2rpx solid #f0f0f0; padding-top: 30rpx; margin-top: 10rpx; }
+.fee-label { font-size: 28rpx; color: #666; }
+.fee-value { font-size: 28rpx; }
+.fee-item.total .fee-value { font-size: 36rpx; font-weight: bold; color: #1677ff; }
+.payment-option { display: flex; justify-content: space-between; align-items: center; padding: 30rpx 0; border-bottom: 1rpx solid #f0f0f0; }
+.payment-option:last-child { border-bottom: none; }
+.payment-option.selected { background: #e6f7ff; margin: 0 -30rpx; padding: 30rpx; border-radius: 8rpx; }
+.payment-info { display: flex; align-items: center; }
+.payment-icon { font-size: 40rpx; margin-right: 20rpx; }
+.payment-name { font-size: 30rpx; }
+.check-icon { width: 40rpx; height: 40rpx; border-radius: 50%; border: 2rpx solid #e8e8e8; display: flex; align-items: center; justify-content: center; font-size: 28rpx; color: #999; }
+.check-icon.checked { background: #1677ff; color: #fff; border-color: #1677ff; }
+.pay-btn { width: 100%; height: 100rpx; background: #1677ff; color: #fff; border-radius: 50rpx; font-size: 32rpx; font-weight: bold; border: none; box-shadow: 0 8rpx 30rpx rgba(22,119,255,0.3); margin-top: 40rpx; }
