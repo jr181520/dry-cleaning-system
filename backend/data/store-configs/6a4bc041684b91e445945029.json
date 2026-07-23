@@ -1,5 +1,5 @@
 {
-  "storeId": "6a5caa0f0d71bd6ca9fef4b8",
+  "storeId": "6a4bc041684b91e445945029",
   "categories": [
     {
       "id": "cat_biz",
@@ -159,41 +159,6 @@
       "enabled": true
     },
     {
-      "id": "kimono",
-      "name": "和服",
-      "category": "租衣",
-      "price": 130,
-      "icon": "🎎",
-      "desc": "日式传统和服，含木履配饰",
-      "unit": "/天",
-      "deposit": 400,
-      "sizePricing": null,
-      "isBoarding": false,
-      "diagnostic": false,
-      "images": [],
-      "videoUrl": "",
-      "duration": 0,
-      "process": "",
-      "materials": "",
-      "brand": "",
-      "sizes": [
-        "M",
-        "L",
-        "均码"
-      ],
-      "size": "M,L,均码",
-      "color": "",
-      "weeklyRate": 780,
-      "monthlyRate": 2600,
-      "creditMode": "deposit",
-      "creditScoreThreshold": 0,
-      "rentalPeriodMin": 1,
-      "rentalPeriodMax": 15,
-      "totalStock": 2,
-      "tags": [],
-      "enabled": true
-    },
-    {
       "id": "cosplay",
       "name": "演出服",
       "category": "租衣",
@@ -294,6 +259,6 @@
       "enabled": false
     }
   ],
-  "updatedAt": 1784797921639,
-  "savedAt": "2026-07-23T09:12:01.641Z"
+  "updatedAt": 1784778828732,
+  "savedAt": "2026-07-23T03:53:48.734Z"
 }

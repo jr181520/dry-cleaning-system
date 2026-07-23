@@ -50,7 +50,7 @@
       "id": "svc_3",
       "name": "羽绒服清洗",
       "category": "衣物清洗",
-      "price": 68,
+      "price": 80,
       "icon": "🧥",
       "desc": "杀菌除螨护理",
       "enabled": true
@@ -59,7 +59,7 @@
       "id": "svc_4",
       "name": "运动鞋清洗",
       "category": "鞋子护理",
-      "price": 38,
+      "price": 40,
       "icon": "👟",
       "desc": "深度清洁保养",
       "enabled": true
@@ -130,13 +130,6 @@
       "enabled": false
     }
   ],
-  "updatedAt": 1782629406036,
-  "savedAt": "2026-06-28T06:50:06.057Z",
-  "boardingConfig": {
-    "small_dog": 30,
-    "medium_dog": 50,
-    "large_dog": 80,
-    "cat": 40,
-    "foodPerDay": 15
-  }
+  "updatedAt": 1784798459386,
+  "savedAt": "2026-07-23T09:20:59.389Z"
 }

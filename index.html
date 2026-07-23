@@ -2145,12 +2145,16 @@
             
             window.closeStoreAccountModal();
             
-            // 更新UI而不刷新
-            var headerName = document.getElementById('current-user-name');
-            if (headerName) headerName.textContent = storeName;
-            
-            // 应用角色权限
-            if (typeof applyRoleAccess === 'function') applyRoleAccess();
+            // 从API获取门店品类并更新，然后刷新页面
+            _fetchStoreCategoryThen(function() {
+                // 更新UI
+                var headerName = document.getElementById('current-user-name');
+                if (headerName) headerName.textContent = storeName;
+                // 应用角色权限
+                if (typeof applyRoleAccess === 'function') applyRoleAccess();
+                // 如果当前在设置页，重新初始化
+                if (typeof initStoreSettings === 'function') initStoreSettings();
+            });
             
             console.log('[已切换门店]', storeName);
         };
@@ -2426,9 +2430,11 @@
                 });
             }
             
-            // 初始化门店设置功能
+            // 初始化门店设置功能 - 先从API加载门店品类信息
             if (typeof initStoreSettings === 'function') {
-                setTimeout(initStoreSettings, 100);
+                setTimeout(function() {
+                    _fetchStoreCategoryThen(function() { initStoreSettings(); });
+                }, 100);
             }
             
             // 移动端关闭侧边栏
@@ -3918,9 +3924,11 @@
                 setTimeout(() => window.dispatchEvent(new Event('reloadOrders')), 50);
             }
             
-            // 切换到门店设置时初始化设置界面
+            // 切换到门店设置时初始化设置界面 - 先从API加载门店品类信息
             if (section === 'store-settings') {
-                setTimeout(() => initStoreSettings(), 100);
+                setTimeout(function() {
+                    _fetchStoreCategoryThen(function() { initStoreSettings(); });
+                }, 100);
             }
             
             // 在移动端关闭侧边栏
@@ -6787,6 +6795,47 @@
         // ============================================
         // 门店设置管理 - 品类化增强版
         // ============================================
+        
+        // 从API获取门店品类信息并写入localStorage，完成后执行回调
+        function _fetchStoreCategoryThen(callback) {
+            var cs = JSON.parse(localStorage.getItem('currentStore') || '{}');
+            var su = JSON.parse(localStorage.getItem('storeUser') || '{}');
+            var storeId = cs.storeId || su.storeId || cs.storeNo || 'ST001';
+            // 如果已有缓存且门店ID未变，直接用缓存
+            if (cs.businessCategory && cs._storeIdCached === storeId) {
+                if (callback) callback();
+                return;
+            }
+            var ab = typeof getApiBaseUrl === 'function' ? getApiBaseUrl() : 'http://localhost:3000/api';
+            fetch(ab + '/cleaning/merchant/stores?storeId=' + storeId).then(function(r) { return r.json(); }).then(function(result) {
+                if (result.success && result.data && result.data.length > 0) {
+                    // 缓存门店列表
+                    try { localStorage.setItem('_merchantStores_cache', JSON.stringify(result.data)); } catch(e) {}
+                    // 找到当前门店并更新businessCategory
+                    var st = result.data.find(function(s) { return s.storeId === storeId || s.storeNo === storeId; });
+                    if (st && st.businessCategory) {
+                        // 确保currentStore有基础信息
+                        if (!cs.storeId) { cs.storeId = storeId; cs.storeName = st.name || ''; }
+                        cs.businessCategory = st.businessCategory;
+                        cs._storeIdCached = storeId;
+                        localStorage.setItem('currentStore', JSON.stringify(cs));
+                        // 同步更新storeUser
+                        try {
+                            if (!su.storeId) { su.storeId = storeId; }
+                            su.businessCategory = st.businessCategory;
+                            localStorage.setItem('storeUser', JSON.stringify(su));
+                        } catch(e) {}
+                        console.log('[品类同步] storeId=' + storeId + ' -> businessCategory=' + st.businessCategory);
+                    }
+                }
+                if (callback) callback();
+            }).catch(function(e) {
+                console.warn('[品类同步] API请求失败:', e.message);
+                if (callback) callback();
+            });
+        }
+        window._fetchStoreCategoryThen = _fetchStoreCategoryThen;
+        
 var BIZ_SERVICES = {
     cleaning: [
         { id: 'suit_dry', icon: '👔', name: '西装干洗', price: 50, unit: '件', desc: '专业熨烫定型', duration: 60, process: '1. 检查面料\n2. 预处理污渍\n3. 干洗清洗\n4. 熨烫定型', materials: '进口干洗溶剂、天然柔顺剂' },
@@ -6864,14 +6913,14 @@ function initStoreSettings() {
             var cached = localStorage.getItem('_merchantStores_cache');
             if (cached) { var sts = JSON.parse(cached); var tid2 = (cs && cs.storeId) || (su && su.storeId) || ''; var f = sts.find(function(s) { return s.storeId === tid2 || s.storeNo === tid2; }); if (f && f.businessCategory) bizCategory = f.businessCategory; }
         }
-        if (bizCategory === 'cleaning' && cs && !cs.businessCategory) {
+        if (bizCategory === 'cleaning' && cs && (!cs.businessCategory || cs._storeIdCached !== ((cs && cs.storeId) || (su && su.storeId) || ''))) {
             var sid = (cs && cs.storeId) || (su && su.storeId) || '';
             if (sid) { var ab = typeof getApiBaseUrl === 'function' ? getApiBaseUrl() : 'http://localhost:3000/api';
                 fetch(ab + '/cleaning/merchant/stores?storeId=' + sid).then(function(r){return r.json();}).then(function(result) {
                     if (result.success && result.data && result.data.length > 0) {
                         _merchantStores = result.data; localStorage.setItem('_merchantStores_cache', JSON.stringify(result.data));
                         var st = result.data.find(function(s){return s.storeId===sid||s.storeNo===sid;});
-                        if (st && st.businessCategory) { bizCategory=st.businessCategory; if(cs){cs.businessCategory=bizCategory;localStorage.setItem('currentStore',JSON.stringify(cs));} setTimeout(function(){initStoreSettings();},200); }
+                        if (st && st.businessCategory) { bizCategory=st.businessCategory; if(cs){cs.businessCategory=bizCategory;cs._storeIdCached=sid;localStorage.setItem('currentStore',JSON.stringify(cs));} try{var su2=JSON.parse(localStorage.getItem('storeUser')||'{}');su2.businessCategory=bizCategory;localStorage.setItem('storeUser',JSON.stringify(su2));}catch(e){} setTimeout(function(){initStoreSettings();},200); }
                     }
                 }).catch(function(){}); }
         }
@@ -6896,7 +6945,7 @@ function initStoreSettings() {
         config._bizCategory = bizCategory; StoreConfig.saveConfig(null, config);
     }
     if (!config._bizCategory) { config._bizCategory = bizCategory; StoreConfig.saveConfig(null, config); }
-    window._switchBizCategory = function(catId) { if (catId===bizCategory) return; if (!confirm('切换到「'+BIZ_INFO[catId].name+'」将重置服务列表，确定？')) return; var cs2=JSON.parse(localStorage.getItem('currentStore')||'{}'); cs2.businessCategory=catId; localStorage.setItem('currentStore',JSON.stringify(cs2)); try{var su2=JSON.parse(localStorage.getItem('storeUser')||'{}');su2.businessCategory=catId;localStorage.setItem('storeUser',JSON.stringify(su2));}catch(e){} initStoreSettings(); };
+    window._switchBizCategory = function(catId) { if (catId===bizCategory) return; if (!confirm('切换到「'+BIZ_INFO[catId].name+'」将重置服务列表，确定？')) return; var cs2=JSON.parse(localStorage.getItem('currentStore')||'{}'); cs2.businessCategory=catId; cs2._storeIdCached=cs2.storeId||''; localStorage.setItem('currentStore',JSON.stringify(cs2)); try{var su2=JSON.parse(localStorage.getItem('storeUser')||'{}');su2.businessCategory=catId;localStorage.setItem('storeUser',JSON.stringify(su2));}catch(e){} initStoreSettings(); };
     var activeTab = 'services'; var editing = { type: null, idx: -1 };
     function save() { StoreConfig.saveConfig(null, config); renderToast('✅ 设置已保存'); }
     function renderToast(msg) { var t=document.createElement('div'); t.style.cssText='position:fixed;top:20px;right:20px;background:#10b981;color:white;padding:12px 20px;border-radius:8px;z-index:9999;box-shadow:0 4px 12px rgba(0,0,0,0.15);transition:opacity 0.3s;'; t.textContent=msg; document.body.appendChild(t); setTimeout(function(){t.style.opacity='0';setTimeout(function(){t.remove();},300);},2000); }

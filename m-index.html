@@ -2736,11 +2736,27 @@
             // 关闭模态框
             closeStoreAccountModal();
             
-            // 提示用户
-            alert(`已切换到门店：${storeName}（${storeId}）`);
-            
-            // 刷新页面
-            location.reload();
+            // 从API获取门店品类并更新，然后刷新页面
+            var ab = typeof getApiBaseUrl === 'function' ? getApiBaseUrl() : 'http://localhost:3000/api';
+            fetch(ab + '/cleaning/merchant/stores?storeId=' + storeId).then(function(r) { return r.json(); }).then(function(result) {
+                if (result.success && result.data && result.data.length > 0) {
+                    try { localStorage.setItem('_merchantStores_cache', JSON.stringify(result.data)); } catch(e) {}
+                    var st = result.data.find(function(s) { return s.storeId === storeId || s.storeNo === storeId; });
+                    if (st && st.businessCategory) {
+                        var cs2 = JSON.parse(localStorage.getItem('currentStore') || '{}');
+                        cs2.businessCategory = st.businessCategory;
+                        cs2._storeIdCached = storeId;
+                        localStorage.setItem('currentStore', JSON.stringify(cs2));
+                        var su2 = JSON.parse(localStorage.getItem('storeUser') || '{}');
+                        su2.businessCategory = st.businessCategory;
+                        localStorage.setItem('storeUser', JSON.stringify(su2));
+                        console.log('[品类同步] storeId=' + storeId + ' -> businessCategory=' + st.businessCategory);
+                    }
+                }
+            }).catch(function(e) { console.warn('[品类同步] 失败:', e.message); }).finally(function() {
+                alert(`已切换到门店：${storeName}（${storeId}）`);
+                location.reload();
+            });
         }
         
         // 关闭门店账号模态框
@@ -6759,7 +6775,14 @@
                         var primary = result.data.find(function(s) { return s.storeId === primaryStoreId || s.storeNo === primaryStoreId; });
                         if (primary && primary.businessCategory && csObj.storeId) {
                             csObj.businessCategory = primary.businessCategory;
+                            csObj._storeIdCached = primaryStoreId;
                             localStorage.setItem('currentStore', JSON.stringify(csObj));
+                            // 同步更新storeUser
+                            try {
+                                var su2 = JSON.parse(localStorage.getItem('storeUser') || '{}');
+                                su2.businessCategory = primary.businessCategory;
+                                localStorage.setItem('storeUser', JSON.stringify(su2));
+                            } catch(e) {}
                         }
                     } catch(e) {}
                     // 同时收集 storeId(storeNo) 和 _id，确保能匹配订单中的任一格式
@@ -15028,7 +15051,14 @@ ${(order.items || order.services || []).map((item, idx) => `${idx + 1}. ${item.n
                 try {
                     var cs = JSON.parse(localStorage.getItem('currentStore') || '{}');
                     cs.businessCategory = newCat;
+                    cs._storeIdCached = cs.storeId || '';
                     localStorage.setItem('currentStore', JSON.stringify(cs));
+                    // 同步更新storeUser
+                    try {
+                        var su2 = JSON.parse(localStorage.getItem('storeUser') || '{}');
+                        su2.businessCategory = newCat;
+                        localStorage.setItem('storeUser', JSON.stringify(su2));
+                    } catch(e) {}
                 } catch(e) {}
                 // 清除旧的品类标记以强制重新填充
                 try {
